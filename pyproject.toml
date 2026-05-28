@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whipper-gui"
+version = "0.0.1"
+description = "Linux GUI front-end for the whipper audio-CD ripping CLI"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Whipper GUI contributors" }]
+keywords = ["audio", "cd", "rip", "flac", "musicbrainz", "whipper", "qt"]
+# License is intentionally unset until KDD-10 is resolved.
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: CD Audio :: CD Ripping",
+]
+dependencies = [
+    "PySide6>=6.7,<7",
+    "musicbrainzngs==0.7.1",
+    "tomli-w>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
+[project.scripts]
+# Console-script entry — used by pipx install and the AppImage's AppRun.
+whipper-gui = "whipper_gui.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip"
+
+[tool.setuptools.packages.find]
+where = ["src"]

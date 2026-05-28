@@ -17,9 +17,10 @@ When a task changes status, update it here in the same commit as the code change
 
 ### Foundation
 
-- [ ] T01 — Repo scaffolding
+- [x] T01 — Repo scaffolding
       Acceptance: `pyproject.toml`, `.gitignore`, `src/whipper_gui/__init__.py` (with `__version__`), `src/whipper_gui/__main__.py` (calls `app.main`), empty `tests/`, empty `build/` directory exist. `python -m whipper_gui` runs and exits cleanly with a placeholder message.
       Phase: P0
+      Done: pyproject.toml uses setuptools src-layout; `app.py` carries a placeholder `main()` so the entry point is real. Verified `PYTHONPATH=src python -m whipper_gui` exits 0 with the placeholder message on Python 3.11.15.
 
 - [ ] T02 — Logging setup module (`logging_setup.py`)
       Acceptance: importing and calling `configure_logging()` once produces a rotating file at `~/.local/share/whipper-gui/log.txt` plus a console handler at INFO. `logging.getLogger(__name__)` in any module writes to both.

@@ -95,11 +95,12 @@ If `PLANNING.md` and the brief conflict, the brief wins on requirements/scope an
 
 ### Run commands
 
-- From a checkout: `python -m whipper_gui`
+- From a checkout: `pip install -e .` once, then `python -m whipper_gui` (or `whipper-gui`)
+- One-off from a checkout without install: `PYTHONPATH=src python -m whipper_gui`
 - From the AppImage: `./whipper-gui-x86_64.AppImage`
 - From a `pipx` install: `whipper-gui`
 
-*(Entry point lands in T29; until then `python -m whipper_gui` will not yet run a usable GUI.)*
+*(T01 placeholder runs and exits cleanly; the real GUI lands in T29.)*
 
 ### Test commands
 
