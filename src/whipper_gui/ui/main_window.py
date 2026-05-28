@@ -328,7 +328,21 @@ class MainWindow(QMainWindow):
                 )
 
     def _on_check_dependencies(self) -> None:
-        """Run the dependency subsystem with GUI-backed resolvers."""
+        """Run the dependency subsystem with GUI-backed resolvers.
+
+        Always shows the summary popup at the end. Use
+        `run_dependency_check(show_summary=False)` to suppress the
+        popup when nothing's missing — that's the launch-time path.
+        """
+        self.run_dependency_check(show_summary=True)
+
+    def run_dependency_check(self, show_summary: bool = True) -> None:
+        """Run check_all + resolve_missing with GUI-backed resolvers.
+
+        Public so app.py can call it at launch. `show_summary=False`
+        means the OK popup is suppressed when nothing's missing — but
+        dialogs still appear for items that need attention.
+        """
         auto = AutoInstaller(consent=self._gui_auto_consent)
         queued = QueuedInstaller(dialog_callback=self._gui_queued_dialog)
         manual = ManualPrompt(dialog_callback=self._gui_manual_dialog)
@@ -344,8 +358,11 @@ class MainWindow(QMainWindow):
         )
 
         report = gui_manager.check_all()
-        gui_manager.resolve_missing(report)
-        self._show_dep_summary(report)
+        if report.missing:
+            gui_manager.resolve_missing(report)
+
+        if show_summary or report.missing:
+            self._show_dep_summary(report)
 
     def _gui_auto_consent(self, items: list[MissingItem]) -> bool:
         if not items:
