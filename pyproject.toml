@@ -41,3 +41,11 @@ Repository = "https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+# `-q` keeps the output readable while the suite is small.
+# `--strict-markers` rejects typo'd `@pytest.mark.foo` decorators.
+addopts = "-q --strict-markers"

@@ -174,9 +174,10 @@ When a task changes status, update it here in the same commit as the code change
 
 ### Build + smoke test
 
-- [ ] T30 — Test harness scaffold (`tests/conftest.py`, fixtures dir)
+- [x] T30 — Test harness scaffold (`tests/conftest.py`, fixtures dir)
       Acceptance: `pytest` runs from repo root with no errors (even with no tests yet). conftest exposes any shared fixtures.
       Phase: P0
+      Done: `tests/conftest.py` was created in T18 with the session-scoped `qapp` QApplication fixture (offscreen Qt platform set before any Qt import). This task ratifies that scaffold: adds `[tool.pytest.ini_options]` to `pyproject.toml` (testpaths=tests, pythonpath=src so PYTHONPATH no longer needs to be set manually, addopts=-q --strict-markers) and writes `tests/fixtures/README.md` documenting each fixture's provenance (notably that `rip_log_real_whipper_0_7.log` is pulled verbatim from upstream and `rip_log_eac_reference.log` exists only for the format comparison). `python3 -m pytest` from the repo root now works without any extra env vars.
 
 - [ ] T31 — python-appimage build harness (`build/build_appimage.sh`, `build/python-appimage/requirements.txt`)
       Acceptance: running `bash build/build_appimage.sh` from repo root produces `whipper-gui-x86_64.AppImage` at the repo root. Build is reproducible (no `git rev-parse`-time state baked in beyond the package version).
