@@ -219,14 +219,21 @@ Each is independent; do them in any order. They should land before the AppImage'
 
 ---
 
-## Out of scope (not in P0, not in P1)
+## P2 — future enhancements (post-P1)
+
+Items that are technically achievable but represent significant effort, double the rip time, or otherwise belong after the P1 backlog has settled. Pull from here when there's a concrete user request.
+
+- **Test & Copy dual-pass rip.** EAC's "Test & Copy" feature rips each track twice — once to a "test" CRC, once to a real "copy" — and compares the two. A match proves bit-perfect reproducibility on this drive, independent of AccurateRip's database. Whipper doesn't expose this natively, so the implementation would be: rip once, parse the rip log for per-track Test CRC and Copy CRC values, rip again to a separate working directory, parse those, then compare. Mismatch raises a warning. Doubles rip time per disc, which is why it's P2 rather than P1 — but for archival-grade rips of irreplaceable discs, it's the second forensic check (alongside AccurateRip + log SHA-256) that EAC users expect to have.
+
+---
+
+## Out of scope (not in P0, P1, or P2)
 
 Listed here for clarity so they don't sneak in:
 
 - Replacing whipper itself
 - **AccurateRip submission.** Policy-restricted, not technically impossible. AccurateRip's operators accept submissions only from EAC and dBpoweramp; any Linux tool implementing the upload protocol would have its submissions rejected. **AccurateRip *verification* IS in scope and already works** — whipper queries AccurateRip during every rip, the parser captures the v1/v2 confidence values, and the rip-progress widget renders them.
 - **CTDB submission.** Likely subject to the same trust-gate as AccurateRip submission.
-- "Test & Copy" dual-pass
 - Network features (NAS, Plex, Jellyfin, cloud)
 - Library/catalog database
 - DVD/Blu-ray support
