@@ -430,3 +430,11 @@ AppImages are unsandboxed, so calling `~/.local/bin/whipper` from inside one wor
 ### KDD-10 — License: TBD (open question)
 
 The brief does not specify a license. Until the user picks one, `pyproject.toml` will note `License :: OSI Approved :: MIT License` as a placeholder for the project metadata, but the actual `LICENSE` file is **not** committed in the bootstrap step. Flagged for explicit user decision before any public release. (PySide6 is LGPL, so MIT/Apache/BSD for our own code are all compatible; GPL would also work.)
+
+### KDD-11 — Rip log: EAC-equivalent archival content, weaker integrity
+
+Whipper's YAML-structured rip log captures every field EAC captures that bears on archival quality (drive, read offset, cache defeat, per-track CRCs, AccurateRip v1+v2 confidence). The `RippingInfo` sub-record on `RipLog` is shaped specifically to mirror EAC's archival header so the GUI can render the same "Rip details" panel a user gets from EAC.
+
+The one real gap is **log integrity**: EAC signs its log with a checksum that CTDB and forum communities recognize as a tamper-evidence signal. Whipper writes a plain SHA-256 of the file contents, which is weaker forensically. This is not actionable from the GUI side — closing it would require whipper itself to implement an EAC-equivalent scheme. Documented for users in `docs/log-format-comparison.md`.
+
+See `docs/log-format-comparison.md` for the full side-by-side. The comparison is anchored on a real upstream whipper test fixture (`tests/fixtures/rip_log_real_whipper_0_7.log`) and a representative EAC v1.6 log (`tests/fixtures/rip_log_eac_reference.log`, hand-authored to match Hydrogenaudio/CueTools documentation).
