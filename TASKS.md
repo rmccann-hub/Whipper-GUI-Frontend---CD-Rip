@@ -202,16 +202,17 @@ These are fenced off so they don't accidentally interleave with P0 work. Each be
 - ReplayGain calculation
 - Auto-move completed rips to a library folder
 - Additional encoding outputs: **MP3** (via `lame`) and **WAV** (via `sox` or whipper-native). Both encoder backends MUST be detected and offered through the existing P0 #11 dependency-resolution flow — no bespoke install code.
+- **CTDB verification (read-only).** The CUETools Database operates an open-source server (LGPL) with no public HTTP API documentation, but the reference server and client code is public — the protocol is derivable from it. A Python client modeled on that reference would let us add a "Verify with CTDB" button to the rip-progress widget that runs after each rip finishes. No submission — same trust-gate as AccurateRip likely applies. Moderate effort (~200-400 lines for the client + UI hookup). Adds a second archival-verification path complementing the AccurateRip data whipper already provides. See [PLANNING.md KDD-12](PLANNING.md) for the reasoning behind moving this from "out of scope" to P1.
 
 ---
 
 ## Out of scope (not in P0, not in P1)
 
-From the brief — listed here for clarity so they don't sneak in:
+Listed here for clarity so they don't sneak in:
 
 - Replacing whipper itself
-- AccurateRip submission (confirmed Linux ecosystem gap)
-- CTDB verification (confirmed Linux ecosystem gap)
+- **AccurateRip submission.** Policy-restricted, not technically impossible. AccurateRip's operators accept submissions only from EAC and dBpoweramp; any Linux tool implementing the upload protocol would have its submissions rejected. **AccurateRip *verification* IS in scope and already works** — whipper queries AccurateRip during every rip, the parser captures the v1/v2 confidence values, and the rip-progress widget renders them.
+- **CTDB submission.** Likely subject to the same trust-gate as AccurateRip submission.
 - "Test & Copy" dual-pass
 - Network features (NAS, Plex, Jellyfin, cloud)
 - Library/catalog database

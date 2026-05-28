@@ -438,3 +438,17 @@ Whipper's YAML-structured rip log captures every field EAC captures that bears o
 The one real gap is **log integrity**: EAC signs its log with a checksum that CTDB and forum communities recognize as a tamper-evidence signal. Whipper writes a plain SHA-256 of the file contents, which is weaker forensically. This is not actionable from the GUI side — closing it would require whipper itself to implement an EAC-equivalent scheme. Documented for users in `docs/log-format-comparison.md`.
 
 See `docs/log-format-comparison.md` for the full side-by-side. The comparison is anchored on a real upstream whipper test fixture (`tests/fixtures/rip_log_real_whipper_0_7.log`) and a representative EAC v1.6 log (`tests/fixtures/rip_log_eac_reference.log`, hand-authored to match Hydrogenaudio/CueTools documentation).
+
+### KDD-12 — AccurateRip + CTDB scope, corrected from the brief
+
+The brief lists "AccurateRip submission" and "CTDB verification" as confirmed Linux ecosystem gaps and pushes both out of scope. After researching the current state (chat log 2026-05-28), the framing was sharpened — the original wording was both too pessimistic about what's actually possible and conflated technical and policy constraints.
+
+- **AccurateRip verification (reading):** supported on Linux today and **already a delivered feature of this project**. Whipper queries AccurateRip during every rip; the rip log carries per-track v1/v2 confidence; our `parsers/rip_log.py` extracts them; `ui/rip_progress.py` renders them. Cyanrip, fre:ac, and Python Audio Tools also support reading. Not a gap.
+
+- **AccurateRip submission (writing):** technically possible, but the AccurateRip operators accept submissions only from EAC and dBpoweramp (community-trust gate to prevent database pollution). A Linux tool implementing the upload protocol would have its entries rejected. Stays out of scope — but for *policy* reasons, not technical ones.
+
+- **CTDB verification (reading):** technically possible on Linux but unimplemented anywhere. The CueTools Database server is LGPL'd; the reference client is on GitHub (`gchudov/cuetools.net`). The protocol is derivable from that code. CueTools.net itself is Windows-only (.NET Framework 4.7, no Mono support documented), but the protocol it speaks isn't. **Moved from "out of scope" to P1 backlog** as a real but bounded engineering opportunity (~200-400 lines for a Python client + UI hookup).
+
+- **CTDB submission:** likely subject to the same trust-gate as AccurateRip submission. Stays out of scope.
+
+The practical takeaway: archival verification on Linux is already solid — AccurateRip is wired through and visible in the GUI. Adding CTDB as a second verification path is post-v1 work whose cost is manageable.
