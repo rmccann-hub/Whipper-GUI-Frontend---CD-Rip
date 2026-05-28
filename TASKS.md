@@ -49,9 +49,10 @@ When a task changes status, update it here in the same commit as the code change
       Phase: P0
       Done: All five probes implemented. `ProbeResult` is a frozen dataclass with `present`, `version`, `location`, `raw_output`. Subprocess probes use a 10s timeout. `check_libdiscid()` uses ctypes (no subprocess). 10 unit tests pass via monkeypatched subprocess.run/shutil.which.
 
-- [ ] T07 — DependencySpec registry (`deps/registry.py`)
+- [x] T07 — DependencySpec registry (`deps/registry.py`)
       Acceptance: `SPECS: list[DependencySpec]` declaratively lists all v1 deps (whipper, metaflac, libdiscid, musicbrainzngs, Picard). Each spec names probe, min_version, tier preference, install command, and tier-(c) search string.
       Phase: P0
+      Done: 4 specs registered: whipper (manual, 0.10.0+), metaflac (manual, 1.3.0+), Picard (auto via Flatpak with queued/manual fallbacks), musicbrainzngs (manual reinstall path). `libdiscid` deferred to T32 per KDD-06; when the smoke test shows we need it, one new entry lands here and nothing else changes. `Tier` is an enum with AUTO/QUEUED/MANUAL; `DependencySpec` is frozen with an optional `fallback_tiers` tuple for cascade-on-failure.
 
 - [ ] T08 — Resolver classes (`deps/resolvers.py`)
       Acceptance: `AutoInstaller`, `QueuedInstaller`, `ManualPrompt` exist with a common `resolve(specs)` shape. AutoInstaller runs pipx and `flatpak install --user`. QueuedInstaller and ManualPrompt drive UI dialogs (defer wiring until T15/T16 land).
