@@ -22,12 +22,13 @@ When a task changes status, update it here in the same commit as the code change
       Phase: P0
       Done: pyproject.toml uses setuptools src-layout; `app.py` carries a placeholder `main()` so the entry point is real. Verified `PYTHONPATH=src python -m whipper_gui` exits 0 with the placeholder message on Python 3.11.15.
 
-- [ ] T02 — Logging setup module (`logging_setup.py`)
-      Acceptance: importing and calling `configure_logging()` once produces a rotating file at `~/.local/share/whipper-gui/log.txt` plus a console handler at INFO. `logging.getLogger(__name__)` in any module writes to both.
-      Phase: P0
-
-- [ ] T03 — Paths module (`paths.py`)
+- [x] T02 — Paths module (`paths.py`)
       Acceptance: module-level constants `CONFIG_PATH`, `LOG_DIR`, `WHIPPER_CONFIG_PATH`, `WHIPPER_BINARY_DEFAULT` populated from XDG env vars with sane fallbacks. Used by `config.py` and `logging_setup.py`.
+      Phase: P0
+      Done: paths.py exports the constants above plus `APP_NAME`, `CONFIG_DIR`, `LOG_PATH`. Honors `XDG_CONFIG_HOME` and `XDG_DATA_HOME` when set; falls back to `~/.config` and `~/.local/share`. Verified: setting XDG vars to `/tmp/...` produces matching `CONFIG_PATH` and `LOG_PATH`. Note: T02 and T03 were swapped from the original ordering (logging depended on paths), so this is the original T03.
+
+- [ ] T03 — Logging setup module (`logging_setup.py`)
+      Acceptance: importing and calling `configure_logging()` once produces a rotating file at `~/.local/share/whipper-gui/log.txt` plus a console handler at INFO. `logging.getLogger(__name__)` in any module writes to both.
       Phase: P0
 
 - [ ] T04 — TOML config module (`config.py`)
