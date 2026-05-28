@@ -39,9 +39,10 @@ When a task changes status, update it here in the same commit as the code change
 
 ### Dependency self-management subsystem (brief P0 #11)
 
-- [ ] T05 — Version-string parsing utility (`deps/version.py`)
+- [x] T05 — Version-string parsing utility (`deps/version.py`)
       Acceptance: `parse_version(text, pattern)` and `meets_minimum(version, minimum)` exist. Unit-tested.
       Phase: P0
+      Done: `parse_version()` uses a named-group regex (default matches `MAJOR.MINOR[.PATCH]`) and returns an int tuple or None. `meets_minimum()` pads short tuples with zeros so `(1, 2)` >= `(1, 2, 0)`. 12 tests pass including the "0.10.0" double-digit trap. Created `src/whipper_gui/deps/__init__.py` to make the package importable.
 
 - [ ] T06 — Probe functions (`deps/checks.py`)
       Acceptance: `check_whipper()`, `check_metaflac()`, `check_libdiscid()`, `check_picard_flatpak()`, `check_python_pkg(name)` each return a `ProbeResult(present, version, location)`. No side effects.
