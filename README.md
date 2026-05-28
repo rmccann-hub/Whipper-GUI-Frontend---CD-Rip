@@ -251,6 +251,15 @@ Run with `whipper-gui` from any terminal.
 
 #### Method C — From source (for developers / current state)
 
+> The repository is currently private during pre-alpha development. Until it's flipped to Public on GitHub, you'll need to authenticate before cloning — GitHub stopped accepting passwords over HTTPS in 2021. The fastest path is the GitHub CLI:
+>
+> ```bash
+> sudo dnf install gh      # if not already present
+> gh auth login            # web-browser login; choose HTTPS → web browser
+> ```
+>
+> After that, `git clone` over HTTPS works transparently because `gh` stores the token in your git credential helper. If you prefer SSH, set up an SSH key on your GitHub account and swap the clone URL for `git@github.com:rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git`.
+
 ```bash
 git clone https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git
 cd Whipper-GUI-Frontend---CD-Rip
@@ -392,6 +401,20 @@ For discs MusicBrainz doesn't recognize, use the Unknown Album flow from the men
 ---
 
 ## Troubleshooting
+
+### `git clone` fails with "Password authentication is not supported"
+
+GitHub deprecated HTTPS password auth in 2021. If the repository is currently private (it is, during pre-alpha), you need to authenticate first. The fastest path on Bazzite:
+
+```bash
+sudo dnf install gh    # if not already present
+gh auth login          # web-browser login; choose HTTPS → web browser
+git clone https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git
+```
+
+`gh auth login` stores a token in your git credential helper so subsequent clones / pushes work without re-authenticating. Alternative: clone via SSH (`git@github.com:…`) if you have an SSH key on your GitHub account.
+
+Once the repo is flipped to Public on GitHub, no authentication will be needed for read-only clones.
 
 ### I can't find `~/.config/whipper/whipper.conf`
 
