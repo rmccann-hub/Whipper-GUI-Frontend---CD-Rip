@@ -217,6 +217,19 @@ Each is independent; do them in any order. They should land before the AppImage'
 
 - **CTDB verification (read-only).** The CUETools Database operates an open-source server (LGPL) with no public HTTP API documentation, but the reference server and client code is public — the protocol is derivable from it. A Python client modeled on that reference would let us add a "Verify with CTDB" button to the rip-progress widget that runs after each rip finishes. No submission — same trust-gate as AccurateRip likely applies. Moderate effort (~200-400 lines for the client + UI hookup). Adds a second archival-verification path complementing the AccurateRip data whipper already provides. See [PLANNING.md KDD-12](PLANNING.md) for the reasoning behind moving this from "out of scope" to P1.
 
+### P1 — Documentation backlog
+
+Items that need real-system output to write authoritatively. Address as T32's smoke test on a real Bazzite system surfaces the actual output. Each is small (a paragraph or two of README) but writing them now would be guesswork.
+
+- **"You should see X" success indicators for `whipper drive analyze`.** Capture the verbatim output a successful run prints; add to Step 5 so users know what success looks like and can recognize a failure.
+- **Same for `whipper offset find`.** Capture the final "Read offset of drive is N samples" (or whatever it actually prints) message; add to Step 5.
+- **Drop the "Method C is the only working path right now" blockquote** once Method A's AppImage is published as a release artifact and Method B's wheel is on PyPI. Promote Method A back to the recommended path; reorder the methods so Method A leads.
+- **Remove the Method C "private repo, authenticate first" blockquote** when the GitHub repo is flipped to Public on first release.
+- **Add a Quick Start** for users who already have whipper + Distrobox set up — a 3-line summary version of the install for second-time installers (e.g., `gh repo clone … && cd … && pip install -e . && whipper-gui`).
+- **Add a screenshot or two** of the GUI to the top of the README once T32 confirms it looks right on Bazzite KDE Plasma 6.
+- **Document Picard's actual auto-launch behavior** under Step 6 once T32 verifies it. The README currently says it works "if you enable the toggle"; T32 will confirm what the toggle UX actually feels like end-to-end.
+- **Sanity-check the "Where things live" table** against T32's real output — does whipper write `.log` and `.cue` files next to the FLACs? Does it write to `output_dir` or `working_dir` or both? Update the table if reality differs from the brief.
+
 ---
 
 ## P2 — future enhancements (post-P1)

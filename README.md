@@ -28,6 +28,8 @@ There are five things to set up. Plan on **20-40 minutes** the first time. Once 
 | 6 | Install MusicBrainz Picard *(optional)* | Manual tag editing for unknown discs |
 | 7 | Install Whipper GUI | This project |
 
+> **If a step doesn't behave as written:** skip to the [Troubleshooting](#troubleshooting) section near the end of this README. The common surprises — missing `pkg_resources`, missing `whipper.conf`, HTTPS clone authentication failure — all have entries there.
+
 ### Step 1 — Install Distrobox
 
 Distrobox lets you run a different Linux distribution's tools alongside your host system. It's the recommended way to run whipper on immutable distros like Bazzite.
@@ -105,7 +107,13 @@ metaflac --version
 
 `whipper` should report `0.10.0` or newer. `metaflac` is part of the `flac` package.
 
-**Optional but recommended** — accept the MusicBrainz user-agent prompt the first time you query MusicBrainz, so future rips don't get throttled.
+> **You'll see a deprecation warning above the version number** that looks like this:
+>
+> ```
+> UserWarning: pkg_resources is deprecated as an API.
+> ```
+>
+> That's normal. Whipper itself uses an old setuptools API; the warning is informational, the version number that follows means whipper still works. The GUI suppresses this when it calls whipper as a subprocess.
 
 ### Step 4 — Export the binaries to your host
 
@@ -146,6 +154,8 @@ Then open a new terminal.
 
 Every optical drive reads audio slightly off from where it "should" — by a positive or negative number of samples. For bit-perfect archival rips that match AccurateRip's database, whipper needs to know your drive's offset.
 
+> **Before you start:** insert a commercial audio CD into your optical drive (any common pressing — Pink Floyd, Beatles, Metallica, anything not a CD-R or burned mix). Both commands below need a real CD that's in [AccurateRip's database](https://www.accuraterip.com) — most retail discs are.
+
 The settings whipper learns about your drive live in `~/.config/whipper/whipper.conf`. **This file does not exist yet** — it's created automatically the first time whipper writes to it (i.e., when you run one of the commands below). Looking for it before that point will turn up nothing, and that's normal.
 
 > **Where `~` actually is on Bazzite/Silverblue:** `~` for your user expands to `/var/home/<username>` (not `/home/<username>`). `~/.config/whipper/whipper.conf` is the same as `/var/home/<username>/.config/whipper/whipper.conf` — just different ways of writing it. Distrobox passes your host home through to the container, so the file lives in one place visible from both sides.
@@ -157,7 +167,9 @@ whipper drive analyze
 whipper offset find
 ```
 
-Both commands probe your drive and write results into `~/.config/whipper/whipper.conf` automatically, creating the file (and the `~/.config/whipper/` directory) on first write. `offset find` ejects and re-ingests the disc several times, takes a few minutes, and needs a CD in the drive that's in [AccurateRip's database](https://www.accuraterip.com) (most commercial CDs are).
+Both commands probe your drive and write results into `~/.config/whipper/whipper.conf` automatically, creating the file (and the `~/.config/whipper/` directory) on first write.
+
+`offset find` is the longer-running one (a few minutes). It will **eject and re-ingest the disc several times** — that's expected, not a malfunction. Don't interrupt it, and don't close the terminal until it returns to a prompt.
 
 After they finish, confirm the file landed:
 
@@ -211,6 +223,8 @@ flatpak run org.musicbrainz.Picard --version
 Whipper GUI will auto-launch Picard with the rip folder when you mark a disc as Unknown Album, *if* you enable the toggle in Settings.
 
 ### Step 7 — Install Whipper GUI
+
+> **As of right now (pre-alpha), only Method C works.** The AppImage and `pipx` wheel aren't published yet. Method C clones the source and runs the GUI directly. The other methods are documented for the future and explain themselves with a "not yet" callout at the top.
 
 Pick **one** of the methods below.
 
