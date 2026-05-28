@@ -83,9 +83,10 @@ When a task changes status, update it here in the same commit as the code change
 
 ### Adapters
 
-- [ ] T13 — WhipperBackend ABC + host-exported impl (`adapters/whipper_backend.py`)
+- [x] T13 — WhipperBackend ABC + host-exported impl (`adapters/whipper_backend.py`)
       Acceptance: `WhipperBackend` ABC with all five methods from PLANNING.md §5. `WhipperHostExportedImpl` shells out to `~/.local/bin/whipper`. Tested with fixture-driven mocks in `tests/test_whipper_backend.py`.
       Phase: P0
+      Done: `WhipperBackend` ABC with four methods (`list_drives`, `disc_info`, `rip`, `version`) — PLANNING.md §5 listed "five methods" inclusive of the rip-returned `RipHandle`'s methods, which now live on the handle class. `WhipperHostExportedImpl` accepts `binary_path` and optional `working_dir`, shells out to whipper, parses via `parsers.drive_list` / `parsers.cd_info`. `RipHandle` wraps the Popen, exposes `log_lines()` (generator), `wait()`, `cancel()` (SIGTERM-then-SIGKILL), and `returncode`. `WhipperError` carries the last error line for the GUI. 13 tests pass: argv construction, `--unknown` flag, working_dir presence/absence, log-line streaming, cancel cascade, post-exit cancel safety, ABC discipline, FileNotFoundError + TimeoutExpired handling.
 
 - [ ] T14 — MusicBrainzClient ABC + ngs impl (`adapters/musicbrainz_client.py`)
       Acceptance: ABC per PLANNING.md §6. `MusicBrainzNgsImpl` wraps `musicbrainzngs`. `set_user_agent` invoked at construction. Exceptions reraised as `MusicBrainzQueryError`. Tested with `musicbrainzngs` mocked.
