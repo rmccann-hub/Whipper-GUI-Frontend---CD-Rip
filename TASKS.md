@@ -137,9 +137,10 @@ When a task changes status, update it here in the same commit as the code change
       Phase: P0
       Done: `DiscInfoPanel` is a pure view with five form rows: Drive, MusicBrainz disc ID, CDDB disc ID, MusicBrainz match, AccurateRip. Setter methods (`set_drive`, `set_disc_info_loading`, `set_disc_info`, `set_disc_info_error`, `set_mb_loading`, `set_mb_matches`, `set_mb_error`) — the main window orchestrates the disc_info + MB lookup workers and feeds results in. `set_drive()` clears all disc-derived fields so switching drives never leaks stale data. Value labels are mouse-selectable so users can copy disc IDs into Picard or a browser. Acceptance differs from spec in two ways flagged for review: (1) TOC isn't in `whipper cd info` output (only in the post-rip log), so the panel can't show it pre-rip — TOC display will appear in rip-progress (T26); (2) AccurateRip availability is also only checked during rip, so this panel shows a "verified during rip" placeholder and the actual results appear in T26. 15 unit tests pass.
 
-- [ ] T23 — Release picker dialog (`ui/release_picker.py`)
+- [x] T23 — Release picker dialog (`ui/release_picker.py`)
       Acceptance: `ReleasePickerDialog` lists MB release candidates; returns the chosen MBID. Substitutes for whipper's TTY prompt (Critical Rule #5).
       Phase: P0
+      Done: Modal `ReleasePickerDialog(releases)` displays a 9-column QTableWidget (Title, Artist, Year, Country, Label, Catalog #, Tracks, Format, Notes). Row-level single selection, no in-place editing. Title and Artist columns stretch; the rest fit content. Row 0 is selected by default so a quick Enter accepts the top candidate. Double-click on a row also accepts (matches OS picker convention). `selected_mbid()` and `selected_release()` are the readback API. Empty release list is supported and returns None for both. 15 unit tests cover construction, row count, column mapping (each ReleaseSummary attribute → correct cell), missing-field rendering, non-editable cells, default selection, MBID readback, OK/Cancel/double-click acceptance paths.
 
 - [ ] T24 — Track table widget (`ui/track_table.py`)
       Acceptance: editable per-track `QTableView` with custom model. Album-level fields above the table. Validates before allowing rip start.
