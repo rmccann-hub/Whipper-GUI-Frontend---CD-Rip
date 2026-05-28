@@ -44,9 +44,10 @@ When a task changes status, update it here in the same commit as the code change
       Phase: P0
       Done: `parse_version()` uses a named-group regex (default matches `MAJOR.MINOR[.PATCH]`) and returns an int tuple or None. `meets_minimum()` pads short tuples with zeros so `(1, 2)` >= `(1, 2, 0)`. 12 tests pass including the "0.10.0" double-digit trap. Created `src/whipper_gui/deps/__init__.py` to make the package importable.
 
-- [ ] T06 — Probe functions (`deps/checks.py`)
+- [x] T06 — Probe functions (`deps/checks.py`)
       Acceptance: `check_whipper()`, `check_metaflac()`, `check_libdiscid()`, `check_picard_flatpak()`, `check_python_pkg(name)` each return a `ProbeResult(present, version, location)`. No side effects.
       Phase: P0
+      Done: All five probes implemented. `ProbeResult` is a frozen dataclass with `present`, `version`, `location`, `raw_output`. Subprocess probes use a 10s timeout. `check_libdiscid()` uses ctypes (no subprocess). 10 unit tests pass via monkeypatched subprocess.run/shutil.which.
 
 - [ ] T07 — DependencySpec registry (`deps/registry.py`)
       Acceptance: `SPECS: list[DependencySpec]` declaratively lists all v1 deps (whipper, metaflac, libdiscid, musicbrainzngs, Picard). Each spec names probe, min_version, tier preference, install command, and tier-(c) search string.
