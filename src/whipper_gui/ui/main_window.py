@@ -414,15 +414,36 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _show_dep_summary(self, report: object) -> None:
-        """A simple post-check summary popup."""
-        # We deliberately keep the summary minimal for v1 — the Settings
-        # dialog and the individual install dialogs already convey detail.
+        """Post-check summary popup with install-failure detail when present.
+
+        The popup format:
+            "<ok_count> ok, <missing_count> missing/needs-attention."
+            (blank line)
+            "Install failures:"           ← only when failures exist
+            "  - <dep>: <error message>"  ← one per failure
+        """
         ok_count = len(getattr(report, "ok", []))
         missing_count = len(getattr(report, "missing", []))
+        # Collect real install failures (not user declines — those are
+        # surfaced via the dialog the user already saw).
+        install_results = getattr(report, "install_results", [])
+        failures = [
+            r for r in install_results
+            if not r.success and not getattr(r, "user_declined", False)
+        ]
+
+        message = f"{ok_count} ok, {missing_count} missing/needs-attention."
+        if failures:
+            failure_lines = "\n".join(
+                f"  • {r.spec.display_name}: {r.message}" for r in failures
+            )
+            message = (
+                f"{message}\n\nInstall failures:\n{failure_lines}\n\n"
+                f"Full output is in ~/.local/share/whipper-gui/log.txt."
+            )
+
         QMessageBox.information(
-            self,
-            "Dependency check complete",
-            f"{ok_count} ok, {missing_count} missing/needs-attention.",
+            self, "Dependency check complete", message
         )
 
     # --- Convenience for the Unknown Album flow ----------------------------

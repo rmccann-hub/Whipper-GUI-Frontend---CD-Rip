@@ -337,3 +337,124 @@ def test_close_event_stops_mb_thread(teardown_threads) -> None:
     window.close()
     # Thread should be stopped by closeEvent.
     assert window._mb_thread.isRunning() is False
+
+
+# --- Dep summary popup ---------------------------------------------------
+
+
+def test_dep_summary_with_no_failures_omits_failure_block(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Clean dep-check produces a minimal popup."""
+    from whipper_gui.deps.manager import DependencyReport
+
+    window = teardown_threads()
+    captured: list[tuple[str, str]] = []
+
+    def fake_info(parent: Any, title: str, text: str) -> Any:
+        captured.append((title, text))
+        return None
+
+    monkeypatch.setattr(
+        "whipper_gui.ui.main_window.QMessageBox.information", fake_info
+    )
+
+    report = DependencyReport(ok=[], missing=[], install_results=[])
+    window._show_dep_summary(report)
+
+    assert len(captured) == 1
+    title, text = captured[0]
+    assert title == "Dependency check complete"
+    assert "Install failures" not in text  # no failure section
+    assert "0 ok" in text
+
+
+def test_dep_summary_includes_failure_details(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real install failures must surface in the popup, not just the log."""
+    from whipper_gui.deps.checks import ProbeResult
+    from whipper_gui.deps.manager import DependencyReport
+    from whipper_gui.deps.registry import DependencySpec, Tier
+    from whipper_gui.deps.resolvers import InstallResult
+
+    spec = DependencySpec(
+        dep_id="picard",
+        display_name="MusicBrainz Picard (Flatpak)",
+        probe=lambda: ProbeResult(present=False, version=None, location=None),
+        min_version=(0, 0, 0),
+        tier=Tier.AUTO,
+        install_command=["flatpak", "install"],
+        search_string="x",
+    )
+    failure = InstallResult(
+        spec=spec,
+        success=False,
+        message="install failed: No remote refs found for 'flathub'",
+        user_declined=False,
+    )
+
+    window = teardown_threads()
+    captured: list[tuple[str, str]] = []
+
+    def fake_info(parent: Any, title: str, text: str) -> Any:
+        captured.append((title, text))
+        return None
+
+    monkeypatch.setattr(
+        "whipper_gui.ui.main_window.QMessageBox.information", fake_info
+    )
+
+    report = DependencyReport(
+        ok=[], missing=[], install_results=[failure]
+    )
+    window._show_dep_summary(report)
+
+    text = captured[0][1]
+    assert "Install failures" in text
+    assert "MusicBrainz Picard" in text
+    assert "No remote refs found" in text
+    assert "log.txt" in text  # points user at the log for full detail
+
+
+def test_dep_summary_does_not_show_user_declines_as_failures(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declines are already conveyed by the dialog itself; they shouldn't
+    appear in the summary as if they were errors."""
+    from whipper_gui.deps.checks import ProbeResult
+    from whipper_gui.deps.manager import DependencyReport
+    from whipper_gui.deps.registry import DependencySpec, Tier
+    from whipper_gui.deps.resolvers import InstallResult
+
+    spec = DependencySpec(
+        dep_id="picard",
+        display_name="MusicBrainz Picard (Flatpak)",
+        probe=lambda: ProbeResult(present=False, version=None, location=None),
+        min_version=(0, 0, 0),
+        tier=Tier.AUTO,
+        install_command=None,
+        search_string="x",
+    )
+    decline = InstallResult(
+        spec=spec,
+        success=False,
+        message="user declined auto-install",
+        user_declined=True,
+    )
+
+    window = teardown_threads()
+    captured: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "whipper_gui.ui.main_window.QMessageBox.information",
+        lambda parent, title, text: captured.append((title, text)) or None,
+    )
+
+    report = DependencyReport(
+        ok=[], missing=[], install_results=[decline]
+    )
+    window._show_dep_summary(report)
+
+    text = captured[0][1]
+    assert "Install failures" not in text  # decline isn't a failure
