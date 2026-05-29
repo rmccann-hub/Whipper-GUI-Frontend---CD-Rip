@@ -28,23 +28,34 @@ def test_build_script_exists_and_is_executable() -> None:
     )
 
 
+# python-appimage globs the entrypoint as `entrypoint.*`, so it MUST carry
+# an extension or it is silently ignored (the default AppRun then runs the
+# bare interpreter — `--version` prints Python's version, not ours).
+ENTRYPOINT = RECIPE_DIR / "entrypoint.sh"
+
+
 def test_recipe_dir_has_required_files() -> None:
-    expected = {"requirements.txt", "entrypoint", "whipper-gui.desktop"}
+    expected = {"requirements.txt", "entrypoint.sh", "whipper-gui.desktop"}
     actual = {p.name for p in RECIPE_DIR.iterdir() if p.is_file()}
     missing = expected - actual
     assert not missing, f"recipe missing: {missing}"
 
 
+def test_entrypoint_has_extension_for_glob() -> None:
+    """python-appimage matches `entrypoint.*`; a bare `entrypoint` is ignored."""
+    assert ENTRYPOINT.is_file()
+    # Guard against re-introducing an extensionless entrypoint.
+    assert not (RECIPE_DIR / "entrypoint").exists()
+
+
 def test_entrypoint_is_executable() -> None:
-    entrypoint = RECIPE_DIR / "entrypoint"
-    assert entrypoint.is_file()
     import os
-    assert os.access(entrypoint, os.X_OK)
+    assert os.access(ENTRYPOINT, os.X_OK)
 
 
 def test_entrypoint_invokes_whipper_gui_module() -> None:
     """The entrypoint must run `python -m whipper_gui`."""
-    text = (RECIPE_DIR / "entrypoint").read_text()
+    text = ENTRYPOINT.read_text()
     assert "whipper_gui" in text
     assert "-m" in text  # invoking as a module
 
@@ -58,19 +69,51 @@ def test_desktop_file_has_correct_app_id() -> None:
     assert "Type=Application" in text
 
 
-def test_requirements_uses_find_links_for_local_wheel() -> None:
-    """Self-install path: --find-links . + bare `whipper-gui` package."""
+def test_desktop_name_has_no_space() -> None:
+    """python-appimage derives the (unquoted) output filename from Name=; a
+    space splits the appimagetool command and the AppImage is never built."""
+    for line in (RECIPE_DIR / "whipper-gui.desktop").read_text().splitlines():
+        if line.startswith("Name="):
+            assert " " not in line[len("Name="):], (
+                "desktop Name must not contain spaces"
+            )
+            break
+    else:
+        pytest.fail("no Name= line in .desktop")
+
+
+def _requirement_lines() -> list[str]:
     lines = (RECIPE_DIR / "requirements.txt").read_text().splitlines()
     non_comment = [line.strip() for line in lines if not line.strip().startswith("#")]
-    non_blank = [line for line in non_comment if line]
-    assert "--find-links ." in non_blank
-    assert "whipper-gui" in non_blank
+    return [line for line in non_comment if line]
+
+
+def test_requirements_request_local_whipper_gui_package() -> None:
+    """The bare `whipper-gui` line is resolved to the local wheel via the
+    PIP_FIND_LINKS the build script exports (a global `--find-links .` line
+    cannot work: python-appimage installs each line from a temp dir)."""
+    assert "whipper-gui" in _requirement_lines()
+    script = (BUILD_DIR / "build_appimage.sh").read_text()
+    assert "PIP_FIND_LINKS" in script
+
+
+def test_requirements_have_no_shell_redirection_chars() -> None:
+    """python-appimage runs each `pip install` through a shell, so `<`/`>` in
+    a version specifier is read as a redirection and crashes the build."""
+    for line in _requirement_lines():
+        assert "<" not in line and ">" not in line, (
+            f"requirement {line!r} uses < or > (use ~= instead)"
+        )
 
 
 def test_requirements_pins_match_dependencies_md() -> None:
-    """Runtime dep pins in the recipe must match the source-of-truth."""
+    """Runtime dep pins in the recipe must match the source-of-truth.
+
+    Expressed with `~=` (no shell-special chars) but equivalent to the
+    pyproject.toml / DEPENDENCIES.md bounds:
+      PySide6 ~=6.7  ==  >=6.7,<7.0     tomli-w ~=1.0  ==  >=1.0,<2.0
+    """
     text = (RECIPE_DIR / "requirements.txt").read_text()
-    # Same constraints as pyproject.toml + DEPENDENCIES.md.
-    assert "PySide6>=6.7,<7" in text
+    assert "PySide6~=6.7" in text
     assert "musicbrainzngs==0.7.1" in text
-    assert "tomli-w>=1.0,<2" in text
+    assert "tomli-w~=1.0" in text

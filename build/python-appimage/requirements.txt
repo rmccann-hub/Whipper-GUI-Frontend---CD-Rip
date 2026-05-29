@@ -1,13 +1,21 @@
 # Runtime deps bundled into the AppImage. Versions track DEPENDENCIES.md.
 #
-# `--find-links .` tells pip to look inside this recipe directory for
-# wheels — that's how the locally-built whipper_gui-X.Y.Z-*.whl gets
-# picked up. The `whipper-gui` line below requests our package by name,
-# which pip then resolves to that local wheel rather than going to PyPI.
+# python-appimage runs `pip install` once per line below (from a temporary
+# build directory), so a global `--find-links .` line does NOT work here —
+# it would be its own argument-less install and pip would also resolve `.`
+# against the wrong directory. Instead, build_appimage.sh exports
+# PIP_FIND_LINKS pointing at this recipe directory, so the `whipper-gui`
+# line resolves to the locally-built whipper_gui-X.Y.Z-*.whl rather than
+# going to PyPI (PIP_FIND_LINKS is a pip env var, so it survives pip's
+# `-I` isolated mode, unlike PYTHON* variables).
 
---find-links .
-
-PySide6>=6.7,<7
+# NOTE on version operators: python-appimage installs each line with a
+# shell (`system()` does `' '.join(args)` + `shell=True`), so a `<` or `>`
+# in a specifier is read as a shell redirection (e.g. `,<7` → "open file 7"
+# → build crash). We therefore use the compatible-release operator `~=`,
+# which expresses the same bounds without any shell-special characters:
+#   PySide6 ~=6.7  ==  >=6.7,<7.0      tomli-w ~=1.0  ==  >=1.0,<2.0
+PySide6~=6.7
 musicbrainzngs==0.7.1
-tomli-w>=1.0,<2
+tomli-w~=1.0
 whipper-gui

@@ -14,7 +14,14 @@ wheels/
 # AppImage build artifacts (the build script outputs to repo root)
 *.AppImage
 *.AppDir/
+AppDir/
 build/python-appimage/.cache/
+# Intermediate wheel build tree from `python -m build`
+build/lib/
+# Locally-built wheel staged for python-appimage's PIP_FIND_LINKS
+build/python-appimage/*.whl
+# Generated placeholder icon (replace with a real committed icon before release)
+build/python-appimage/whipper-gui.png
 
 # Virtual environments
 .venv/

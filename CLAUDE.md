@@ -130,7 +130,13 @@ There is no `compass_artifact_*.md` in the repo; the original v1 research valida
 
 ### Notes for future sessions
 
-- **P0 status:** 31 of 32 tasks done. T32 (end-to-end smoke test) is in progress — the **rip pipeline is verified end-to-end** on real hardware (see below); only the AppImage build+launch remains before T32 closes.
+- **P0 status:** 31 of 32 tasks done. T32 (end-to-end smoke test) is in progress — the **rip pipeline is verified end-to-end** on real hardware, and the **AppImage now builds, launches, and self-initialises** (verified 2026-05-29, see below). Only one acceptance criterion remains: confirming a full rip *through the AppImage* on Bazzite.
+- **T32 AppImage build (2026-05-29):** `bash build/build_appimage.sh` produces `whipper-gui-x86_64.AppImage`; `--version` prints `whipper-gui 0.0.1`; a headless `QT_QPA_PLATFORM=offscreen` launch reaches the Qt event loop (config created, MusicBrainz adapter up, dependency manager probes all deps). Building it surfaced **five recipe bugs the unit tests missed** — all fixed + regression-guarded in `tests/test_build_harness.py`:
+  - python-appimage installs requirements.txt **one line at a time from a temp dir**, so a standalone `--find-links .` line fails → use `PIP_FIND_LINKS` (exported by the build script) instead.
+  - `system()` runs each `pip install` through a shell, so `<`/`>` in pins are read as redirections → pins use `~=` (`PySide6~=6.7`, `tomli-w~=1.0`).
+  - the entrypoint is globbed as `entrypoint.*`, so it must have an extension (`entrypoint.sh`) or the bare interpreter runs.
+  - a space in the `.desktop` `Name=` breaks the unquoted appimagetool command → `Name=Whipper-GUI`; the script normalises the output to `whipper-gui-x86_64.AppImage`.
+  - python-appimage fetches the CPython base image via the GitHub **API** (403s when rate-limited) → optional `WHIPPER_GUI_BASE_IMAGE` env var feeds a pre-downloaded base image; FUSE-less hosts also need `APPIMAGE_EXTRACT_AND_RUN=1`.
 - **T32 real-hardware rip (2026-05-29):** a 16-track CD-R ripped end-to-end on Bazzite + Distrobox + Pioneer BDR-209D. All Test CRCs == Copy CRCs, FLACs play, `.log`/`.cue`/`.m3u`/`.toc` written, AccurateRip correctly "not in DB". Findings + fixes (each has a test):
   - whipper refuses CD-Rs without `--cdr` → added `Config.continue_on_cdr` + Settings toggle + `RipParameters.cdr` + flag passthrough.
   - whipper `os.chdir()`s into `--working-directory` without creating it → adapter now `mkdir -p`s the working + output dirs before the rip.

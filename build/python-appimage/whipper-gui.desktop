@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Whipper GUI
+Name=Whipper-GUI
 GenericName=CD Audio Ripper
 Comment=GUI front-end for the whipper CD ripping CLI
 Exec=whipper-gui
