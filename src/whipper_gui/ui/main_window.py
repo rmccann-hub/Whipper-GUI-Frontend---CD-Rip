@@ -215,6 +215,13 @@ class MainWindow(QMainWindow):
             self._disc_info_panel.set_mb_loading()
             # Run the MB query on the worker thread.
             self._mb_worker.lookup_disc_id(info.musicbrainz_disc_id)
+        else:
+            # Empty disc ID means whipper couldn't retrieve metadata
+            # (per WhipperHostExportedImpl.disc_info's unknown-disc
+            # fallback). Surface "not in MusicBrainz" instead of leaving
+            # the panel stuck on "reading disc…" forever. The user can
+            # then proceed via File → Rip as Unknown Album.
+            self._disc_info_panel.set_mb_matches([])
 
     # --- Slots: MusicBrainz results ----------------------------------------
 

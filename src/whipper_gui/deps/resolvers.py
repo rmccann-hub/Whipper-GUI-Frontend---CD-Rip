@@ -139,27 +139,40 @@ class AutoInstaller:
                 timeout=_INSTALL_TIMEOUT_S,
             )
         except FileNotFoundError as exc:
+            msg = f"install tool not found: {exc.filename}"
+            log.warning("auto-install %s failed: %s", item.spec.dep_id, msg)
             return InstallResult(
                 spec=item.spec,
                 success=False,
-                message=f"install tool not found: {exc.filename}",
+                message=msg,
             )
         except subprocess.TimeoutExpired:
+            msg = f"install timed out after {_INSTALL_TIMEOUT_S:.0f}s"
+            log.warning("auto-install %s failed: %s", item.spec.dep_id, msg)
             return InstallResult(
                 spec=item.spec,
                 success=False,
-                message=f"install timed out after {_INSTALL_TIMEOUT_S:.0f}s",
+                message=msg,
             )
 
         if proc.returncode != 0:
             tail = (proc.stderr or proc.stdout or "").strip().splitlines()
             last_line = tail[-1] if tail else f"rc={proc.returncode}"
+            full_output = (
+                (proc.stdout or "").strip() + "\n" +
+                (proc.stderr or "").strip()
+            ).strip()
+            log.warning(
+                "auto-install %s failed (rc=%d): %s\nFull output:\n%s",
+                item.spec.dep_id, proc.returncode, last_line, full_output,
+            )
             return InstallResult(
                 spec=item.spec,
                 success=False,
                 message=f"install failed: {last_line}",
             )
 
+        log.info("auto-install %s succeeded", item.spec.dep_id)
         return InstallResult(
             spec=item.spec, success=True, message="installed"
         )

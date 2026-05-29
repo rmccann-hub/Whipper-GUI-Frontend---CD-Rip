@@ -71,10 +71,25 @@ class SettingsDialog(QDialog):
         form.addRow("Disc template:", self._disc_template_edit)
 
         # --- Read offset ---
+        # Per the brief: whipper.conf is authoritative for the read
+        # offset. This field is informational; setting it here does
+        # NOT (yet) override what's in whipper.conf. Surfaced clearly
+        # in the label + tooltip to avoid the "I set 667 here but my
+        # rip is still using 0" confusion real-user testing surfaced.
         self._read_offset_spin: QSpinBox = QSpinBox(self)
         self._read_offset_spin.setRange(_OFFSET_MIN, _OFFSET_MAX)
         self._read_offset_spin.setValue(config.read_offset)
-        form.addRow("Read offset (samples):", self._read_offset_spin)
+        self._read_offset_spin.setReadOnly(True)
+        # Tooltip on the spinbox + the field label so hover-help works
+        # regardless of which the user mouses over.
+        tooltip = (
+            "Informational only — whipper.conf is the authoritative "
+            "source. Edit your drive's [drive:VENDOR :MODEL:RELEASE] "
+            "section in ~/.config/whipper/whipper.conf to change."
+        )
+        self._read_offset_spin.setToolTip(tooltip)
+        offset_label = "Read offset (informational, see whipper.conf):"
+        form.addRow(offset_label, self._read_offset_spin)
 
         # --- Tool paths ---
         self._whipper_path_edit, whipper_row = self._build_file_row(
