@@ -227,6 +227,15 @@ class WhipperHostExportedImpl(WhipperBackend):
             # a CD-R, --cdr not passed" unless we explicitly allow it.
             argv.append("--cdr")
 
+        # Whipper chdir's into --working-directory without creating it
+        # (crashes with FileNotFoundError otherwise — hit on T32 with a
+        # fresh ~/.cache/whipper-gui). Create both dirs up front so a
+        # first-ever rip on a clean system just works. exist_ok keeps
+        # this idempotent for every subsequent rip.
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if self._working_dir is not None:
+            self._working_dir.mkdir(parents=True, exist_ok=True)
+
         log.info("rip starting: %s", " ".join(argv))
         process = subprocess.Popen(
             argv,

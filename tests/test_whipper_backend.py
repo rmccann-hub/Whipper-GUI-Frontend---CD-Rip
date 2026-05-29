@@ -317,6 +317,34 @@ def test_rip_cdr_flag_absent_by_default(
     assert "--cdr" not in _FakePopen.instances[0].argv
 
 
+def test_rip_creates_working_and_output_dirs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """rip() must create the output + working dirs before launching.
+
+    Whipper does a bare os.chdir() into --working-directory and crashes
+    with FileNotFoundError if it doesn't exist (T32 on a fresh
+    ~/.cache/whipper-gui)."""
+    monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    out_dir = tmp_path / "music" / "rips"
+    work_dir = tmp_path / "cache" / "whipper-gui"
+    assert not out_dir.exists() and not work_dir.exists()
+
+    impl = WhipperHostExportedImpl(
+        binary_path=Path("/x/whipper"), working_dir=work_dir
+    )
+    impl.rip(
+        drive="/dev/sr0",
+        release_id="x",
+        output_dir=out_dir,
+        track_template="t",
+        disc_template="d",
+    )
+
+    assert out_dir.is_dir()
+    assert work_dir.is_dir()
+
+
 def test_rip_omits_working_directory_when_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
