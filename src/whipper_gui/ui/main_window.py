@@ -163,6 +163,9 @@ class MainWindow(QMainWindow):
     def _build_menus(self) -> None:
         menubar = self.menuBar()
         file_menu = menubar.addMenu("&File")
+        unknown_action = file_menu.addAction("Rip as &Unknown Album…")
+        unknown_action.triggered.connect(self._on_rip_as_unknown)
+        file_menu.addSeparator()
         quit_action = file_menu.addAction("&Quit")
         quit_action.triggered.connect(self.close)
 
@@ -400,6 +403,22 @@ class MainWindow(QMainWindow):
         )
 
     # --- Convenience for the Unknown Album flow ----------------------------
+
+    def _on_rip_as_unknown(self) -> None:
+        """File → Rip as Unknown Album… menu action.
+
+        Validates that a drive is selected, then opens the Unknown Album
+        dialog. Sets unknown mode on the rip controls so the user can
+        click Start without needing a MusicBrainz release ID.
+        """
+        if not self._drive_picker.current_device():
+            QMessageBox.warning(
+                self,
+                "Cannot rip",
+                "Select a drive first.",
+            )
+            return
+        self.open_unknown_album_dialog()
 
     def open_unknown_album_dialog(self) -> bool:
         """Show the Unknown Album confirmation. Returns True if accepted.
