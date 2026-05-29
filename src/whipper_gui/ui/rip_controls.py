@@ -121,12 +121,21 @@ class RipControls(QWidget):
         return bool(self._release_id)
 
     def _on_start(self) -> None:
+        # Unknown discs use the literal "Unknown Album" templates so the
+        # disc-ID hash whipper puts in %d never reaches the path; known
+        # discs use the rich tag-driven templates.
+        if self._unknown_mode:
+            track_template = self._config.track_template_unknown
+            disc_template = self._config.disc_template_unknown
+        else:
+            track_template = self._config.track_template
+            disc_template = self._config.disc_template
         params = RipParameters(
             drive=self._drive,
             release_id=self._release_id,
             output_dir=Path(self._config.output_dir),
-            track_template=self._config.track_template,
-            disc_template=self._config.disc_template,
+            track_template=track_template,
+            disc_template=disc_template,
             unknown=self._unknown_mode,
             cdr=self._config.continue_on_cdr,
         )

@@ -103,8 +103,10 @@ def test_v1_to_v2_upgrades_untouched_templates(
     cfg = config_module.load()
 
     assert cfg.schema_version == 2
-    assert cfg.track_template == "%A/%d/%t - %n"
+    assert cfg.track_template == "%A/%d/%t - %n - %d - %A - %y"
     assert cfg.disc_template == "%A/%d/%d"
+    # The unknown-disc templates fill in from defaults (absent in v1).
+    assert cfg.track_template_unknown.startswith("Unknown Artist/Unknown Album/")
 
 
 def test_v1_to_v2_preserves_custom_templates(

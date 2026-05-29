@@ -65,10 +65,26 @@ class SettingsDialog(QDialog):
 
         # --- Templates ---
         self._track_template_edit: QLineEdit = QLineEdit(config.track_template, self)
+        self._track_template_edit.setToolTip(
+            "Path for identified discs. Codes: %A artist, %d album, "
+            "%t track #, %n title, %a track artist, %y year, %N disc #."
+        )
         form.addRow("Track template:", self._track_template_edit)
 
         self._disc_template_edit: QLineEdit = QLineEdit(config.disc_template, self)
-        form.addRow("Disc template:", self._disc_template_edit)
+        form.addRow("Disc template (.log/.cue):", self._disc_template_edit)
+
+        # Unknown-disc templates: used for the --unknown rip so the
+        # disc-ID hash whipper puts in %d never reaches the path.
+        self._track_template_unknown_edit: QLineEdit = QLineEdit(
+            config.track_template_unknown, self
+        )
+        form.addRow("Track template (unknown):", self._track_template_unknown_edit)
+
+        self._disc_template_unknown_edit: QLineEdit = QLineEdit(
+            config.disc_template_unknown, self
+        )
+        form.addRow("Disc template (unknown):", self._disc_template_unknown_edit)
 
         # --- Read offset ---
         # Per the brief: whipper.conf is authoritative for the read
@@ -160,6 +176,8 @@ class SettingsDialog(QDialog):
             working_dir=self._working_dir_edit.text(),
             track_template=self._track_template_edit.text(),
             disc_template=self._disc_template_edit.text(),
+            track_template_unknown=self._track_template_unknown_edit.text(),
+            disc_template_unknown=self._disc_template_unknown_edit.text(),
             whipper_path=self._whipper_path_edit.text(),
             metaflac_path=self._metaflac_path_edit.text(),
             read_offset=self._read_offset_spin.value(),

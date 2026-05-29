@@ -34,16 +34,24 @@ _DEFAULT_OUTPUT_DIR: Path = Path.home() / "Music" / "rips"
 _DEFAULT_WORKING_DIR: Path = Path.home() / ".cache" / "whipper-gui"
 
 # Whipper path templates (see `whipper cd rip --help`). Format codes:
-#   %A = album artist   %d = album/disc title   %a = track artist
-#   %t = track number   %n = track title
-# Default layout (chosen during T32): Artist/Album folders, "## - Title"
-# track files, and the per-disc files (.log/.cue/.m3u/.toc) named after
-# the album in the same folder. NOTE: for a disc MusicBrainz can't
-# identify, whipper substitutes the raw disc-ID hash for %d — so the
-# album folder for an unknown disc is that hash until the "Unknown Album"
-# rename lands (P1 backlog).
-_DEFAULT_TRACK_TEMPLATE: str = "%A/%d/%t - %n"
+#   %A = release artist   %d = release title (album)   %a = track artist
+#   %t = track number      %n = track title             %y = release year
+#   %N = disc number        %M = total discs
+#
+# We keep TWO template pairs and pick per rip (see ui/rip_controls):
+#
+#   * Known disc  → rich tags: "Artist/Album/## - Title - Album - Artist - Year".
+#     A disc with no year leaves a trailing " - " (whipper templates are
+#     flat — they can't conditionally drop an empty field). Multi-disc
+#     sets: add "/%N" to the folder portion yourself.
+#   * Unknown disc → literal "Unknown Artist/Unknown Album/## - Track NN".
+#     We deliberately do NOT use %d here: for a disc MusicBrainz can't
+#     identify, whipper fills %d with the raw disc-ID hash, so a literal
+#     path keeps unknown rips tidy (and matches the placeholder tags).
+_DEFAULT_TRACK_TEMPLATE: str = "%A/%d/%t - %n - %d - %A - %y"
 _DEFAULT_DISC_TEMPLATE: str = "%A/%d/%d"
+_DEFAULT_TRACK_TEMPLATE_UNKNOWN: str = "Unknown Artist/Unknown Album/%t - Track %t"
+_DEFAULT_DISC_TEMPLATE_UNKNOWN: str = "Unknown Artist/Unknown Album/Unknown Album"
 
 # The v1 defaults, kept so the v1→v2 migration can recognise an
 # untouched template and upgrade it without clobbering a custom one.
@@ -62,8 +70,12 @@ class Config:
     working_dir: str = field(default_factory=lambda: str(_DEFAULT_WORKING_DIR))
 
     # --- Whipper rip templates ---
+    # Used for discs MusicBrainz identifies (rich, tag-driven names).
     track_template: str = _DEFAULT_TRACK_TEMPLATE
     disc_template: str = _DEFAULT_DISC_TEMPLATE
+    # Used for the --unknown rip (literal "Unknown Album" path, no hash).
+    track_template_unknown: str = _DEFAULT_TRACK_TEMPLATE_UNKNOWN
+    disc_template_unknown: str = _DEFAULT_DISC_TEMPLATE_UNKNOWN
 
     # --- Tool paths (overrides for the dependency subsystem) ---
     # User can re-point these in Settings if the defaults are wrong.

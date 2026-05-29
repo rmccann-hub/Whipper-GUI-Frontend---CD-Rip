@@ -25,6 +25,8 @@ def test_initial_widget_state_matches_input_config(
         working_dir="/tmp/work",
         track_template="t/%n",
         disc_template="d/%d",
+        track_template_unknown="unk-t",
+        disc_template_unknown="unk-d",
         whipper_path="/x/whipper",
         metaflac_path="/x/metaflac",
         read_offset=42,
@@ -38,6 +40,8 @@ def test_initial_widget_state_matches_input_config(
     assert dialog._working_dir_edit.text() == "/tmp/work"
     assert dialog._track_template_edit.text() == "t/%n"
     assert dialog._disc_template_edit.text() == "d/%d"
+    assert dialog._track_template_unknown_edit.text() == "unk-t"
+    assert dialog._disc_template_unknown_edit.text() == "unk-d"
     assert dialog._whipper_path_edit.text() == "/x/whipper"
     assert dialog._metaflac_path_edit.text() == "/x/metaflac"
     assert dialog._read_offset_spin.value() == 42
@@ -73,6 +77,8 @@ def test_to_config_reflects_user_edits(qapp: QApplication) -> None:
     dialog._working_dir_edit.setText("/changed/working")
     dialog._track_template_edit.setText("changed-track")
     dialog._disc_template_edit.setText("changed-disc")
+    dialog._track_template_unknown_edit.setText("changed-unk-track")
+    dialog._disc_template_unknown_edit.setText("changed-unk-disc")
     dialog._whipper_path_edit.setText("/changed/whipper")
     dialog._metaflac_path_edit.setText("/changed/metaflac")
     dialog._read_offset_spin.setValue(-42)
@@ -85,6 +91,8 @@ def test_to_config_reflects_user_edits(qapp: QApplication) -> None:
     assert out.working_dir == "/changed/working"
     assert out.track_template == "changed-track"
     assert out.disc_template == "changed-disc"
+    assert out.track_template_unknown == "changed-unk-track"
+    assert out.disc_template_unknown == "changed-unk-disc"
     assert out.whipper_path == "/changed/whipper"
     assert out.metaflac_path == "/changed/metaflac"
     assert out.read_offset == -42

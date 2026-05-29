@@ -155,6 +155,46 @@ def test_set_config_updates_params_for_next_rip(qapp: QApplication) -> None:
     assert captured[0].cdr is True
 
 
+def test_unknown_mode_uses_unknown_templates(qapp: QApplication) -> None:
+    config = Config(
+        output_dir="/music",
+        track_template="known-track",
+        disc_template="known-disc",
+        track_template_unknown="unknown-track",
+        disc_template_unknown="unknown-disc",
+    )
+    controls = RipControls(config)
+    controls.set_drive("/dev/sr0")
+    controls.set_unknown_mode(True)
+
+    captured: list[RipParameters] = []
+    controls.rip_requested.connect(captured.append)
+    controls._start_button.click()
+
+    assert captured[0].track_template == "unknown-track"
+    assert captured[0].disc_template == "unknown-disc"
+
+
+def test_known_mode_uses_known_templates(qapp: QApplication) -> None:
+    config = Config(
+        output_dir="/music",
+        track_template="known-track",
+        disc_template="known-disc",
+        track_template_unknown="unknown-track",
+        disc_template_unknown="unknown-disc",
+    )
+    controls = RipControls(config)
+    controls.set_drive("/dev/sr0")
+    controls.set_release_id("mbid")
+
+    captured: list[RipParameters] = []
+    controls.rip_requested.connect(captured.append)
+    controls._start_button.click()
+
+    assert captured[0].track_template == "known-track"
+    assert captured[0].disc_template == "known-disc"
+
+
 def test_start_in_unknown_mode_sets_unknown_flag(
     qapp: QApplication,
 ) -> None:
