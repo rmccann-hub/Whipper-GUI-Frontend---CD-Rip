@@ -277,9 +277,33 @@ Run with `whipper-gui` from any terminal.
 ```bash
 git clone https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git
 cd Whipper-GUI-Frontend---CD-Rip
+
+# Create a virtual environment. On Bazzite, Fedora 38+, Ubuntu 24.04+,
+# and other distros with PEP 668 enforcement, this is required — a
+# plain `pip install` against the system Python will refuse with
+# "error: externally-managed-environment". The venv keeps our deps
+# (PySide6, musicbrainzngs, tomli-w) isolated from the system Python.
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install the package in editable mode. From now on, anything you
+# edit in src/whipper_gui/ is picked up the next time you run the GUI.
 pip install -e .
+
+# Run the GUI. The console-script entry point lives in .venv/bin
+# (added to PATH by the `activate` line above).
 whipper-gui
 ```
+
+To re-enter the same environment in a future terminal session:
+
+```bash
+cd ~/Whipper-GUI-Frontend---CD-Rip
+source .venv/bin/activate
+whipper-gui
+```
+
+To leave the venv: `deactivate`.
 
 To build an AppImage from your local checkout:
 
@@ -415,6 +439,19 @@ For discs MusicBrainz doesn't recognize, use the Unknown Album flow from the men
 ---
 
 ## Troubleshooting
+
+### `pip install` fails with "error: externally-managed-environment"
+
+Bazzite, Fedora 38+, Ubuntu 24.04+, and other distros now ship a PEP 668 marker that blocks `pip install` against the system Python. The fix is to install into a virtual environment, which Method C already does for you:
+
+```bash
+cd Whipper-GUI-Frontend---CD-Rip
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+If you tried `pip install -e .` without activating a venv first, no harm done — re-run with the venv active and it'll work.
 
 ### `git clone` fails with "Password authentication is not supported"
 
