@@ -203,6 +203,33 @@ def test_disc_info_returns_empty_for_disc_not_in_database(
     assert info.musicbrainz_submit_url == ""
 
 
+def test_disc_info_salvages_track_count_from_failed_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On the "unable to retrieve disc metadata" failure, whipper has
+    still printed the disc IDs and "N audio tracks" to stdout. The
+    adapter parses that partial output so the GUI can show numbered
+    blank rows for an unknown disc (T32)."""
+    failed_output = (
+        "CDDB disc id: d30e9010\n"
+        "MusicBrainz disc id PKt4tUZ9zkm_5aEh6ButPQLlNs0-\n"
+        "Disc duration: 01:02:08.026, 16 audio tracks\n"
+        "CRITICAL:whipper.command.cd:unable to retrieve disc metadata, "
+        "--unknown argument not passed\n"
+    )
+    monkeypatch.setattr(
+        whipper_backend.subprocess, "run",
+        lambda *a, **kw: _fail_run(stdout=failed_output),
+    )
+
+    impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
+    info = impl.disc_info("/dev/sr0")
+
+    assert info.cddb_disc_id == "d30e9010"
+    assert info.musicbrainz_disc_id == "PKt4tUZ9zkm_5aEh6ButPQLlNs0-"
+    assert info.num_tracks == 16
+
+
 def test_disc_info_still_raises_on_other_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

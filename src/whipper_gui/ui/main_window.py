@@ -102,6 +102,9 @@ class MainWindow(QMainWindow):
         self._current_release_id: str = ""
         self._current_release_detail: ReleaseDetail | None = None
         self._last_mb_releases: list[ReleaseSummary] = []
+        # Track count for the current disc (from whipper cd info). Used to
+        # render numbered blank rows when MusicBrainz has no match.
+        self._current_num_tracks: int = 0
         # Active rip's worker/thread; set during a rip, cleared on finish.
         self._rip_worker: RipWorker | None = None
         self._rip_thread: QThread | None = None
@@ -199,6 +202,7 @@ class MainWindow(QMainWindow):
         self._disc_info_panel.set_drive(device)
         self._track_table.clear()
         self._current_release_id = ""
+        self._current_num_tracks = 0
         self._rip_controls.set_release_id("")
         self._rip_controls.set_drive(device)
 
@@ -211,9 +215,13 @@ class MainWindow(QMainWindow):
             return
 
         self._disc_info_panel.set_disc_info(info)
+        # Remember the disc's track count so we can show numbered blank
+        # rows if MusicBrainz turns up nothing.
+        self._current_num_tracks = info.num_tracks
         if info.musicbrainz_disc_id:
             self._disc_info_panel.set_mb_loading()
-            # Run the MB query on the worker thread.
+            # Run the MB query on the worker thread. A 0-result response
+            # routes to _handle_no_mb_match (same as an empty disc ID).
             self._mb_worker.lookup_disc_id(info.musicbrainz_disc_id)
         else:
             # Empty disc ID means whipper couldn't retrieve metadata
@@ -221,14 +229,7 @@ class MainWindow(QMainWindow):
             # fallback). Surface "not in MusicBrainz" instead of leaving
             # the panel stuck on "reading disc…" forever.
             self._disc_info_panel.set_mb_matches([])
-            # Auto-prompt the Unknown Album flow: the user has a disc
-            # inserted but MB doesn't recognize it, so the only path
-            # forward is to rip as unknown. Surfacing the dialog
-            # proactively beats requiring the user to discover
-            # File → Rip as Unknown Album. Guard against re-prompting
-            # if the user already accepted it in this session.
-            if not self._rip_controls.is_unknown_mode():
-                self.open_unknown_album_dialog()
+            self._handle_no_mb_match()
 
     # --- Slots: MusicBrainz results ----------------------------------------
 
@@ -247,8 +248,11 @@ class MainWindow(QMainWindow):
                 mbid = dialog.selected_mbid()
                 if mbid:
                     self._fetch_release_detail(mbid)
-        # If 0: nothing more to do here. The user can open the Unknown
-        # Album flow via the menu (or future "Rip as unknown" button).
+        else:
+            # 0 matches: the disc had a MusicBrainz disc ID but no release
+            # is registered for it. Same outcome as a disc with no ID —
+            # show blank track rows and offer the unknown-album rip.
+            self._handle_no_mb_match()
 
     def _on_mb_release_detail(self, detail: ReleaseDetail) -> None:
         self._current_release_detail = detail
@@ -259,6 +263,20 @@ class MainWindow(QMainWindow):
     def _on_mb_error(self, message: str) -> None:
         log.warning("MB worker error: %s", message)
         self._disc_info_panel.set_mb_error(message)
+
+    def _handle_no_mb_match(self) -> None:
+        """No MusicBrainz match for the inserted disc.
+
+        Shared by the empty-disc-ID path and the 0-result lookup path.
+        Shows numbered blank track rows (so the user sees the disc's
+        contents) and proactively offers the unknown-album rip. The
+        unknown-mode guard stops it re-prompting once the user has
+        already accepted in this session.
+        """
+        if self._current_num_tracks > 0:
+            self._track_table.set_blank_tracks(self._current_num_tracks)
+        if not self._rip_controls.is_unknown_mode():
+            self.open_unknown_album_dialog()
 
     def _fetch_release_detail(self, mbid: str) -> None:
         self._mb_worker.fetch_release(mbid)

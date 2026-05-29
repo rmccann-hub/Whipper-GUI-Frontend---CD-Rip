@@ -183,7 +183,7 @@ def test_menus_have_settings_and_check_deps(teardown_threads) -> None:
 
 
 def test_drive_change_triggers_disc_info_and_mb_lookup(
-    teardown_threads,
+    teardown_threads, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     backend = _FakeBackend()
     backend.disc_info_return = DiscInfo(
@@ -192,6 +192,10 @@ def test_drive_change_triggers_disc_info_and_mb_lookup(
     )
     mb = _FakeMb()
     window = teardown_threads(backend=backend, mb_client=mb)
+    # The fake MB returns [] synchronously, which now routes to the
+    # no-match handler and would open a modal. Stub it so the test
+    # focuses on the disc-info + lookup wiring.
+    monkeypatch.setattr(window, "open_unknown_album_dialog", lambda: False)
 
     window._on_drive_changed("/dev/sr0")
 
@@ -203,6 +207,47 @@ def test_drive_change_triggers_disc_info_and_mb_lookup(
     # happens on its thread and isn't deterministic without an event
     # loop drive).
     assert "MusicBrainz" in window._disc_info_panel._mb_match_value.text()
+
+
+def test_no_mb_match_shows_blank_track_rows(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unknown disc (no MB ID) still shows numbered blank rows.
+
+    whipper reports the track count even for a disc MusicBrainz can't
+    identify; we render that many rows so the user sees the disc."""
+    backend = _FakeBackend()
+    backend.disc_info_return = DiscInfo(num_tracks=16)  # no MB/CDDB id
+    window = teardown_threads(backend=backend)
+    prompted: list[bool] = []
+    monkeypatch.setattr(
+        window, "open_unknown_album_dialog",
+        lambda: prompted.append(True) or False,
+    )
+
+    window._on_drive_changed("/dev/sr0")
+
+    assert len(window._track_table.tracks()) == 16
+    assert window._track_table.tracks()[0].number == 1
+    assert window._track_table.tracks()[0].title == ""
+    assert prompted == [True]  # unknown-album flow was offered
+
+
+def test_zero_mb_results_shows_blank_track_rows(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A disc with an MB ID but no registered release also gets blank rows."""
+    backend = _FakeBackend()
+    backend.disc_info_return = DiscInfo(
+        musicbrainz_disc_id="mb-id", num_tracks=12
+    )
+    mb = _FakeMb()  # returns [] for the lookup
+    window = teardown_threads(backend=backend, mb_client=mb)
+    monkeypatch.setattr(window, "open_unknown_album_dialog", lambda: False)
+
+    window._on_drive_changed("/dev/sr0")
+
+    assert len(window._track_table.tracks()) == 12
 
 
 def test_drive_change_handles_whipper_error(teardown_threads) -> None:

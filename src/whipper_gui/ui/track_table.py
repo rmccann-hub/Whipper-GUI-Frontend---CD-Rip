@@ -205,6 +205,24 @@ class TrackTable(QWidget):
         self._album_year_edit.setText(detail.summary.date)
         self._model.set_tracks(detail.tracks)
 
+    def set_blank_tracks(self, count: int) -> None:
+        """Show `count` numbered rows with empty title/artist.
+
+        Used for a disc MusicBrainz can't identify: whipper still tells
+        us how many audio tracks the disc has, so we render that many
+        rows (1..count) so the user sees the disc contents before an
+        unknown-album rip. The album-level fields are left blank.
+
+        Note: editing these rows does NOT yet feed the unknown rip —
+        whipper writes placeholder "Track NN" tags and our post-rip step
+        applies them. Wiring edited tags into the rip is tracked as P2.
+        """
+        if count <= 0:
+            self._model.set_tracks([])
+            return
+        blanks = [TrackSummary(number=n, title="") for n in range(1, count + 1)]
+        self._model.set_tracks(blanks)
+
     def clear(self) -> None:
         """Reset to the empty state (no album metadata, no tracks)."""
         self._album_artist_edit.clear()

@@ -48,3 +48,33 @@ def test_parse_partial_input() -> None:
     assert info.cddb_disc_id == ""
     assert info.musicbrainz_disc_id == "partial-id-only"
     assert info.musicbrainz_submit_url == ""
+
+
+def test_parse_num_tracks_from_disc_duration_line() -> None:
+    """The track count comes from "Disc duration: ..., N audio tracks"."""
+    info = parse_cd_info(
+        "Disc duration: 01:02:08.026, 16 audio tracks\n"
+    )
+    assert info.num_tracks == 16
+
+
+def test_parse_num_tracks_defaults_zero_when_absent() -> None:
+    info = parse_cd_info("CDDB disc id: 940A6A0B\n")
+    assert info.num_tracks == 0
+
+
+def test_parse_num_tracks_from_real_unknown_disc_output() -> None:
+    """Whipper still prints the disc IDs + track count even when the disc
+    isn't in MusicBrainz (the output the adapter salvages on failure)."""
+    output = (
+        "WARNING:whipper.common.program:release not found\n"
+        "CDDB disc id: d30e9010\n"
+        "MusicBrainz disc id PKt4tUZ9zkm_5aEh6ButPQLlNs0-\n"
+        "MusicBrainz lookup URL https://musicbrainz.org/cdtoc/attach?"
+        "toc=1+16+279752&tracks=16&id=PKt4tUZ9zkm_5aEh6ButPQLlNs0-\n"
+        "Disc duration: 01:02:08.026, 16 audio tracks\n"
+    )
+    info = parse_cd_info(output)
+    assert info.cddb_disc_id == "d30e9010"
+    assert info.musicbrainz_disc_id == "PKt4tUZ9zkm_5aEh6ButPQLlNs0-"
+    assert info.num_tracks == 16

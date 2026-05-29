@@ -166,6 +166,25 @@ def test_set_release_populates_album_and_tracks(qapp: QApplication) -> None:
     assert widget.tracks()[0].title == "Speak to Me"
 
 
+def test_set_blank_tracks_creates_numbered_empty_rows(
+    qapp: QApplication,
+) -> None:
+    widget = TrackTable()
+    widget.set_blank_tracks(16)
+
+    tracks = widget.tracks()
+    assert len(tracks) == 16
+    assert [t.number for t in tracks] == list(range(1, 17))
+    assert all(t.title == "" for t in tracks)
+
+
+def test_set_blank_tracks_zero_or_negative_clears(qapp: QApplication) -> None:
+    widget = TrackTable()
+    widget.set_release(_detail())
+    widget.set_blank_tracks(0)
+    assert widget.tracks() == []
+
+
 def test_clear_resets_to_empty(qapp: QApplication) -> None:
     widget = TrackTable()
     widget.set_release(_detail())

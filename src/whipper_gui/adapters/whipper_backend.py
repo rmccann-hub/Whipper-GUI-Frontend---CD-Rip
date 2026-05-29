@@ -183,11 +183,18 @@ class WhipperHostExportedImpl(WhipperBackend):
             # can render a clean "not in MusicBrainz" state and offer
             # the File → Rip as Unknown Album flow.
             if "unable to retrieve disc metadata" in (exc.output or ""):
+                # Whipper still prints the disc IDs and "N audio tracks"
+                # to stdout before it bails on the missing metadata, so
+                # parse what it gave us rather than discarding everything.
+                # That salvages the track count (for showing numbered
+                # blank rows) and the disc IDs (for the info panel). If
+                # the output had none of those, parse_cd_info returns an
+                # empty DiscInfo and the unknown-album flow still works.
                 log.info(
                     "whipper cd info: disc not in MusicBrainz/FreeDB; "
-                    "returning empty DiscInfo for unknown-album flow"
+                    "parsing partial output for the unknown-album flow"
                 )
-                return DiscInfo()
+                return parse_cd_info(exc.output)
             raise
         return parse_cd_info(output)
 

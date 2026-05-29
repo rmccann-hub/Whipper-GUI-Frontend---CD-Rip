@@ -25,6 +25,10 @@ from dataclasses import dataclass
 _CDDB_DISC_ID = re.compile(r"^CDDB disc id:\s*(?P<value>\S+)\s*$")
 _MB_DISC_ID = re.compile(r"^MusicBrainz disc id\s+(?P<value>\S+)\s*$")
 _MB_URL = re.compile(r"^MusicBrainz lookup URL\s+(?P<value>\S+)\s*$")
+# "Disc duration: 01:02:08.026, 16 audio tracks". The track count lets
+# the GUI show numbered (blank) rows for a disc MusicBrainz doesn't know,
+# so the user still sees what's on the disc before an unknown-album rip.
+_NUM_TRACKS = re.compile(r"(?P<value>\d+)\s+audio\s+tracks")
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,7 @@ class DiscInfo:
     cddb_disc_id: str = ""
     musicbrainz_disc_id: str = ""
     musicbrainz_submit_url: str = ""
+    num_tracks: int = 0
 
 
 def parse_cd_info(stdout: str) -> DiscInfo:
@@ -47,6 +52,7 @@ def parse_cd_info(stdout: str) -> DiscInfo:
     cddb = ""
     mb_id = ""
     mb_url = ""
+    num_tracks = 0
 
     for line in stdout.splitlines():
         match = _CDDB_DISC_ID.match(line)
@@ -64,8 +70,16 @@ def parse_cd_info(stdout: str) -> DiscInfo:
             mb_url = match.group("value")
             continue
 
+        # `search`, not `match`: the track count is embedded mid-line
+        # ("Disc duration: ..., 16 audio tracks"), not anchored.
+        match = _NUM_TRACKS.search(line)
+        if match:
+            num_tracks = int(match.group("value"))
+            continue
+
     return DiscInfo(
         cddb_disc_id=cddb,
         musicbrainz_disc_id=mb_id,
         musicbrainz_submit_url=mb_url,
+        num_tracks=num_tracks,
     )
