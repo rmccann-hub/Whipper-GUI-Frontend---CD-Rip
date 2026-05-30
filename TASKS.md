@@ -210,6 +210,16 @@ The sub-sections below are ordered by current priority for picking up work:
 5. **P1 — Install automation** — pre-clone host bootstrap script. Blocked on the repo flipping public.
 6. **P1 — Documentation backlog** — items that need real-system output from T32 to write authoritatively.
 
+**Ranked execution order (set 2026-05-30, after the "EAC successor" research review):**
+1. **Release milestones** (merge → public → tag `v0.0.1` → publish AppImage) — nothing below ships value until v1 is out.
+2. **Drive setup wizard** (write-enabled; PLANNING.md KDD-15) — biggest first-run UX win; see P1.1.
+3. **Drive-access permission diagnostics** — cheap; stops silent "no drive" abandonment; see P1.1.
+4. **EAC parity-gap Settings widgets** (cover art / force-overread / max-retries / keep-going) — below.
+5. **CTDB verify (read-only)** — Phase 1 of KDD-14; foundation for repair.
+6. **CTDB repair (parity, wrap `ctdb-cli`, bundled, explicit trigger)** — Phase 2 of KDD-14; the headline EAC++ differentiator.
+
+*Downgraded:* Test & Copy dual-pass — whipper already emits a per-track Test CRC and Copy CRC, so the guarantee is already delivered (see P2).
+
 High-level feature backlog (not bucketed into a sub-section because each is small):
 
 - Eject button + auto-eject toggle
@@ -233,7 +243,9 @@ The following whipper CLI options exist but aren't currently surfaced in our Set
 
 Each is independent; do them in any order. They should land before the AppImage's first public release so the GUI matches what EAC users expect.
 
-- **CTDB verification (read-only).** The CUETools Database operates an open-source server (LGPL) with no public HTTP API documentation, but the reference server and client code is public — the protocol is derivable from it. A Python client modeled on that reference would let us add a "Verify with CTDB" button to the rip-progress widget that runs after each rip finishes. No submission — same trust-gate as AccurateRip likely applies. Moderate effort (~200-400 lines for the client + UI hookup). Adds a second archival-verification path complementing the AccurateRip data whipper already provides. See [PLANNING.md KDD-12](PLANNING.md) for the reasoning behind moving this from "out of scope" to P1.
+- **CTDB verification (read-only).** The CUETools Database operates an open-source server (LGPL) with no public HTTP API documentation, but the reference server and client code is public — the protocol is derivable from it. A Python client modeled on that reference would let us add a "Verify with CTDB" button to the rip-progress widget that runs after each rip finishes. No submission — same trust-gate as AccurateRip likely applies. Moderate effort (~200-400 lines for the client + UI hookup). Adds a second archival-verification path complementing the AccurateRip data whipper already provides. See [PLANNING.md KDD-12](PLANNING.md) for the reasoning behind moving this from "out of scope" to P1. **This is now Phase 1 of KDD-14** — the foundation for the repair feature below; do it first.
+
+- **CTDB repair (parity) — confirmed in scope; Phase 2 of [KDD-14](PLANNING.md).** The headline EAC++ differentiator: on a rip that finishes with uncorrectable errors, reconstruct the corrupted samples from CTDB's downloaded recovery record (whole-CD parity, ~180 KB) and re-verify — turning a damaged disc into a mathematically perfect file. **Decisions (2026-05-30):** *wrap* the `ctdb-cli` C tool (Option A — do NOT reimplement the erasure coding); **bundle** it in the AppImage (repair operates on the ripped files + downloaded parity, needs no optical device, so no Distrobox/permission involvement); **explicit "Attempt CTDB repair" trigger** first (auto-on-error is a later refinement); **submission shelved**. Reached through a thin `CTDBRepair` adapter (unmaintained-dependency rule). Larger than verify and depends on it — sequence verify → repair. Build step needed in the `python-appimage` recipe to vendor `ctdb-cli`.
 
 ### P1 — Release milestones
 
@@ -255,6 +267,10 @@ The host-side setup (Distrobox, container, whipper, exports) currently lives onl
 ### P1.1 — Install / uninstall ease (real-user testing)
 
 Highest-priority subset of P1, focused specifically on the friction the first-time user hits between "no GUI installed" and "GUI running with a successful rip in hand." Items here unblock new contributors and reduce abandonment at the install step.
+
+- **Drive setup wizard (write-enabled) — top first-run priority.** Replaces the manual hand-edit of `whipper.conf` (the worst current onboarding step) with a guided "Detect my drive" flow: runs `whipper drive analyze` (cache) + `whipper offset find` (offset; needs an AccurateRip-known CD) through the host-exported `~/.local/bin/whipper`, then persists to `whipper.conf` — **backing up to `whipper.conf.bak`** and showing before/after values for confirmation. Fallback when `offset find` fails: AccurateRip drive-model offset lookup + a manual entry box (open question: ship the fallback in v1 of the wizard or later). Also **fixes the "misleading read-offset field"** UX gap (below): Settings becomes read-only/informational with a "Re-detect…" button that launches the wizard. Design + decisions: PLANNING.md **KDD-15**.
+
+- **Drive-access permission diagnostics.** An AppImage inherits the running user's permissions; if the user isn't in the `cdrom` group (or `/dev/sr0` is group-locked), the drive silently never appears and the GUI just looks broken. On "no drives found," diagnose group membership / device permissions and show an actionable message with the exact fix (e.g. `sudo usermod -aG cdrom $USER`, or the Bazzite/atomic equivalent) instead of an empty list. Cheap; directly serves the brief's "easy to set up." (This is the one transferable lesson from the EAC-successor doc's Flatpak/Snap sandboxing section — which is otherwise N/A for us, since we ship AppImage + pipx specifically to reach the host-exported whipper.)
 
 - **[x] Auto-prompt the Unknown Album dialog when MB returns 0 matches.** Done 2026-05-28. Previously the user had to find File → Rip as Unknown Album in the menu after seeing "not in MusicBrainz"; now the dialog opens automatically the first time the GUI detects an unknown disc on a given drive selection. Guarded so it doesn't re-prompt if the user already accepted in this session.
 
@@ -310,7 +326,7 @@ Items that are technically achievable but represent significant effort, double t
 
 - **[x] Edited track tags feed the unknown-album rip.** Done 2026-05-30. After a successful unknown-mode rip, `_on_rip_finished` now calls `run_unknown_post_processing`, which reads `TrackTable.album_metadata()` + `tracks()` (the placeholder rows plus any edits the user made) and writes them to the FLACs via the new `apply_track_tags()` — blank fields fall back to the `Track NN` / Unknown Artist / Unknown Album placeholders, and a typed year becomes a `DATE` tag. **Bug fixed in the same change:** the post-processing is scoped to the album folder whipper just wrote (the `.log`'s parent dir), not the configured output root — otherwise an `rglob("*.flac")` over `~/Music/rips` would have re-tagged every previously ripped album with this disc's metadata. (`apply_placeholder_tags` remains for the no-data path.) Note: edits only flow to **tags**, not filenames — the unknown template still names files `## - Track NN` (renaming-from-edits would be a separate feature).
 
-- **Test & Copy dual-pass rip.** EAC's "Test & Copy" feature rips each track twice — once to a "test" CRC, once to a real "copy" — and compares the two. A match proves bit-perfect reproducibility on this drive, independent of AccurateRip's database. Whipper doesn't expose this natively, so the implementation would be: rip once, parse the rip log for per-track Test CRC and Copy CRC values, rip again to a separate working directory, parse those, then compare. Mismatch raises a warning. Doubles rip time per disc, which is why it's P2 rather than P1 — but for archival-grade rips of irreplaceable discs, it's the second forensic check (alongside AccurateRip + log SHA-256) that EAC users expect to have.
+- **Test & Copy dual-pass rip — DOWNGRADED (largely already delivered).** Re-evaluated 2026-05-30 during the EAC-successor research review: **whipper already performs a test read and a copy read per track and records both CRCs** (your T32 log shows `Test CRC == Copy CRC` for all 16 tracks, and `(try 2)` re-reads on mismatch). We already surface this as the fidelity summary ("all N tracks verified, Test/Copy CRCs match"). So the core guarantee EAC's Test&Copy provides is already in hand. The only delta would be EAC's literal *two separate full passes* of the whole disc — marginal extra assurance at 2× rip time. Not worth building unless a user specifically asks for the two-full-passes behavior; keep parked here.
 
 ---
 

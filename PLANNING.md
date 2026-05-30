@@ -488,6 +488,8 @@ The brief lists "AccurateRip submission" and "CTDB verification" as confirmed Li
 
 - **CTDB submission:** likely subject to the same trust-gate as AccurateRip submission. Stays out of scope.
 
+- **CTDB repair (parity):** confirmed **in scope** (user request, 2026-05-30). The unique capability beyond verification — reconstructing corrupted samples in a damaged rip from a downloaded recovery record. See **KDD-14** for the phased plan and the decision to *wrap* `ctdb-cli` rather than reimplement the erasure coding.
+
 The practical takeaway: archival verification on Linux is already solid — AccurateRip is wired through and visible in the GUI. Adding CTDB as a second verification path is post-v1 work whose cost is manageable.
 
 ### KDD-13 — EAC bit-perfect settings audit
@@ -510,7 +512,7 @@ We benchmark our defaults and exposed settings against the widely-cited "Perfect
 | Gap detection (Secure) | whipper uses cdrdao for gap detection |
 | Track/Disc filename template | configurable in Settings dialog |
 | Detect drive features auto-test | `whipper drive analyze` |
-| CUETools DB metadata plugin | We use MusicBrainz; CTDB verify is P1 (KDD-12) |
+| CUETools DB metadata plugin | We use MusicBrainz; CTDB verify (P1) + parity repair (in scope) — KDD-12, KDD-14 |
 
 **Upstream-locked (whipper hardcodes, can't expose from our GUI):**
 
@@ -539,3 +541,28 @@ These are listed in TASKS.md under "P1 — EAC bit-perfect parity gaps" and shou
 
 - **Does whipper emit a `.cue` sheet alongside the FLACs?** Yes. A real rip wrote `<disc>.cue`, `<disc>.m3u`, and `<disc>.toc` next to the FLACs (plus the `.log`). The `.cue` carries `REM DISCID`, per-track `INDEX`/`ISRC`, and the gap (`INDEX 00`) data. Surfacing the `.cue` in the rip-progress widget the way we surface the `.log` is a small P1 addition.
 - **Does whipper capture per-track ISRC and disc UPC?** The slots exist — the `.cue` has `CATALOG` (UPC) and per-track `ISRC` lines, and the `.toc` has `ISRC` per track — but on the CD-R tested they were all zeros (`CATALOG 0000000000000`, `ISRC 000000000000`) because the disc carries no subchannel ISRC/UPC. A pressed commercial disc would populate them; capturing them into our `RipLog`/UI is a P1 evaluation once a disc with real ISRCs is on hand.
+
+### KDD-14 — CTDB integration: verify (Python), then repair (wrap `ctdb-cli`), bundled
+
+The CUETools Database adds two capabilities beyond AccurateRip: a second cryptographic *verification* path, and — uniquely — *active parity repair* that reconstructs corrupted samples in a damaged rip from a downloaded whole-CD recovery record. Both are confirmed in scope (user request, 2026-05-30). Sequenced as two phases sharing one `CTDBClient` adapter:
+
+- **Phase 1 — verify (read-only).** Pure-Python client (same shape as `MusicBrainzClient`): compute the disc CRC, query CTDB, render confidence next to the AccurateRip result. No new system dependency; bundles in the AppImage trivially. Protocol is derivable from the LGPL reference (`gchudov/cuetools.net`), and a Python reference exists (`bmwalters/python-cuetoolsdb`). This is the existing P1 "CTDB verification" item (KDD-12).
+
+- **Phase 2 — repair (parity).** Download the recovery record (~180 KB, parity is whole-CD, not per-track), reconstruct corrupted samples via erasure coding, then re-verify. **Decision: Option A — wrap the existing `ctdb-cli` C tool** (`github.com/Masterisk-F/ctdb-cli`; builds with `./configure && make`), NOT a pure-Python port of `CUETools.Parity`. Rationale: this is the same "orchestrate a trusted tool, don't reimplement forensic math" thesis that made us delegate extraction to whipper rather than to libcdio directly. A Python Galois-field Reed-Solomon port would have to bit-match CUETools' format exactly — high risk for no architectural gain. (Correcting an earlier research note: `ctdb-cli` is a C tool, not a .NET app, so it is cheap to vendor.)
+
+Implementation decisions (all 2026-05-30):
+- **Bundled, not host- or container-installed.** Repair operates on the already-ripped files plus the downloaded parity — it needs **no optical device**, so it does not require the Distrobox container and is not gated by drive permissions. We vendor `ctdb-cli` into the AppImage (build it in the `python-appimage` recipe / a build step). It is reached through a thin `CTDBRepair` adapter (mandatory per the unmaintained-dependency rule) so a future replacement is a one-file swap.
+- **Explicit trigger first.** v1 surfaces an "Attempt CTDB repair" action only when a rip finishes with uncorrectable errors — transparent and testable. The fully-automatic "silently repair on error" model is a later refinement, not v1.
+- **Submission shelved.** Contributing parity back to CTDB is opt-in power-user territory and likely subject to the same trust-gate as AccurateRip submission (KDD-12). Out of scope for now.
+
+Net effect: the project becomes a superset of EAC's workflow — EAC needs CUETools as a *separate* application for parity repair; we integrate it.
+
+### KDD-15 — Drive setup wizard writes `whipper.conf` (via whipper's own commands)
+
+The biggest first-run friction is calibrating the drive: today the user hand-edits `whipper.conf` with an offset they looked up manually. A guided wizard fixes this, and (user decision, 2026-05-30) it is allowed to **write** `whipper.conf`.
+
+To avoid *owning* whipper's config format (which would undercut the "`whipper.conf` is authoritative" principle and the adapter rule), the wizard drives whipper's OWN commands through the sacred `~/.local/bin/whipper` routing — `whipper drive analyze` (cache profile) and `whipper offset find` (offset; needs a CD that is in AccurateRip) — and lets whipper persist what it can. For anything whipper does not auto-persist, a thin adapter writes it after **backing up `whipper.conf` → `whipper.conf.bak`** and showing the user the before/after values to confirm. Re-runnable and reversible.
+
+Fallback when `offset find` fails (no AccurateRip CD inserted, or whipper's admittedly "primitive" detection misfires): offset lookup by drive-model against the AccurateRip drive-offset database, plus a manual entry box. **Open:** whether that fallback ships in the wizard's first version or lands later.
+
+Side effect: this resolves the "misleading read-offset field" UX bug (TASKS.md, P1 UX gaps) — Settings becomes read-only/informational with a "Re-detect…" button that launches the wizard, which becomes the single place the offset is set.
