@@ -77,10 +77,21 @@ Terminal=false
 Categories=AudioVideo;Audio;DiscBurning;
 Keywords=cd;rip;flac;audio;whipper;musicbrainz;
 DESKTOP
-# Refresh the menu database if the tool is available (harmless if not).
+# Refresh the desktop caches so the entry shows up without a re-login.
+# update-desktop-database handles the freedesktop MIME cache, but KDE
+# Plasma's application launcher reads its own ksycoca cache — so on KDE
+# (the project's primary target) we must also run kbuildsycoca, or the
+# entry won't appear until the next login. All best-effort + quiet.
 command -v update-desktop-database >/dev/null 2>&1 \
     && update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+for _kbs in kbuildsycoca6 kbuildsycoca5; do
+    if command -v "$_kbs" >/dev/null 2>&1; then
+        "$_kbs" >/dev/null 2>&1 || true
+        break
+    fi
+done
 echo "Installed desktop entry: $DESKTOP_FILE"
+echo "(If it doesn't appear in the menu immediately, log out and back in.)"
 
 # --- Done ---
 cat <<EOF

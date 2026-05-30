@@ -158,12 +158,18 @@ DESKTOP_FILE="$DESKTOP_DIR/whipper-gui.desktop"
 if [ -f "$DESKTOP_FILE" ]; then
     run rm -f "$DESKTOP_FILE"
     removed "$DESKTOP_FILE"
-    # Refresh the app-menu cache so the entry disappears immediately
-    # (mirrors dev-setup.sh, which refreshes it on create). Harmless if
-    # the tool isn't installed; skipped in --dry-run via run().
+    # Refresh the app-menu caches so the entry disappears immediately
+    # (mirrors dev-setup.sh). update-desktop-database covers the MIME
+    # cache; KDE Plasma's launcher needs kbuildsycoca. Best-effort.
     if command -v update-desktop-database >/dev/null 2>&1; then
         run update-desktop-database "$DESKTOP_DIR"
     fi
+    for _kbs in kbuildsycoca6 kbuildsycoca5; do
+        if command -v "$_kbs" >/dev/null 2>&1; then
+            run "$_kbs"
+            break
+        fi
+    done
 else
     missing "$DESKTOP_FILE"
 fi
