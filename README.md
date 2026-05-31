@@ -2,7 +2,7 @@
 
 A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whipper) audio-CD ripping CLI. Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage.
 
-> **Status: v0.0.1 — first public test release.** Implemented end-to-end with 300+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
+> **Status: v0.0.1 — first public test release.** Implemented end-to-end with 400+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
 
 ## At a glance
 
@@ -198,6 +198,8 @@ Then open a new terminal.
 Every optical drive reads audio slightly off from where it "should" — by a positive or negative number of samples. For bit-perfect archival rips that match AccurateRip's database, whipper needs to know your drive's offset.
 
 > **Before you start:** insert a commercial audio CD into your optical drive (any common pressing — Pink Floyd, Beatles, Metallica, anything not a CD-R or burned mix). Both commands below need a real CD that's in [AccurateRip's database](https://www.accuraterip.com) — most retail discs are.
+
+> **No commercial CD handy (e.g. you only have CD-Rs)?** You can skip this terminal step and set the offset from inside the GUI instead: the drive-setup wizard (offered on first launch, or **Tools → Set up drive…**) has a manual-entry field. Look your drive's offset up at [accuraterip.com/driveoffsets.htm](https://www.accuraterip.com/driveoffsets.htm) and type it in — the GUI applies it via `whipper --offset` without touching `whipper.conf`.
 
 The settings whipper learns about your drive live in `~/.config/whipper/whipper.conf`. **This file does not exist yet** — it's created automatically the first time whipper writes to it (i.e., when you run one of the commands below). Looking for it before that point will turn up nothing, and that's normal.
 
@@ -495,15 +497,17 @@ When you launch Whipper GUI for the first time:
    - **Pending installs:** a checklist for items that need batching or confirmation.
    - **Manual install:** a copyable search string for items like `libdiscid` that need root + reboot.
 
-2. **Pick a drive.** The dropdown at the top of the window lists everything `whipper drive list` returns. Click Refresh if you plug in a drive after launch.
+2. **Drive offset (first launch only).** whipper can't rip until your drive's read offset is set. If none is configured yet, the GUI offers the drive-setup wizard once. You can **auto-detect** it (insert a commercial CD that's in AccurateRip) or **enter it by hand** (look your drive up at [accuraterip.com/driveoffsets.htm](https://www.accuraterip.com/driveoffsets.htm) — handy if you only have CD-Rs). It's a one-time, dismissible prompt; afterwards re-run it anytime from **Tools → Set up drive…**.
 
-3. **Insert a CD.** The GUI fetches the disc's MusicBrainz ID, looks it up, and shows the match status. If multiple releases match, a picker dialog appears (this is the GUI's substitute for whipper's interactive TTY prompt — you'll never see whipper itself ask you anything).
+3. **Pick a drive.** The dropdown at the top of the window lists everything `whipper drive list` returns. Click Refresh if you plug in a drive after launch.
 
-4. **Edit metadata.** The track table is editable. Fix any tags that look wrong before you rip.
+4. **Insert a CD.** The GUI fetches the disc's MusicBrainz ID, looks it up, and shows the match status. If multiple releases match, a picker dialog appears (this is the GUI's substitute for whipper's interactive TTY prompt — you'll never see whipper itself ask you anything).
 
-5. **Click "Start rip."** Progress and per-track AccurateRip confidence appear as the rip runs. You can cancel mid-rip.
+5. **Edit metadata.** The track table is editable. Fix any tags that look wrong before you rip.
 
-6. **View the log.** When the rip finishes, the "View log" button opens the rip log in your default text editor.
+6. **Click "Start rip."** Progress and per-track AccurateRip confidence appear as the rip runs. You can cancel mid-rip.
+
+7. **View the log.** When the rip finishes, the "View log" button opens the rip log in your default text editor.
 
 For discs MusicBrainz doesn't recognize, use the Unknown Album flow from the menu — the GUI rips with placeholder `Track NN` tags and optionally launches Picard for you to fix them up.
 
@@ -712,7 +716,7 @@ Your music at `~/Music/rips/` (or wherever Settings points) is never touched by 
 Core project documents (in this directory):
 
 - [`CLAUDE.md`](CLAUDE.md) — project rules and conventions (read before contributing); Project operations section has current build/run/test/uninstall commands
-- [`PLANNING.md`](PLANNING.md) — architecture, directory tree, per-module responsibilities, 13 keyed design decisions (KDD-01 through KDD-13)
+- [`PLANNING.md`](PLANNING.md) — architecture, directory tree, per-module responsibilities, 15 keyed design decisions (KDD-01 through KDD-15)
 - [`TASKS.md`](TASKS.md) — active task checklist. P0 (T01-T32, complete), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope.
 - [`DEPENDENCIES.md`](DEPENDENCIES.md) — pinned versions, last upstream release dates, replacement plans, retirement-review log
 
