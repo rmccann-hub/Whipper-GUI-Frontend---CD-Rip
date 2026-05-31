@@ -800,3 +800,94 @@ def test_safe_path_segment() -> None:
     assert _safe_path_segment("AC/DC") == "AC-DC"          # no stray subdir
     assert _safe_path_segment("50%off") == "50off"          # no whipper code
     assert _safe_path_segment("") == ""                      # blank → fallback
+
+
+# --- First-run drive-setup offer + manual offset -------------------------
+
+
+def test_should_offer_when_unconfigured_and_not_prompted(
+    teardown_threads, monkeypatch
+) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
+    window = teardown_threads(config=Config(drive_setup_prompted=False))
+    assert window._should_offer_drive_setup() is True
+
+
+def test_no_offer_when_already_prompted(teardown_threads, monkeypatch) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
+    window = teardown_threads(config=Config(drive_setup_prompted=True))
+    assert window._should_offer_drive_setup() is False
+
+
+def test_no_offer_when_offset_already_configured(
+    teardown_threads, monkeypatch
+) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
+    window = teardown_threads(config=Config(drive_setup_prompted=False))
+    assert window._should_offer_drive_setup() is False
+
+
+def test_maybe_offer_records_prompt_and_launches_on_yes(
+    teardown_threads, monkeypatch
+) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
+    saved: list[Config] = []
+    window = teardown_threads(
+        config=Config(drive_setup_prompted=False), save_cfg=saved.append
+    )
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+    launched: list[bool] = []
+    monkeypatch.setattr(window, "_on_drive_setup", lambda: launched.append(True))
+
+    window._maybe_offer_drive_setup()
+
+    # Recorded so it never re-nags, persisted, and the wizard was launched.
+    assert window._config.drive_setup_prompted is True
+    assert saved and saved[-1].drive_setup_prompted is True
+    assert launched == [True]
+
+
+def test_maybe_offer_no_launch_on_no(teardown_threads, monkeypatch) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
+    window = teardown_threads(config=Config(drive_setup_prompted=False))
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.No
+    )
+    launched: list[bool] = []
+    monkeypatch.setattr(window, "_on_drive_setup", lambda: launched.append(True))
+
+    window._maybe_offer_drive_setup()
+
+    assert launched == []
+    assert window._config.drive_setup_prompted is True  # still recorded
+
+
+def test_maybe_offer_skips_when_configured(teardown_threads, monkeypatch) -> None:
+    import whipper_gui.ui.main_window as mw
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
+    window = teardown_threads(config=Config(drive_setup_prompted=False))
+    launched: list[bool] = []
+    monkeypatch.setattr(window, "_on_drive_setup", lambda: launched.append(True))
+
+    window._maybe_offer_drive_setup()
+
+    assert launched == []
+    assert window._config.drive_setup_prompted is False  # never even offered
+
+
+def test_manual_offset_saved_sets_override(teardown_threads) -> None:
+    saved: list[Config] = []
+    window = teardown_threads(config=Config(), save_cfg=saved.append)
+
+    window._on_manual_offset_saved(667)
+
+    assert window._config.read_offset == 667
+    assert window._config.override_read_offset is True
+    assert saved and saved[-1].read_offset == 667

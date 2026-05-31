@@ -1,0 +1,82 @@
+name: Release
+
+# Push a version tag (e.g. `git tag v0.0.2 && git push origin v0.0.2`) and this
+# builds the AppImage in a clean environment and attaches it to a GitHub
+# Release automatically. No more hand-building or manual uploads — cutting a
+# release is one `git tag`.
+#
+# The build itself reuses build/build_appimage.sh (the same script developers
+# run locally), so there is exactly one build recipe to maintain.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Needed for the `gh release` calls to create/update the release.
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    # Pin to 22.04 for a stable, older glibc — the AppImage bundles a
+    # manylinux2014 CPython, so building on an older host keeps it broadly
+    # compatible across the target distros (Bazzite, Fedora, Arch, Ubuntu).
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build "python-appimage>=1.4,<2"
+
+      - name: Build the AppImage
+        env:
+          # FUSE isn't available on GitHub runners; the build/appimagetool both
+          # honour this and extract-and-run instead of mounting.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          # Authenticated GitHub API access raises the rate limit for
+          # python-appimage's CPython base-image download (anonymous requests
+          # get 403'd under load).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash build/build_appimage.sh
+
+      - name: Generate checksum
+        run: sha256sum whipper-gui-x86_64.AppImage > whipper-gui-x86_64.AppImage.sha256
+
+      - name: Sanity-check the built AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          chmod +x whipper-gui-x86_64.AppImage
+          ./whipper-gui-x86_64.AppImage --version
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # 0.x (and any tag with a pre-release suffix) ship as pre-releases.
+          case "$TAG" in
+            v0.*|*-*) PRERELEASE="--prerelease" ;;
+            *)        PRERELEASE="" ;;
+          esac
+          # Create the release if it doesn't exist yet; otherwise just (re)upload
+          # the assets. --generate-notes auto-summarises merged PRs since the
+          # last tag; the canonical detailed notes live in CHANGELOG.md.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              whipper-gui-x86_64.AppImage whipper-gui-x86_64.AppImage.sha256 --clobber
+          else
+            gh release create "$TAG" \
+              whipper-gui-x86_64.AppImage whipper-gui-x86_64.AppImage.sha256 \
+              --title "Whipper GUI $TAG" \
+              --generate-notes \
+              $PRERELEASE
+          fi

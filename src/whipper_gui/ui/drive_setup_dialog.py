@@ -15,14 +15,16 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QLabel,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -39,11 +41,18 @@ log = logging.getLogger(__name__)
 class DriveSetupDialog(QDialog):
     """Modal-ish dialog that calibrates one drive via whipper's commands."""
 
+    # Emitted when the user saves a manually-entered offset (the fallback for
+    # when auto-detection can't run — e.g. no AccurateRip disc to hand). The
+    # main window persists it as the GUI's `--offset` override; this dialog
+    # stays a view and never writes config itself.
+    manual_offset_saved = Signal(int)
+
     def __init__(
         self,
         backend: WhipperBackend,
         device: str,
         parent: QWidget | None = None,
+        current_offset: int = 0,
     ) -> None:
         super().__init__(parent)
         self._backend: WhipperBackend = backend
@@ -99,6 +108,35 @@ class DriveSetupDialog(QDialog):
         self._results_label.setReadOnly(True)
         root.addWidget(self._results_label, stretch=1)
 
+        # --- Manual fallback ---------------------------------------------------
+        # Auto-detection needs a disc that's in AccurateRip; a user with only
+        # CD-Rs (or an obscure pressing) can't run it. Let them enter the
+        # offset by hand — every drive model's value is published at
+        # AccurateRip's list, keyed by the exact drive the GUI already shows.
+        manual_intro = QLabel(
+            "No AccurateRip disc handy? Look up your drive's offset at "
+            '<a href="https://www.accuraterip.com/driveoffsets.htm">'
+            "accuraterip.com/driveoffsets.htm</a> and enter it here. It's "
+            "applied via whipper's --offset, so whipper.conf isn't touched.",
+            self,
+        )
+        manual_intro.setWordWrap(True)
+        manual_intro.setOpenExternalLinks(True)
+        root.addWidget(manual_intro)
+
+        manual_row = QHBoxLayout()
+        manual_row.addWidget(QLabel("Read offset (samples):", self))
+        self._offset_spin: QSpinBox = QSpinBox(self)
+        # AccurateRip offsets sit well within ±2000 samples in practice.
+        self._offset_spin.setRange(-2000, 2000)
+        self._offset_spin.setValue(current_offset)
+        manual_row.addWidget(self._offset_spin)
+        self._save_offset_button: QPushButton = QPushButton("Save offset", self)
+        self._save_offset_button.clicked.connect(self._on_save_offset_clicked)
+        manual_row.addWidget(self._save_offset_button)
+        manual_row.addStretch(1)
+        root.addLayout(manual_row)
+
         # Close only — there's no "apply" step because whipper writes the
         # config itself the moment detection succeeds.
         self._button_box: QDialogButtonBox = QDialogButtonBox(
@@ -145,6 +183,14 @@ class DriveSetupDialog(QDialog):
         self._detect_button.setText("Re-detect")
         self._worker = None
         self._thread = None
+
+    def _on_save_offset_clicked(self) -> None:
+        """Persist a hand-entered offset via the main window (--offset path)."""
+        value = self._offset_spin.value()
+        self.manual_offset_saved.emit(value)
+        self._status_label.setText(
+            f"Saved read offset {value:+d} — it will be used for rips."
+        )
 
     # --- Lifecycle ----------------------------------------------------------
 

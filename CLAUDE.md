@@ -72,7 +72,7 @@ The line between these is judgment. When in doubt, the safer call is to stop and
 
 Read these alongside this file when picking up a session:
 
-- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-13)
+- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-15)
 - **`TASKS.md`** — active task checklist; update status (`[ ]` → `[~]` → `[x]`) as work progresses. Sections: P0 (v1 release, T01-T32), P1.1 (install/uninstall ease — highest-priority P1 subset), P1 (broader backlog), P2 (future), Out of scope.
 - **`DEPENDENCIES.md`** — dep table with last release dates and replacement plans; review per the cadence stated in that file
 - **`README.md`** — outward-facing project description and install instructions
@@ -95,6 +95,12 @@ There is no `compass_artifact_*.md` in the repo; the original v1 research valida
 ### Build commands
 
 - AppImage: `bash build/build_appimage.sh` (produces `whipper-gui-x86_64.AppImage` at repo root via `python-appimage`)
+- App icon: `python3 build/make_icon.py` (regenerates the committed `build/python-appimage/whipper-gui.png`; needs Pillow)
+
+### CI / release
+
+- **CI:** `.github/workflows/ci.yml` runs `pytest` on every push to `main` and every PR.
+- **Releasing is automated** — do *not* hand-build/upload. Cut a release by pushing a version tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` then builds the AppImage (reusing `build/build_appimage.sh`) and attaches it + a `.sha256` to a GitHub Release. `v0.*` tags publish as pre-releases. Bump `version` in `pyproject.toml` and add a `CHANGELOG.md` entry before tagging.
 
 ### Run commands
 

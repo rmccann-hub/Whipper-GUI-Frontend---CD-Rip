@@ -96,6 +96,12 @@ class Config:
     # --- UI toggles ---
     auto_launch_picard: bool = False
 
+    # Set once we've auto-offered the drive-setup wizard on first run (when no
+    # read offset was configured). Keeps the offer to a single, dismissible
+    # prompt — afterwards the user runs it from Tools → Set up drive…. Pure UI
+    # bookkeeping, not a rip parameter.
+    drive_setup_prompted: bool = False
+
     # Continue ripping a CD-R (burned disc). Whipper refuses by default
     # ("inserted disc seems to be a CD-R, --cdr not passed") because in an
     # archival workflow a burned disc is usually an accident. Off by

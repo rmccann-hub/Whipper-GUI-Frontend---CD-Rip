@@ -16,7 +16,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
@@ -49,6 +49,7 @@ from whipper_gui.drive_access import (
     DriveAccessDiagnosis,
     diagnose_drive_access,
 )
+from whipper_gui.offset_config import is_offset_configured
 from whipper_gui.parsers.cd_info import DiscInfo
 from whipper_gui.parsers.rip_log import parse_rip_log
 from whipper_gui.ui.disc_info_panel import DiscInfoPanel
@@ -164,6 +165,12 @@ class MainWindow(QMainWindow):
 
         # --- Signal wiring -------------------------------------------------
         self._wire_signals()
+
+        # First-run: if no read offset is configured yet, offer the drive-setup
+        # wizard once (dismissible). Deferred to the event loop so it appears
+        # after the window is shown; in tests (no exec loop) it never fires, so
+        # it can't interfere — _should_offer_drive_setup() is tested directly.
+        QTimer.singleShot(0, self._maybe_offer_drive_setup)
 
     # --- Top-level lifecycle ------------------------------------------------
 
@@ -461,8 +468,56 @@ class MainWindow(QMainWindow):
                 self, "Set up drive", "Select a drive first."
             )
             return
-        dialog = DriveSetupDialog(self._backend, device, self)
+        dialog = DriveSetupDialog(
+            self._backend, device, self, current_offset=self._config.read_offset
+        )
+        dialog.manual_offset_saved.connect(self._on_manual_offset_saved)
         dialog.exec()
+
+    def _should_offer_drive_setup(self) -> bool:
+        """True when we should auto-offer calibration on first run.
+
+        Only when (a) we haven't offered before and (b) no read offset is
+        configured (neither whipper.conf nor our --offset override). whipper
+        can't rip without one, so a fresh user is otherwise stuck.
+        """
+        if self._config.drive_setup_prompted:
+            return False
+        return not is_offset_configured(self._config.override_read_offset)
+
+    def _maybe_offer_drive_setup(self) -> None:
+        """Show the one-time, dismissible first-run calibration offer."""
+        if not self._should_offer_drive_setup():
+            return
+        # Record the offer first so a decline (or any path out) never re-nags;
+        # afterwards calibration lives on Tools → Set up drive….
+        self._config.drive_setup_prompted = True
+        self._save_config(self._config)
+        choice = QMessageBox.question(
+            self,
+            "Set up your drive",
+            "Your drive's read offset isn't configured yet — whipper needs it "
+            "to rip. Set it up now?\n\n"
+            "You can auto-detect it (insert a popular commercial CD) or enter "
+            "it by hand. You can also do this later from Tools → Set up drive….",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice == QMessageBox.StandardButton.Yes:
+            self._on_drive_setup()
+
+    def _on_manual_offset_saved(self, value: int) -> None:
+        """Store a hand-entered read offset as the GUI's --offset override.
+
+        This is the fallback when auto-detection can't run (no AccurateRip
+        disc). We persist it to our own config and pass it as `--offset` at
+        rip time, so whipper.conf is never hand-authored (KDD-15).
+        """
+        self._config.read_offset = value
+        self._config.override_read_offset = True
+        self._rip_controls.set_config(self._config)
+        self._save_config(self._config)
+        log.info("manual read offset saved: %+d", value)
 
     # --- Slots: drive-access diagnostics -----------------------------------
 

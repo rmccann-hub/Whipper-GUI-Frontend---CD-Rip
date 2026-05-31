@@ -41,6 +41,24 @@ def test_initial_state(qapp: QApplication) -> None:
     assert dialog._results_label.toPlainText() == ""
 
 
+def test_manual_offset_save_emits_signal(qapp: QApplication) -> None:
+    """The manual fallback emits the entered offset for the main window."""
+    dialog = _dialog(qapp)
+    captured: list[int] = []
+    dialog.manual_offset_saved.connect(captured.append)
+
+    dialog._offset_spin.setValue(667)
+    dialog._on_save_offset_clicked()
+
+    assert captured == [667]
+    assert "+667" in dialog._status_label.text()
+
+
+def test_manual_offset_prefilled_from_current(qapp: QApplication) -> None:
+    dialog = DriveSetupDialog(_StubBackend(), "/dev/sr0", current_offset=-12)
+    assert dialog._offset_spin.value() == -12
+
+
 def test_on_finished_renders_success(qapp: QApplication) -> None:
     dialog = _dialog(qapp)
     dialog._on_finished(

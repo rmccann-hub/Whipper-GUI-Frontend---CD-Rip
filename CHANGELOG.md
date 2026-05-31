@@ -3,6 +3,20 @@
 All notable changes to Whipper GUI are recorded here. This project adheres to
 [Semantic Versioning](https://semver.org/). Dates are ISO-8601 (YYYY-MM-DD).
 
+## [Unreleased]
+
+### Added
+- **First-run read-offset onboarding.** whipper refuses to rip until a read
+  offset is configured; a fresh user (especially one with only CD-Rs, who
+  can't run AccurateRip auto-detection) would otherwise hit a cryptic error.
+  On first launch, if no offset is set (neither in `whipper.conf` nor as the
+  GUI's `--offset` override), the GUI now offers the drive-setup wizard once —
+  dismissible, and never re-nagged (afterwards it lives on Tools → Set up
+  drive…). The wizard gains a **manual-entry fallback**: when auto-detection
+  can't run, enter your drive's published offset by hand (linked to
+  AccurateRip's list); it's applied via `--offset`, so `whipper.conf` is never
+  hand-authored (KDD-15).
+
 ## [0.0.1] — 2026-05-31
 
 **First public test release.** A Linux GUI front-end for the `whipper` CD-ripping
