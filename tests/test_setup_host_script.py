@@ -64,6 +64,14 @@ def test_dry_run_prints_all_steps_without_executing() -> None:
     assert "Running from a checkout" in out
 
 
+def test_dry_run_checks_for_a_container_backend() -> None:
+    # Distrobox needs podman/docker; the script must verify a backend exists
+    # before trying to create the container (the Ubuntu install gotcha).
+    result = _run(["--dry-run", "--yes", "--no-gui"])
+    assert result.returncode == 0
+    assert "container backend" in result.stdout
+
+
 def test_dry_run_no_gui_skips_install_step() -> None:
     result = _run(["--dry-run", "--yes", "--no-gui"])
     assert result.returncode == 0

@@ -5,7 +5,7 @@
 # and then the GUI install, so a new user goes from nothing to a launchable
 # app in one command:
 #
-#   1. Ensure Distrobox is installed.
+#   1. Ensure Distrobox + a container backend (podman/docker) are installed.
 #   2. Create the `ripping` Distrobox container (Fedora-based).
 #   3. Install whipper + flac + python3-setuptools inside it.
 #   4. Export the whipper/metaflac binaries to ~/.local/bin on the host.
@@ -26,7 +26,7 @@
 #   bash setup-host.sh --container NAME --image IMAGE
 #   bash setup-host.sh --help
 #
-# One-liner (once the repo is public):
+# One-liner (the repo is public):
 #   curl -fsSL https://raw.githubusercontent.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/main/setup-host.sh | bash
 
 set -euo pipefail
@@ -49,7 +49,7 @@ Automates README Steps 1-4 (Distrobox, the `ripping` container, whipper +
 flac install, binary export) and then clones + installs the GUI.
 
 Steps performed:
-  1. Ensure Distrobox is installed.
+  1. Ensure Distrobox + a container backend (podman/docker) are installed.
   2. Create the `ripping` container (Fedora-based).
   3. Install whipper + flac + python3-setuptools inside it.
   4. Export whipper/metaflac to ~/.local/bin on the host.
@@ -159,6 +159,41 @@ ensure_distrobox() {
     fi
 }
 
+# --- Step 1.5: container backend (podman/docker) ---------------------------
+# Distrobox is only a front-end; it needs podman or docker to actually create
+# containers. On Bazzite/Silverblue podman is preinstalled, but on Ubuntu/Debian
+# `apt install distrobox` does NOT reliably pull a backend (podman is only a
+# Recommends, which `--no-install-recommends` setups skip), and the upstream
+# installer ships no backend at all. Without one, `distrobox create` fails with
+# "Cannot find a container manager." Ensure podman is present; it's the
+# Distrobox default and is in every target distro's repos.
+ensure_container_backend() {
+    step "Step 1.5/5 — container backend (podman/docker)"
+    if have podman; then
+        echo "Found podman: $(podman --version 2>/dev/null || echo present)"
+        return
+    fi
+    if have docker; then
+        echo "Found docker — Distrobox can use it."
+        return
+    fi
+    echo "No container backend (podman/docker) found. Distrobox needs one."
+    if ! confirm "Install podman now?"; then
+        die "A container backend is required. Install podman or docker and re-run."
+    fi
+    local id_like=""
+    [ -r /etc/os-release ] && id_like="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
+    case "$id_like" in
+        *fedora*|*rhel*|*centos*) run sudo dnf install -y podman ;;
+        *debian*|*ubuntu*)        run sudo apt-get install -y podman ;;
+        *arch*)                   run sudo pacman -S --noconfirm podman ;;
+        *)                        die "Unknown distro; install podman or docker manually and re-run." ;;
+    esac
+    if [ "$DRY_RUN" -eq 0 ] && ! have podman; then
+        die "podman install did not succeed. Install podman or docker and re-run."
+    fi
+}
+
 # --- Step 2: container -----------------------------------------------------
 container_exists() {
     have distrobox || return 1
@@ -245,6 +280,7 @@ echo "Whipper GUI host setup"
 have git || die "git is required (to clone the repo). Install git and re-run."
 
 ensure_distrobox
+ensure_container_backend
 ensure_container
 install_tools
 export_binaries

@@ -73,6 +73,8 @@ There are five things to set up. Plan on **20-40 minutes** the first time. Once 
 
 Distrobox lets you run a different Linux distribution's tools alongside your host system. It's the recommended way to run whipper on immutable distros like Bazzite.
 
+> **Distrobox needs a container backend** — `podman` (recommended) or `docker`. Bazzite, Fedora Silverblue, and most atomic distros ship podman already. On **Ubuntu/Debian** it isn't guaranteed, so install it alongside Distrobox (the commands below do this). If `distrobox create` later fails with *"Cannot find a container manager"*, a missing backend is why — `sudo apt install podman` fixes it.
+
 **On Bazzite (already pre-installed):**
 
 ```bash
@@ -96,8 +98,10 @@ sudo pacman -S distrobox
 **On Ubuntu / Debian (24.04+):**
 
 ```bash
-sudo apt install distrobox
+sudo apt install distrobox podman
 ```
+
+(Installing `podman` explicitly here is the Ubuntu-specific gotcha — the `distrobox` package only *recommends* it, so on minimal installs it can be absent and `distrobox create` then fails.)
 
 **On older systems:**
 
