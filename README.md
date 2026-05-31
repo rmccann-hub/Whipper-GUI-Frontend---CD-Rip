@@ -2,7 +2,7 @@
 
 A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whipper) audio-CD ripping CLI. Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage.
 
-> **Status: pre-alpha.** The application is implemented end-to-end and has 300+ unit tests, but it has not yet been validated against a real CD on a real Bazzite system. See [TASKS.md](TASKS.md) — T32 (end-to-end smoke test) is the only remaining P0 task.
+> **Status: v0.0.1 — first public test release.** Implemented end-to-end with 300+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
 
 ## At a glance
 
@@ -15,6 +15,27 @@ A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whippe
 ---
 
 ## Installation
+
+### Quickstart for testers (the short version)
+
+There are **two pieces**: the *host stack* (Distrobox + whipper, which does the actual ripping) and the *GUI* (this AppImage). The GUI can't rip without the host stack — that's by design ([why](PLANNING.md)). So:
+
+```bash
+# 1. Host stack — installs Distrobox, the `ripping` container, whipper + flac,
+#    and exports them to your host. One command, idempotent, ~20-40 min first time.
+curl -fsSL https://raw.githubusercontent.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/main/setup-host.sh | bash -s -- --no-gui
+
+# 2. The GUI — download the AppImage from the latest release, make it executable, run it.
+#    (Grab whipper-gui-x86_64.AppImage from the Releases page linked below.)
+chmod +x whipper-gui-x86_64.AppImage
+./whipper-gui-x86_64.AppImage
+```
+
+Latest AppImage: **[Releases page](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/latest)**.
+
+Then, inside the GUI: **Tools → Set up drive…** to calibrate your drive's read offset (one time), insert a CD, and rip. To remove everything later, see [Uninstalling](#uninstalling).
+
+The rest of this section is the long form — read it if the quickstart hits a snag or you'd rather do each step by hand.
 
 ### Fast path — one command (Steps 1-4 + 7)
 
@@ -242,22 +263,24 @@ Whipper GUI will auto-launch Picard with the rip folder when you mark a disc as 
 
 ### Step 7 — Install Whipper GUI
 
-> **As of right now (pre-alpha), only Method C works.** The AppImage and `pipx` wheel aren't published yet. Method C clones the source and runs the GUI directly. The other methods are documented for the future and explain themselves with a "not yet" callout at the top.
+> **Recommended: Method A (AppImage).** As of v0.0.1 it's published as a downloadable release asset — this is the simplest path for most people. Method B (`pipx` from PyPI) isn't published yet. Method C runs the GUI from a source clone and is aimed at developers.
 
 Pick **one** of the methods below.
 
 #### Method A — AppImage (recommended for end users)
 
-> The AppImage is not yet published as a release artifact. Until it is, use Method B or Method C below to build one yourself or run from source.
-
-When the AppImage is available:
+Download the latest `whipper-gui-x86_64.AppImage` from the **[Releases page](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/latest)**, then:
 
 ```bash
 chmod +x whipper-gui-x86_64.AppImage
 ./whipper-gui-x86_64.AppImage
 ```
 
+That's it — the AppImage bundles Python, Qt, and the GUI's dependencies, so there's nothing else to install on the GUI side. (You still need the host stack from Steps 1-4 for ripping to work.)
+
 To integrate it with KDE's application menu, drop it in `~/Applications/` and use [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher) or KDE's "Install AppImage" right-click option.
+
+> **On a FUSE-less host** (rare on desktop Linux, but some minimal setups): run with `APPIMAGE_EXTRACT_AND_RUN=1 ./whipper-gui-x86_64.AppImage`, or see [AppImage won't launch](#appimage-wont-launch) in Troubleshooting.
 
 #### Method B — pipx (recommended for technical users)
 
@@ -281,7 +304,7 @@ pipx install whipper-gui
 
 Run with `whipper-gui` from any terminal.
 
-#### Method C — From source (for developers / current state)
+#### Method C — From source (for developers)
 
 > The repository is **public**, so no authentication is needed to clone over HTTPS. (If you plan to push changes, set up SSH or `gh auth login` — but for just running from source, a plain clone works.)
 
@@ -506,17 +529,9 @@ If you tried `pip install -e .` without activating a venv first, no harm done �
 
 ### `git clone` fails with "Password authentication is not supported"
 
-GitHub deprecated HTTPS password auth in 2021. If the repository is currently private (it is, during pre-alpha), you need to authenticate first. The fastest path on Bazzite:
+The repository is **public**, so a plain `git clone https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git` needs no authentication. If you only want to *run* the GUI, you don't need to clone at all — use the AppImage from the [Releases page](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/latest) (Method A).
 
-```bash
-sudo dnf install gh    # if not already present
-gh auth login          # web-browser login; choose HTTPS → web browser
-git clone https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip.git
-```
-
-`gh auth login` stores a token in your git credential helper so subsequent clones / pushes work without re-authenticating. Alternative: clone via SSH (`git@github.com:…`) if you have an SSH key on your GitHub account.
-
-Once the repo is flipped to Public on GitHub, no authentication will be needed for read-only clones.
+If you plan to **push changes**, GitHub deprecated HTTPS password auth in 2021, so set up auth first — either an SSH key on your account (clone via `git@github.com:…`) or `gh auth login` (web-browser login; stores a token in your git credential helper).
 
 ### I can't find `~/.config/whipper/whipper.conf`
 
@@ -636,6 +651,35 @@ sudo dnf system-upgrade reboot   # inside the container only
 
 ---
 
+## Uninstalling
+
+The [`uninstall.sh`](uninstall.sh) script (in a source clone) tears everything down in layers, safest-first. It **never** removes your ripped music or the repo itself without an explicit flag.
+
+```bash
+# Interactive — removes the GUI's venv/config/logs by default, then prompts
+# you about the broader stack (Picard, the ripping container, whipper.conf,
+# the host-exported binaries) one at a time.
+bash uninstall.sh
+
+# Preview only — print what would be removed, change nothing.
+bash uninstall.sh --dry-run
+
+# Everything except your music files and the cloned repo, no prompts.
+bash uninstall.sh --full --yes
+
+bash uninstall.sh --help   # full option list
+```
+
+If you installed via the **AppImage** rather than a source clone, removing the GUI is just deleting the file (and any KDE menu entry you created). The host stack — the Distrobox `ripping` container, whipper, and the exported binaries — is separate; remove it with `uninstall.sh --full` from a clone, or by hand:
+
+```bash
+distrobox rm ripping            # remove the container
+rm ~/.local/bin/whipper ~/.local/bin/metaflac   # remove the host exports
+rm -rf ~/.config/whipper ~/.config/whipper-gui ~/.local/share/whipper-gui
+```
+
+Your music at `~/Music/rips/` (or wherever Settings points) is never touched by any of this.
+
 ## Where things live
 
 | Path | Contents |
@@ -655,7 +699,7 @@ Core project documents (in this directory):
 
 - [`CLAUDE.md`](CLAUDE.md) — project rules and conventions (read before contributing); Project operations section has current build/run/test/uninstall commands
 - [`PLANNING.md`](PLANNING.md) — architecture, directory tree, per-module responsibilities, 13 keyed design decisions (KDD-01 through KDD-13)
-- [`TASKS.md`](TASKS.md) — active task checklist. P0 (T01-T32, one open), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope.
+- [`TASKS.md`](TASKS.md) — active task checklist. P0 (T01-T32, complete), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope.
 - [`DEPENDENCIES.md`](DEPENDENCIES.md) — pinned versions, last upstream release dates, replacement plans, retirement-review log
 
 Source documents and reference material (in `docs/`):
