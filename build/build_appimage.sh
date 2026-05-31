@@ -52,11 +52,12 @@ rm -f "$RECIPE_DIR"/whipper_gui-*.whl
 python3 -m build --wheel --outdir "$RECIPE_DIR"
 ls -1 "$RECIPE_DIR"/whipper_gui-*.whl
 
-# --- Placeholder icon ------------------------------------------------------
-# python-appimage's "build app" recipe requires <name>.png in the
-# recipe directory. If the user hasn't committed a real icon yet, we
-# drop in a 16×16 grey square so the build succeeds and the user can
-# replace it before release.
+# --- Icon ------------------------------------------------------------------
+# python-appimage's "build app" recipe requires <name>.png in the recipe
+# directory. The real icon (build/python-appimage/whipper-gui.png, produced
+# by build/make_icon.py) is committed, so this fallback normally does nothing
+# — it only fires if that file has been deleted, dropping a 16×16 grey square
+# so the build still succeeds.
 if [ ! -f "$RECIPE_DIR/whipper-gui.png" ]; then
     echo "Note: no whipper-gui.png in recipe; generating placeholder."
     python3 - <<'PY'

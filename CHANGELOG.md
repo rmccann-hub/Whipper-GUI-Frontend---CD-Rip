@@ -48,7 +48,6 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
 - **FLAC only** in v1 (MP3/WAV are backlog). FLAC compression level is fixed at
   whipper's upstream default (`-5`); see the README for a post-rip re-encode
   recipe if you want `-8`.
-- **AppImage icon** is currently a placeholder.
 - `setup-host.sh` is verified by `--dry-run` and smoke tests; the full
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.

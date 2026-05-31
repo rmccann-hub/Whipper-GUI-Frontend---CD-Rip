@@ -20,8 +20,9 @@ build/python-appimage/.cache/
 build/lib/
 # Locally-built wheel staged for python-appimage's PIP_FIND_LINKS
 build/python-appimage/*.whl
-# Generated placeholder icon (replace with a real committed icon before release)
-build/python-appimage/whipper-gui.png
+# Note: build/python-appimage/whipper-gui.png IS committed (the real app icon,
+# produced by build/make_icon.py). The build script only generates a
+# placeholder if that committed file is ever missing.
 
 # Virtual environments
 .venv/
