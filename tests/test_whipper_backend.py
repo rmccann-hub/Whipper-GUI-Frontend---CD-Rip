@@ -259,8 +259,18 @@ def test_version_returns_trimmed_string(monkeypatch: pytest.MonkeyPatch) -> None
 # --- rip (Popen) ----------------------------------------------------------
 
 
+def _disable_mkdir(monkeypatch: pytest.MonkeyPatch) -> None:
+    """rip() creates the output + working dirs before launching. The argv-only
+    tests below point output_dir at an absolute path like /music, which CI
+    (non-root) can't create — and they don't care about real dirs anyway, so
+    no-op the creation. (test_rip_creates_working_and_output_dirs uses a real
+    writable tmp_path and is intentionally NOT patched.)"""
+    monkeypatch.setattr(Path, "mkdir", lambda self, *a, **k: None)
+
+
 def test_rip_builds_expected_argv(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
 
     impl = WhipperHostExportedImpl(
         binary_path=Path("/x/whipper"),
@@ -294,6 +304,7 @@ def test_rip_unknown_flag_appended_when_requested(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
     impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
     impl.rip(
         drive="/dev/sr0",
@@ -314,6 +325,7 @@ def test_rip_cdr_flag_appended_when_requested(
     Real-hardware testing (T32) hit "inserted disc seems to be a CD-R,
     --cdr not passed" on a home-burned disc; this flag is the fix."""
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
     impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
     impl.rip(
         drive="/dev/sr0",
@@ -330,6 +342,7 @@ def test_rip_cdr_flag_absent_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
     impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
     impl.rip(
         drive="/dev/sr0",
@@ -344,6 +357,7 @@ def test_rip_cdr_flag_absent_by_default(
 def _rip_argv(monkeypatch: pytest.MonkeyPatch, **kwargs: Any) -> list[str]:
     """Run rip() with the given kwargs and return the captured argv."""
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
     impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
     impl.rip(
         drive="/dev/sr0",
@@ -423,6 +437,7 @@ def test_rip_omits_working_directory_when_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(whipper_backend.subprocess, "Popen", _FakePopen)
+    _disable_mkdir(monkeypatch)
     impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"))
     impl.rip(
         drive="/dev/sr0",
