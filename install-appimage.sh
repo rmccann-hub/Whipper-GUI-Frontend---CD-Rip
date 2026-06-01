@@ -29,6 +29,14 @@ DESKTOP_FILE="$DESKTOP_DIR/$DESKTOP_ID.desktop"
 ICON_FILE="$ICON_DIR/$DESKTOP_ID.png"
 USER_DESKTOP="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
 
+# The "Uninstall Whipper GUI" launcher, and the copy of the comprehensive
+# uninstaller it runs. uninstall.sh is staged next to the AppImage so the
+# shortcut works even on an AppImage-only machine (no repo checkout).
+UNINSTALL_ID="whipper-gui-uninstall"
+UNINSTALL_DESKTOP="$DESKTOP_DIR/$UNINSTALL_ID.desktop"
+UNINSTALL_SCRIPT="$APPS_DIR/whipper-gui-uninstall.sh"
+REPO_RAW="https://raw.githubusercontent.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/main"
+
 usage() {
     sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
 }
@@ -47,10 +55,46 @@ refresh_menu() {
 }
 
 do_uninstall() {
-    rm -f "$DESKTOP_FILE" "$ICON_FILE" "$USER_DESKTOP/$DESKTOP_ID.desktop"
+    rm -f "$DESKTOP_FILE" "$ICON_FILE" "$USER_DESKTOP/$DESKTOP_ID.desktop" \
+          "$UNINSTALL_DESKTOP" "$UNINSTALL_SCRIPT"
     refresh_menu
-    echo "Removed Whipper GUI menu entry, desktop icon, and icon file."
-    echo "The AppImage binary itself was left untouched."
+    echo "Removed Whipper GUI menu entry, desktop icon, icon file, and the"
+    echo "uninstall shortcut. The AppImage binary itself was left untouched."
+    echo "(To remove the AppImage, config, and the Distrobox/whipper stack too,"
+    echo " run uninstall.sh — interactively, with options.)"
+}
+
+# Stage the comprehensive uninstaller next to the AppImage and add an
+# "Uninstall Whipper GUI" launcher that runs it in a terminal (so its
+# interactive options are usable). Best-effort: a missing uninstaller just
+# means no shortcut — the AppImage still installs fine.
+install_uninstall_shortcut() {
+    local here
+    here="$(cd "$(dirname "$0")" && pwd)"
+    mkdir -p "$APPS_DIR"
+    if [ -f "$here/uninstall.sh" ]; then
+        cp -f "$here/uninstall.sh" "$UNINSTALL_SCRIPT"
+    elif command -v curl >/dev/null 2>&1 \
+            && curl -fsSL "$REPO_RAW/uninstall.sh" -o "$UNINSTALL_SCRIPT"; then
+        :
+    else
+        echo "Note: couldn't stage uninstall.sh; skipping the uninstall shortcut." >&2
+        return 0
+    fi
+    chmod +x "$UNINSTALL_SCRIPT"
+    cat > "$UNINSTALL_DESKTOP" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Uninstall Whipper GUI
+GenericName=Whipper GUI uninstaller
+Comment=Remove Whipper GUI (with options for the Distrobox/whipper stack)
+Exec=bash "$UNINSTALL_SCRIPT"
+Icon=edit-delete
+Terminal=true
+Categories=AudioVideo;Audio;
+Keywords=uninstall;remove;whipper;
+EOF
+    echo "Installed uninstall shortcut: $UNINSTALL_DESKTOP"
 }
 
 # Find the AppImage to integrate: explicit arg, else search common spots.
@@ -142,6 +186,8 @@ EOF
                >/dev/null 2>&1 || true
         echo "Installed desktop icon: $USER_DESKTOP/$DESKTOP_ID.desktop"
     fi
+
+    install_uninstall_shortcut
 
     refresh_menu
     echo

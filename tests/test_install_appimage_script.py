@@ -69,3 +69,34 @@ def test_install_without_appimage_errors_clearly(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "Couldn't find" in result.stderr or "find a" in result.stderr
+
+
+def test_install_creates_then_removes_uninstall_shortcut(tmp_path: Path) -> None:
+    """A full install drops the AppImage, an app launcher, AND an 'Uninstall
+    Whipper GUI' shortcut + a staged copy of uninstall.sh; --uninstall removes
+    the integration again."""
+    env = dict(os.environ)
+    env["HOME"] = str(tmp_path)
+    env["XDG_DATA_HOME"] = str(tmp_path / ".local" / "share")
+
+    # A stand-in AppImage (icon extraction fails → stock-icon fallback, fine).
+    appimage = tmp_path / "whipper-gui-x86_64.AppImage"
+    appimage.write_text("#!/bin/sh\necho fake\n")
+    appimage.chmod(0o755)
+
+    apps = tmp_path / "Applications"
+    desktop_dir = tmp_path / ".local" / "share" / "applications"
+    uninstall_desktop = desktop_dir / "whipper-gui-uninstall.desktop"
+    staged_uninstaller = apps / "whipper-gui-uninstall.sh"
+
+    install = _run([str(appimage)], env=env)
+    assert install.returncode == 0, install.stderr
+    assert uninstall_desktop.is_file()
+    assert staged_uninstaller.is_file()
+    # The shortcut runs the staged uninstaller.
+    assert "whipper-gui-uninstall.sh" in uninstall_desktop.read_text()
+
+    remove = _run(["--uninstall"], env=env)
+    assert remove.returncode == 0, remove.stderr
+    assert not uninstall_desktop.exists()
+    assert not staged_uninstaller.exists()

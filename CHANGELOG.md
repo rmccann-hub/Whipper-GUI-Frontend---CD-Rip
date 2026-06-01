@@ -8,6 +8,20 @@ All notable changes to Whipper GUI are recorded here. This project adheres to
 ## [0.1.0] — 2026-06-01
 
 ### Added
+- **One-command installer (`install.sh`).** A single downloadable file (also a
+  release asset) that takes a machine from nothing to a launchable app: sets up
+  the host stack (Distrobox + `ripping` container + whipper, via
+  `setup-host.sh --no-gui`), downloads the published AppImage, and adds the
+  desktop shortcut **plus an "Uninstall Whipper GUI" shortcut**. Flags:
+  `--yes`, `--dry-run`, `--no-host`, `--appimage PATH`, `--build`. The
+  uninstall shortcut runs the comprehensive `uninstall.sh` (interactive, with
+  options); `uninstall.sh` now also removes the AppImage, its icon, and the
+  shortcuts, so it cleanly handles both the source and AppImage installs.
+- **AppImage built on every push to `main`** (`.github/workflows/appimage.yml`),
+  not just at release time, so a broken build recipe is caught immediately. It
+  also runs on demand (`workflow_dispatch`) on any branch, uploading a
+  downloadable AppImage artifact for testing branches that have no release yet.
+  See `docs/appimage-testing.md`.
 - **Help menu.** A new **Help → About** dialog shows the version number plus
   support-relevant info (Python/Qt/PySide6 versions, config/log/whipper paths,
   project & issue links), and **Help → User Guide** opens a built-in,

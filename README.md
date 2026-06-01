@@ -18,22 +18,17 @@ A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whippe
 
 ### Quickstart for testers (the short version)
 
-There are **two pieces**: the *host stack* (Distrobox + whipper, which does the actual ripping) and the *GUI* (this AppImage). The GUI can't rip without the host stack — that's by design ([why](PLANNING.md)). So:
+**One command installs everything** — the *host stack* (Distrobox + whipper, which does the actual ripping) and the *GUI* (the AppImage), plus an app-menu entry, a Desktop icon, and an **Uninstall Whipper GUI** shortcut:
 
 ```bash
-# 1. Host stack — installs Distrobox, the `ripping` container, whipper + flac,
-#    and exports them to your host. One command, idempotent, ~20-40 min first time.
-curl -fsSL https://raw.githubusercontent.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/main/setup-host.sh | bash -s -- --no-gui
-
-# 2. The GUI — download the AppImage from the latest release, make it executable, run it.
-#    (Grab whipper-gui-x86_64.AppImage from the Releases page linked below.)
-chmod +x whipper-gui-x86_64.AppImage
-./whipper-gui-x86_64.AppImage
+curl -fsSL https://raw.githubusercontent.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/main/install.sh | bash
 ```
 
-Latest AppImage: **[Releases page](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/latest)**.
+Prefer to download and run it yourself? Grab `install.sh` from the [Releases page](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/latest), then `bash install.sh`. Useful flags: `--dry-run` (preview), `--no-host` (GUI only, host stack already set up), `--appimage PATH` (use a local AppImage). First run takes ~20–40 min because it builds the container.
 
-Then, inside the GUI: **Tools → Set up drive…** to calibrate your drive's read offset (one time), insert a CD, and rip. To remove everything later, see [Uninstalling](#uninstalling).
+Then, inside the GUI: **Tools → Set up drive…** to calibrate your drive's read offset (one time), insert a CD, and rip. To remove everything later, use the **Uninstall Whipper GUI** shortcut (or see [Uninstalling](#uninstalling)).
+
+> Why two pieces under the hood? The GUI can't rip without the host stack — that's by design ([why](PLANNING.md)). `install.sh` just sets up both for you; you can still do each step by hand (below).
 
 The rest of this section is the long form — read it if the quickstart hits a snag or you'd rather do each step by hand.
 
@@ -678,7 +673,9 @@ sudo dnf system-upgrade reboot   # inside the container only
 
 ## Uninstalling
 
-The [`uninstall.sh`](uninstall.sh) script (in a source clone) tears everything down in layers, safest-first. It **never** removes your ripped music or the repo itself without an explicit flag.
+If you installed with `install.sh` (or `install-appimage.sh`), the easiest way is the **Uninstall Whipper GUI** shortcut in your application menu — it runs `uninstall.sh` in a terminal with all the options below.
+
+The [`uninstall.sh`](uninstall.sh) script tears everything down in layers, safest-first: it removes the GUI (AppImage, config, logs, and all shortcuts) by default, then prompts about the broader stack. It **never** removes your ripped music or a source checkout without an explicit flag.
 
 ```bash
 # Interactive — removes the GUI's venv/config/logs by default, then prompts
@@ -695,7 +692,7 @@ bash uninstall.sh --full --yes
 bash uninstall.sh --help   # full option list
 ```
 
-If you installed via the **AppImage** rather than a source clone, removing the GUI is just deleting the file (and any KDE menu entry you created). The host stack — the Distrobox `ripping` container, whipper, and the exported binaries — is separate; remove it with `uninstall.sh --full` from a clone, or by hand:
+If you installed via the **AppImage** with `install.sh`/`install-appimage.sh`, the **Uninstall Whipper GUI** shortcut (or running the staged `~/Applications/whipper-gui-uninstall.sh`) does all of the above — it removes the AppImage, its icon, and the shortcuts, then prompts about the host stack. To remove the host stack by hand instead:
 
 ```bash
 distrobox rm ripping            # remove the container

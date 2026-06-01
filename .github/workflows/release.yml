@@ -73,11 +73,11 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               whipper-gui-x86_64.AppImage whipper-gui-x86_64.AppImage.sha256 \
-              install-appimage.sh --clobber
+              install.sh install-appimage.sh --clobber
           else
             gh release create "$TAG" \
               whipper-gui-x86_64.AppImage whipper-gui-x86_64.AppImage.sha256 \
-              install-appimage.sh \
+              install.sh install-appimage.sh \
               --title "Whipper GUI $TAG" \
               --generate-notes \
               $PRERELEASE

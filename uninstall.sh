@@ -195,6 +195,37 @@ else
     missing "$DESKTOP_ICON"
 fi
 
+# AppImage install (install.sh / install-appimage.sh): the parked AppImage,
+# its extracted icon, the uninstall shortcut, and the staged copy of this
+# very script. Globs the versioned AppImage filename.
+APPS_DIR="$HOME/Applications"
+shopt -s nullglob
+for _app in "$APPS_DIR"/whipper-gui*.AppImage; do
+    run rm -f "$_app"
+    removed "$_app"
+done
+shopt -u nullglob
+
+APP_ICON="${XDG_DATA_HOME:-$HOME/.local/share}/icons/whipper-gui.png"
+if [ -f "$APP_ICON" ]; then
+    run rm -f "$APP_ICON"
+    removed "$APP_ICON"
+fi
+
+UNINSTALL_DESKTOP="$DESKTOP_DIR/whipper-gui-uninstall.desktop"
+if [ -f "$UNINSTALL_DESKTOP" ]; then
+    run rm -f "$UNINSTALL_DESKTOP"
+    removed "$UNINSTALL_DESKTOP"
+fi
+
+# The staged copy of this uninstaller (deleting a running script is safe on
+# Linux — the kernel keeps the open inode until the process exits).
+STAGED_UNINSTALLER="$APPS_DIR/whipper-gui-uninstall.sh"
+if [ -f "$STAGED_UNINSTALLER" ]; then
+    run rm -f "$STAGED_UNINSTALLER"
+    removed "$STAGED_UNINSTALLER"
+fi
+
 # Build artifact left over from dev-setup or AppImage builds.
 if [ -d "$REPO_ROOT/build/python-appimage/__pycache__" ]; then
     run rm -rf "$REPO_ROOT/build/python-appimage/__pycache__"
@@ -284,8 +315,12 @@ echo
 echo "Done."
 echo
 echo "Not touched (remove yourself if you want):"
-echo "  - The cloned repo at $REPO_ROOT"
-echo "    To remove: cd .. && rm -rf \"$(basename "$REPO_ROOT")\""
+# Only mention the repo when we're actually running from a checkout (the
+# staged-copy/AppImage case runs from ~/Applications, where there's no repo).
+if [ -f "$REPO_ROOT/pyproject.toml" ]; then
+    echo "  - The cloned repo at $REPO_ROOT"
+    echo "    To remove: cd .. && rm -rf \"$(basename "$REPO_ROOT")\""
+fi
 if [ "$REMOVE_RIPS" -eq 0 ]; then
     echo "  - Music files at ~/Music/rips/ (use --remove-rips if you really want to)"
 fi
