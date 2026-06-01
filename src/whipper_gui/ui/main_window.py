@@ -12,6 +12,7 @@ graph is documented inline.
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Callable
@@ -49,6 +50,7 @@ from whipper_gui.drive_access import (
     DriveAccessDiagnosis,
     diagnose_drive_access,
 )
+from whipper_gui import drive_control
 from whipper_gui.offset_config import is_offset_configured
 from whipper_gui.parsers.cd_info import DiscInfo
 from whipper_gui.parsers.rip_log import parse_rip_log
@@ -71,6 +73,11 @@ from whipper_gui.workers.mb_worker import MusicBrainzWorker
 from whipper_gui.workers.rip_worker import RipParameters, RipWorker
 
 log = logging.getLogger(__name__)
+
+# How long after Cancel to wait before auto-force-stopping the drive (the
+# in-container reader can keep it spinning). The user can hit Force stop to
+# escalate sooner.
+_FORCE_STOP_COUNTDOWN_MS: int = 8000
 
 
 class MainWindow(QMainWindow):
@@ -124,6 +131,13 @@ class MainWindow(QMainWindow):
         # Set when the user hits Cancel, so the finish handler reports a
         # cancellation rather than a failure.
         self._rip_cancelled: bool = False
+        # Auto-escalation: after Cancel, if the in-container reader keeps the
+        # drive spinning, force-stop it once the countdown elapses. Guard so
+        # we force-stop at most once per cancel.
+        self._force_stop_done: bool = False
+        self._force_stop_timer: QTimer = QTimer(self)
+        self._force_stop_timer.setSingleShot(True)
+        self._force_stop_timer.timeout.connect(self._auto_force_stop)
         # Whether the user asked to launch Picard after an unknown rip.
         self._pending_picard_launch: bool = False
         # Guard so the "no drive — here's the fix" nudge auto-shows at most
@@ -180,6 +194,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: object) -> None:  # noqa: N802 — Qt API
         """Tear down the MB worker thread cleanly on window close."""
+        # Disarm the auto-force-stop so it can't fire into a torn-down window.
+        self._force_stop_timer.stop()
         if self._mb_thread.isRunning():
             self._mb_thread.quit()
             self._mb_thread.wait(2000)
@@ -228,6 +244,7 @@ class MainWindow(QMainWindow):
         # Rip controls.
         self._rip_controls.rip_requested.connect(self._on_rip_requested)
         self._rip_controls.cancel_requested.connect(self._on_rip_cancel)
+        self._rip_controls.force_stop_requested.connect(self._on_force_stop_button)
 
     # --- Slots: drive selection --------------------------------------------
 
@@ -361,6 +378,10 @@ class MainWindow(QMainWindow):
         # Cleared here, set in _on_rip_cancel — so the finish handler can
         # say "cancelled" instead of "failed".
         self._rip_cancelled = False
+        # Disarm any pending auto-force-stop from a previous cancel, so its
+        # countdown can't fire into this fresh rip.
+        self._force_stop_timer.stop()
+        self._force_stop_done = False
 
         self._rip_worker = RipWorker(self._backend, params)
         self._rip_thread = QThread(self)
@@ -384,11 +405,47 @@ class MainWindow(QMainWindow):
         if self._rip_worker is None:
             return
         self._rip_cancelled = True
-        # The in-container reader can take a moment to stop; set expectations.
+        self._force_stop_done = False
+        # The in-container reader can take a moment to stop; set expectations,
+        # and arm the auto force-stop in case it doesn't stop on its own.
+        secs = _FORCE_STOP_COUNTDOWN_MS // 1000
         self._rip_progress.set_status(
-            "Cancelling rip… the drive may take a moment to spin down."
+            f"Cancelling rip… if the drive keeps spinning it'll be "
+            f"force-stopped in {secs}s (or hit Force stop)."
         )
         self._rip_worker.cancel()
+        self._force_stop_timer.start(_FORCE_STOP_COUNTDOWN_MS)
+
+    def _auto_force_stop(self) -> None:
+        """Countdown elapsed after Cancel — force-stop if we haven't already."""
+        if self._force_stop_done:
+            return
+        self._do_force_stop("auto")
+
+    def _on_force_stop_button(self) -> None:
+        """User pressed Force stop — escalate immediately."""
+        self._force_stop_timer.stop()
+        self._do_force_stop("manual")
+
+    def _do_force_stop(self, trigger: str) -> None:
+        """Eject + kill the in-container reader so the drive stops spinning.
+
+        Runs on a daemon thread because `eject` and `distrobox enter` can each
+        block for their timeout — we must not freeze the GUI. We don't touch
+        widgets from the thread; the status is set here on the GUI thread
+        first. See drive_control for the (user-approved) Rule #3 exception.
+        """
+        self._force_stop_done = True
+        device = self._drive_picker.current_device() or ""
+        log.info("force-stopping drive (%s trigger), device=%s", trigger, device or "(default)")
+        self._rip_progress.set_status(
+            "Force-stopping the drive (eject + stopping the reader)…"
+        )
+        threading.Thread(
+            target=drive_control.force_stop_drive,
+            kwargs={"device": device},
+            daemon=True,
+        ).start()
 
     def _on_rip_error(self, message: str) -> None:
         log.warning("rip error: %s", message)

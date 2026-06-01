@@ -6,6 +6,17 @@ All notable changes to Whipper GUI are recorded here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- **Force-stop for a runaway drive.** Cancelling a rip kills the host-side
+  process, but `cdparanoia` runs inside the `ripping` container and podman
+  doesn't forward the signal, so the drive could keep spinning for minutes
+  with no way to stop it. Cancel now auto-escalates after an 8-second
+  countdown (and there's a manual **Force stop** button): it ejects the disc
+  on the host, then — as a deliberate, user-approved exception to the
+  "never call into the container" rule, scoped to this case only — kills the
+  in-container reader so the drive spins down.
+- **Desktop integration for the AppImage** (`install-appimage.sh`, shipped as
+  a release asset): adds an app-menu entry + Desktop icon for a downloaded
+  AppImage (which otherwise installs no shortcut), with `--uninstall`.
 - **First-run read-offset onboarding.** whipper refuses to rip until a read
   offset is configured; a fresh user (especially one with only CD-Rs, who
   can't run AccurateRip auto-detection) would otherwise hit a cryptic error.

@@ -283,3 +283,22 @@ def test_offset_override_none_when_disabled(qapp: QApplication) -> None:
     controls.rip_requested.connect(captured.append)
     controls._start_button.click()
     assert captured[0].read_offset_override is None
+
+
+def test_force_stop_button_enabled_only_during_rip(qapp: QApplication) -> None:
+    controls = RipControls(Config(output_dir="/music"))
+    # Idle: force-stop disabled.
+    assert controls._force_stop_button.isEnabled() is False
+    controls.set_rip_active(True)
+    assert controls._force_stop_button.isEnabled() is True
+    controls.set_rip_active(False)
+    assert controls._force_stop_button.isEnabled() is False
+
+
+def test_force_stop_button_emits_signal(qapp: QApplication) -> None:
+    controls = RipControls(Config(output_dir="/music"))
+    controls.set_rip_active(True)
+    fired: list[bool] = []
+    controls.force_stop_requested.connect(lambda: fired.append(True))
+    controls._force_stop_button.click()
+    assert fired == [True]

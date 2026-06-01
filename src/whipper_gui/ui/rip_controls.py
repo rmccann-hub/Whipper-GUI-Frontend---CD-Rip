@@ -29,6 +29,7 @@ class RipControls(QWidget):
 
     rip_requested = Signal(object)        # carries a RipParameters
     cancel_requested = Signal()
+    force_stop_requested = Signal()       # drastic stop: eject + kill reader
 
     def __init__(
         self,
@@ -48,12 +49,21 @@ class RipControls(QWidget):
 
         self._start_button: QPushButton = QPushButton("Start rip", self)
         self._cancel_button: QPushButton = QPushButton("Cancel", self)
+        # Force stop is the drastic escalation: eject + kill the in-container
+        # reader, for when Cancel leaves the drive spinning. Enabled only
+        # during a rip, same as Cancel.
+        self._force_stop_button: QPushButton = QPushButton("Force stop", self)
+        self._force_stop_button.setToolTip(
+            "Eject and kill the reader if the drive keeps spinning after Cancel."
+        )
 
         self._start_button.clicked.connect(self._on_start)
         self._cancel_button.clicked.connect(self._on_cancel)
+        self._force_stop_button.clicked.connect(self._on_force_stop)
 
         layout.addWidget(self._start_button)
         layout.addWidget(self._cancel_button)
+        layout.addWidget(self._force_stop_button)
 
         self._refresh_button_state()
 
@@ -112,6 +122,7 @@ class RipControls(QWidget):
             (not self._rip_active) and self._has_minimum_state()
         )
         self._cancel_button.setEnabled(self._rip_active)
+        self._force_stop_button.setEnabled(self._rip_active)
 
     def _has_minimum_state(self) -> bool:
         if not self._drive:
@@ -153,3 +164,6 @@ class RipControls(QWidget):
 
     def _on_cancel(self) -> None:
         self.cancel_requested.emit()
+
+    def _on_force_stop(self) -> None:
+        self.force_stop_requested.emit()
