@@ -203,6 +203,32 @@ def test_clear_resets_to_empty(qapp: QApplication) -> None:
     assert widget.tracks() == []
 
 
+def test_highlight_track_selects_matching_row(qapp: QApplication) -> None:
+    widget = TrackTable()
+    widget.set_release(_detail())  # 2 tracks
+
+    widget.highlight_track(2)  # 1-based → row index 1
+
+    selected = widget._view.selectionModel().selectedRows()
+    assert len(selected) == 1
+    assert selected[0].row() == 1
+
+
+def test_highlight_track_ignores_out_of_range(qapp: QApplication) -> None:
+    """A stray 0 (pre-first-track) or a number beyond the loaded rows must
+    not raise and must not change the selection."""
+    widget = TrackTable()
+    widget.set_release(_detail())  # 2 tracks
+    widget.highlight_track(1)  # select row 0
+
+    widget.highlight_track(0)   # below range — ignored
+    widget.highlight_track(99)  # above range — ignored
+
+    selected = widget._view.selectionModel().selectedRows()
+    assert len(selected) == 1
+    assert selected[0].row() == 0
+
+
 def test_user_edit_album_artist_visible_in_metadata(
     qapp: QApplication,
 ) -> None:

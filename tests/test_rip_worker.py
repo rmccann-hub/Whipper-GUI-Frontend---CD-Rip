@@ -138,6 +138,7 @@ class _Signals:
     def __init__(self) -> None:
         self.log_lines: list[str] = []
         self.progress: list[tuple[float, float]] = []  # (overall, task)
+        self.current_tracks: list[int] = []
         self.errors: list[str] = []
         self.finished: list[tuple[bool, str]] = []
 
@@ -146,6 +147,7 @@ class _Signals:
         worker.progress.connect(
             lambda overall, task: self.progress.append((overall, task))
         )
+        worker.current_track.connect(self.current_tracks.append)
         worker.error.connect(self.errors.append)
         worker.finished.connect(
             lambda ok, path: self.finished.append((ok, path))
@@ -246,6 +248,33 @@ def test_progress_two_tier_overall_monotonic_and_task_resets(
     assert sigs.progress[1] == (5.0, 100.0)
     # The task bar reset back down when a new operation started.
     assert 50.0 in tasks and 100.0 in tasks
+
+
+def test_emits_current_track_once_per_new_track(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    """current_track fires once when whipper moves to a new track — not on
+    every per-percent line for the same track — so the GUI can follow the
+    rip by highlighting the active row."""
+    handle = _FakeHandle(
+        lines=[
+            "Reading TOC  100 %",                          # no track yet
+            "Reading track 1 of 3 (1 of 9) ...  10 %",     # → track 1
+            "Reading track 1 of 3 (1 of 9) ...  90 %",     # same track, no re-emit
+            "Verifying track 1 of 3 (3 of 9) ... 100 %",   # still track 1
+            "Reading track 2 of 3 (1 of 9) ...  50 %",     # → track 2
+            "Reading track 3 of 3 (1 of 9) ...  50 %",     # → track 3
+        ],
+        exit_code=0,
+    )
+    worker = RipWorker(_FakeBackend(handle=handle), _params(tmp_path))
+    sigs = _Signals()
+    sigs.attach(worker)
+
+    worker.start_rip()
+
+    # One emission per distinct track, in order; no duplicate for track 1.
+    assert sigs.current_tracks == [1, 2, 3]
 
 
 def test_progress_for_ignores_lines_without_usable_percent(

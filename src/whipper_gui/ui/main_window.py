@@ -400,6 +400,9 @@ class MainWindow(QMainWindow):
         self._rip_worker.log_line.connect(self._rip_progress.append_log_line)
         self._rip_worker.progress.connect(self._rip_progress.set_progress)
         self._rip_worker.status.connect(self._rip_progress.set_status)
+        # Follow the rip in the track table — highlight the row whipper is
+        # currently working on so the user can see progress track by track.
+        self._rip_worker.current_track.connect(self._track_table.highlight_track)
         self._rip_worker.error.connect(self._on_rip_error)
         self._rip_worker.finished.connect(self._on_rip_finished)
 

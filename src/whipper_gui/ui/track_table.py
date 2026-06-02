@@ -259,6 +259,24 @@ class TrackTable(QWidget):
         ]
         self._model.set_tracks(rows)
 
+    def highlight_track(self, track_number: int) -> None:
+        """Select and scroll to the row for `track_number` (1-based).
+
+        Called as a rip progresses so the table follows whipper track by
+        track instead of staying wherever the user last clicked. The track
+        rows are laid out 1..N in order, so row index == track_number - 1.
+        Out-of-range numbers (e.g. a stray 0 before the first track, or a
+        track beyond the loaded rows) are ignored rather than raising.
+        """
+        row = track_number - 1
+        if row < 0 or row >= self._model.rowCount():
+            return
+        self._view.selectRow(row)
+        self._view.scrollTo(
+            self._model.index(row, _COL_NUMBER),
+            QAbstractItemView.ScrollHint.EnsureVisible,
+        )
+
     def clear(self) -> None:
         """Reset to the empty state (no album metadata, no tracks)."""
         self._album_artist_edit.clear()

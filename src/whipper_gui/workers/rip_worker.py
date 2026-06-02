@@ -111,6 +111,9 @@ class RipWorker(QObject):
     # operation (read → verify → encode each sweep 0-100%).
     progress = Signal(float, float)        # overall_percent, task_percent
     status = Signal(str)                   # human-readable current phase
+    # Emitted with the 1-based track number whenever whipper starts working
+    # on a new track, so the GUI can follow along by highlighting that row.
+    current_track = Signal(int)
     finished = Signal(bool, str)           # success, log_path
     error = Signal(str)
 
@@ -133,6 +136,9 @@ class RipWorker(QObject):
         self._overall: float = 0.0
         self._total_tracks: int = 0
         self._current_track: int = 0
+        # Last track number we emitted `current_track` for, so we signal
+        # once per track instead of on every per-percent progress line.
+        self._emitted_track: int = 0
         # Flag is a plain Python bool — assignment is atomic under the
         # GIL, so reading it from the worker thread while the GUI thread
         # sets it is safe without locks.
@@ -186,6 +192,12 @@ class RipWorker(QObject):
                 prog = self._progress_for(line)
                 if prog is not None:
                     self.progress.emit(prog[0], prog[1])
+                # _progress_for updates _current_track as a side effect when
+                # it sees a "track N of M" line. Emit once per new track so
+                # the GUI can highlight the row whipper is on.
+                if self._current_track and self._current_track != self._emitted_track:
+                    self._emitted_track = self._current_track
+                    self.current_track.emit(self._current_track)
         except Exception as exc:  # noqa: BLE001
             log.exception("error reading whipper stdout")
             self.error.emit(f"rip stream error: {exc}")
