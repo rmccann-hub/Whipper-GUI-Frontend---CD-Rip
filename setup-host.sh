@@ -142,13 +142,16 @@ ensure_distrobox() {
     if ! confirm "Install Distrobox now?"; then
         die "Distrobox is required. Install it and re-run (see README Step 1)."
     fi
-    # Pick the host package manager from /etc/os-release.
+    # Pick the host package manager from /etc/os-release (OS_RELEASE_FILE
+    # lets tests point this at a fixture).
     local id_like=""
-    [ -r /etc/os-release ] && id_like="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
+    local os_release="${OS_RELEASE_FILE:-/etc/os-release}"
+    [ -r "$os_release" ] && id_like="$(. "$os_release"; echo "${ID:-} ${ID_LIKE:-}")"
     case "$id_like" in
         *fedora*|*rhel*|*centos*) run sudo dnf install -y distrobox ;;
         *debian*|*ubuntu*)        run sudo apt-get install -y distrobox ;;
         *arch*)                   run sudo pacman -S --noconfirm distrobox ;;
+        *suse*)                   run sudo zypper --non-interactive install distrobox ;;
         *)
             echo "Unknown distro; using the upstream installer."
             run sh -c 'curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sudo sh'
@@ -182,11 +185,13 @@ ensure_container_backend() {
         die "A container backend is required. Install podman or docker and re-run."
     fi
     local id_like=""
-    [ -r /etc/os-release ] && id_like="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
+    local os_release="${OS_RELEASE_FILE:-/etc/os-release}"
+    [ -r "$os_release" ] && id_like="$(. "$os_release"; echo "${ID:-} ${ID_LIKE:-}")"
     case "$id_like" in
         *fedora*|*rhel*|*centos*) run sudo dnf install -y podman ;;
         *debian*|*ubuntu*)        run sudo apt-get install -y podman ;;
         *arch*)                   run sudo pacman -S --noconfirm podman ;;
+        *suse*)                   run sudo zypper --non-interactive install podman ;;
         *)                        die "Unknown distro; install podman or docker manually and re-run." ;;
     esac
     if [ "$DRY_RUN" -eq 0 ] && ! have podman; then

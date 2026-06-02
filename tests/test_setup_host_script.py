@@ -85,3 +85,36 @@ def test_custom_container_and_image_are_used() -> None:
     )
     assert result.returncode == 0
     assert "--name myrip --image fedora:41" in result.stdout
+
+
+def test_opensuse_uses_zypper_for_distrobox_and_backend(tmp_path: Path) -> None:
+    """On openSUSE the script installs Distrobox + podman via zypper.
+
+    Distro detection reads OS_RELEASE_FILE (defaults to /etc/os-release),
+    so we point it at an openSUSE fixture and confirm the dry-run picks the
+    zypper branch instead of the upstream-installer fallback.
+    """
+    os_release = tmp_path / "os-release"
+    os_release.write_text('ID="opensuse-tumbleweed"\nID_LIKE="suse opensuse"\n')
+    env = dict(os.environ)
+    env["OS_RELEASE_FILE"] = str(os_release)
+    result = subprocess.run(
+        ["bash", str(SETUP), "--dry-run", "--yes", "--no-gui"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout
+    # At least the Distrobox install path is exercised on a host without
+    # distrobox; assert the zypper branch was taken, not the curl fallback.
+    assert "zypper --non-interactive install distrobox" in out
+    assert "upstream installer" not in out
+
+
+def test_both_install_paths_offer_a_zypper_branch() -> None:
+    """Static guard: both the Distrobox and backend installers handle suse."""
+    text = SETUP.read_text()
+    assert "*suse*)" in text
+    assert text.count("zypper --non-interactive install") >= 2

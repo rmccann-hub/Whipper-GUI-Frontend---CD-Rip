@@ -40,7 +40,7 @@ The one-line installer works on any modern desktop Linux. It auto-detects your p
 | **Ubuntu / Debian (24.04+)** | ✅ Fully | Installs `podman` too (the `distrobox` package only *recommends* it). |
 | **Linux Mint / Pop!_OS / elementary** | ✅ Fully | Ubuntu-based — same path as Ubuntu/Debian. |
 | **Arch / Manjaro / EndeavourOS** | ✅ Fully | Installs `distrobox` + `podman` via `pacman`. |
-| **openSUSE Leap / Tumbleweed** | ⚠️ Partial | Distrobox installs via the upstream installer, but **install the backend first**: `sudo zypper install podman`. Then run the one-liner. |
+| **openSUSE Leap / Tumbleweed** | ✅ Fully | Installs `distrobox` + `podman` via `zypper`. |
 | **Other / older distros** | ⚠️ Fallback | Uses Distrobox's official installer. Make sure `podman` (or `docker`) is present first. |
 
 If the installer can't set up the host stack on your distro, do [the manual steps](#manual-steps) once — they work everywhere and are the source of truth.

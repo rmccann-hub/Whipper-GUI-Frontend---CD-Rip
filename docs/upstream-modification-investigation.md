@@ -55,23 +55,78 @@ remaining edge over us is the CUETools Database (CTDB) repair path, which is an
 ## Feasible — added to TASKS.md with priority
 
 ### 1. CTDB verify (read-only) — HIGH (already P1, KDD-14 Phase 1)
-The CUETools Database client + server are **open source (LGPL)**. A native
-Linux CLI, [`ctdb-cli`](https://github.com/Masterisk-F/ctdb-cli), already speaks
-the protocol (verify, parity calc, repair, submit). Phase 1 is a read-only
-"Verify with CTDB" button after a rip, behind a thin `CTDBClient` adapter
-(Critical Rule #1). We can either wrap `ctdb-cli` or port the LGPL reference
-client to Python. ~200–400 lines. **This is the prerequisite for repair.**
+The CUETools Database server is **open source (LGPL)**; the protocol is
+derivable from it, and a Python reference client exists
+([`bmwalters/python-cuetoolsdb`](https://github.com/bmwalters/python-cuetoolsdb)).
+Phase 1 is a read-only "Verify with CTDB" verdict after a rip, behind a thin
+`CTDBClient` adapter (Critical Rule #1). **It is a pure-Python client — NOT a
+wrap of `ctdb-cli`** (see the correction below). Concrete plan in
+[CTDB Phase-1 implementation spec](#ctdb-phase-1-implementation-spec). **This is
+the prerequisite for repair.**
+
+> **Cannot be finished in the cloud dev environment.** Verification means
+> computing a CTDB CRC over the *decoded FLAC audio* and comparing it to the DB
+> — correctness-critical code that needs a real CD whose disc is actually in
+> CTDB to validate (a T32-style hardware confirmation). And a licensing
+> question must be resolved first (see below). So this is implemented in a
+> focused, hardware-validated follow-up, not blindly here.
 
 ### 2. CTDB parity **repair** — HIGH (already P1, KDD-14 Phase 2) — the differentiator
 CTDB stores whole-disc parity (~180 KB). On a rip that ends with uncorrectable
 errors, the parity record can **reconstruct the damaged samples** and re-verify
 — turning a scratched disc into a mathematically perfect file. This is the one
-place we can genuinely *exceed* EAC's everyday workflow. Confirmed feasible:
-`ctdb-cli` implements repair today. Plan (unchanged from KDD-14): **wrap
-`ctdb-cli`** (don't reimplement the erasure coding), **bundle it in the
-AppImage** (repair works on files + downloaded parity, no optical device → no
-Distrobox involvement), **explicit "Attempt repair" trigger**, **submission
-shelved**. Depends on #1.
+place we can genuinely *exceed* EAC's everyday workflow. Plan (from KDD-14):
+**wrap `ctdb-cli`** (`ctdb-cli verify|repair <cue>`, `--xml` for parseable
+output) rather than reimplement the Reed-Solomon erasure coding; **explicit
+"Attempt repair" trigger**; **submission shelved**. Depends on #1.
+
+> **Correction — `ctdb-cli` is C#/.NET 10, not C.** KDD-14 (and an earlier
+> research note) called `ctdb-cli` "a C tool, cheap to vendor." The repo
+> ([`Masterisk-F/ctdb-cli`](https://github.com/Masterisk-F/ctdb-cli)) builds
+> with `./configure && make` but is **C# on .NET 10**. That makes bundling it
+> in the AppImage **heavy** (it drags in the .NET runtime), not cheap — a real
+> change to the Phase-2 cost/benefit. Options to weigh when Phase 2 starts:
+> (a) bundle `ctdb-cli` + a trimmed/self-contained .NET publish in the AppImage;
+> (b) route repair through the dependency subsystem as an *optional* tool the
+> user installs (like Picard), rather than bundling; (c) revisit a pure-Python
+> `CUETools.Parity` port (previously rejected as high-risk). No decision needed
+> now — recorded so Phase 2 starts from the real facts.
+
+### CTDB Phase-1 implementation spec
+
+What a future, hardware-validated PR needs to build. Grounded in the
+`python-cuetoolsdb` reference (modules: `network.py`, `verify.py`,
+`zlib_crc.py`, `cdda.py`, `types.py`).
+
+- **Adapter:** `adapters/ctdb_client.py` — `CTDBClient` ABC shaped like
+  `MusicBrainzClient` (PLANNING §6), plus `CtdbHttpImpl`. Mandatory adapter
+  layer per Critical Rule #1.
+- **Disc identity:** the CD **TOC** (track offsets + lead-out), same input
+  AccurateRip uses. We already have it from the rip (`.toc`/`.cue`/the parsed
+  log), so no extra optical read.
+- **Lookup:** HTTP GET to the CTDB server (the `db.cuetools.net` lookup
+  endpoint) keyed by the TOC; response lists entries with **confidence** and
+  **CRC(s)**. Set a descriptive `User-Agent` (MB-client convention).
+- **Local CRC:** compute CTDB's CRC over the ripped audio and compare to the
+  DB entry to produce the verdict + confidence. **The exact algorithm lives in
+  the reference's `zlib_crc.py`/`verify.py` — read it when implementing; do not
+  guess.** Requires decoding FLAC → PCM (via `flac -d`/`soundfile`); the FLAC
+  files are already on disk next to the rip.
+- **Worker + UI:** `workers/ctdb_worker.py` (off-thread, emits
+  `verified(result)`/`error`), and a "Verify with CTDB" affordance in
+  `ui/rip_progress.py` populated after a rip — next to the AccurateRip column.
+- **No new bundled dependency** (pure-Python; bundles trivially) — the opposite
+  of Phase 2.
+- **⚠️ License gate (resolve before writing code):** `python-cuetoolsdb` is
+  **GPL-2.0**; this project is **GPL-3.0-only** (KDD-10). If it is GPL-2.0-*only*
+  we **cannot port its code** — the two are one-way incompatible. Mitigation:
+  reimplement the protocol clean-room from the **LGPL** server reference
+  (`gchudov/cuetools.net`), using `python-cuetoolsdb` only as documentation,
+  **or** confirm the reference is GPL-2.0-*or-later* (then it's usable under
+  GPL-3.0).
+- **Validation:** a real CD that is present in CTDB → "verified, confidence N";
+  a CD not in CTDB → "not in database" (the no-match path). This is the
+  T32-equivalent acceptance test and can only be done on hardware.
 
 ### 3. Upstream whipper bug fixes — contribute, don't fork — LOW/MEDIUM
 Two known upstream defects we currently work around:
