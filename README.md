@@ -2,7 +2,7 @@
 
 A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whipper) audio-CD ripping CLI. Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage.
 
-> **Status: v0.1.0 — public test release.** Implemented end-to-end with 440+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Recent additions: a **Force stop** for runaway drives on cancel, AppImage **desktop integration** (`install-appimage.sh`), and a **Help menu** (About + User Guide). This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
+> **Status: v0.1.0 — public test release.** Implemented end-to-end with 450+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Recent additions: a **Force stop** for runaway drives on cancel, AppImage **desktop integration** (`install-appimage.sh`), and a **Help menu** (About + User Guide). This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
 
 ## At a glance
 
@@ -29,6 +29,21 @@ Prefer to download and run it yourself? Grab `install.sh` from the [Releases pag
 Then, inside the GUI: **Tools → Set up drive…** to calibrate your drive's read offset (one time), insert a CD, and rip. To remove everything later, use the **Uninstall Whipper GUI** shortcut (or see [Uninstalling](#uninstalling)).
 
 > Why two pieces under the hood? The GUI can't rip without the host stack — that's by design ([why](PLANNING.md)). `install.sh` just sets up both for you; you can still do each step by hand (below).
+
+#### Supported distributions
+
+The one-line installer works on any modern desktop Linux. It auto-detects your package manager to install Distrobox + podman; everything ripping-related runs in a Fedora container, so your host distro only needs Distrobox and a container backend.
+
+| Distro family | Auto-handled by the installer? | Notes |
+|---|---|---|
+| **Fedora / Bazzite / Silverblue / RHEL / CentOS** | ✅ Fully | Bazzite & Silverblue ship Distrobox + podman already; nothing extra. |
+| **Ubuntu / Debian (24.04+)** | ✅ Fully | Installs `podman` too (the `distrobox` package only *recommends* it). |
+| **Linux Mint / Pop!_OS / elementary** | ✅ Fully | Ubuntu-based — same path as Ubuntu/Debian. |
+| **Arch / Manjaro / EndeavourOS** | ✅ Fully | Installs `distrobox` + `podman` via `pacman`. |
+| **openSUSE Leap / Tumbleweed** | ⚠️ Partial | Distrobox installs via the upstream installer, but **install the backend first**: `sudo zypper install podman`. Then run the one-liner. |
+| **Other / older distros** | ⚠️ Fallback | Uses Distrobox's official installer. Make sure `podman` (or `docker`) is present first. |
+
+If the installer can't set up the host stack on your distro, do [the manual steps](#manual-steps) once — they work everywhere and are the source of truth.
 
 The rest of this section is the long form — read it if the quickstart hits a snag or you'd rather do each step by hand.
 
@@ -97,6 +112,22 @@ sudo apt install distrobox podman
 ```
 
 (Installing `podman` explicitly here is the Ubuntu-specific gotcha — the `distrobox` package only *recommends* it, so on minimal installs it can be absent and `distrobox create` then fails.)
+
+**On Linux Mint / Pop!_OS / elementary OS:**
+
+These are Ubuntu-based, so the Ubuntu command works:
+
+```bash
+sudo apt install distrobox podman
+```
+
+**On openSUSE Leap / Tumbleweed:**
+
+```bash
+sudo zypper install distrobox podman
+```
+
+(If your openSUSE version doesn't package `distrobox` yet, use the one-line installer under "older systems" below — but install `podman` with `zypper` first, since the installer doesn't pull a backend.)
 
 **On older systems:**
 
@@ -740,7 +771,7 @@ Build / dev tooling:
 - [`build/build_appimage.sh`](build/build_appimage.sh) — produce the AppImage locally
 - [`build/make_icon.py`](build/make_icon.py) — regenerate the app icon
 - [`build/python-appimage/README.md`](build/python-appimage/README.md) — AppImage recipe details
-- **CI / releases:** `.github/workflows/ci.yml` runs the tests on every push/PR; `.github/workflows/release.yml` builds the AppImage and publishes it to a GitHub Release when a `vX.Y.Z` tag is pushed — so cutting a release is just `git tag v0.0.1 && git push origin v0.0.1` (no local build or manual upload).
+- **CI / releases:** `.github/workflows/ci.yml` runs the tests on every push/PR; `.github/workflows/release.yml` builds the AppImage and publishes it to a GitHub Release when a `vX.Y.Z` tag is pushed — so cutting a release is just `git tag vX.Y.Z && git push origin vX.Y.Z` (no local build or manual upload).
 
 ---
 

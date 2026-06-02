@@ -210,13 +210,13 @@ The sub-sections below are ordered by current priority for picking up work:
 5. **P1 — Install automation** — pre-clone host bootstrap script. Blocked on the repo flipping public.
 6. **P1 — Documentation backlog** — items that need real-system output from T32 to write authoritatively.
 
-**Ranked execution order (set 2026-05-30, after the "EAC successor" research review):**
-1. **Release milestones** (merge → public → tag `v0.0.1` → publish AppImage) — nothing below ships value until v1 is out.
+**Ranked execution order (set 2026-05-30, after the "EAC successor" research review; updated 2026-06-02 after v0.1.0 shipped):**
+1. **[x] Release milestones** (merge → public → tag `v0.1.0` → publish AppImage) — **done 2026-06-01.** v0.1.0 is live with the AppImage + installers attached. *(PyPI wheel publish is the one remaining sub-item; unblocked.)*
 2. **[x] Drive setup wizard** (write-enabled; PLANNING.md KDD-15) — done 2026-05-30; see P1.1.
 3. **[x] Drive-access permission diagnostics** — done 2026-05-30; see P1.1.
 4. **[x] EAC parity-gap Settings widgets** (cover art / force-overread / max-retries / keep-going) — done 2026-05-30; below.
-5. **CTDB verify (read-only)** — Phase 1 of KDD-14; foundation for repair.
-6. **CTDB repair (parity, wrap `ctdb-cli`, bundled, explicit trigger)** — Phase 2 of KDD-14; the headline EAC++ differentiator.
+5. **CTDB verify (read-only)** — Phase 1 of KDD-14; foundation for repair. **← next up.** Feasibility re-confirmed 2026-06-02 (see [docs/upstream-modification-investigation.md](docs/upstream-modification-investigation.md)): `ctdb-cli` is open-source (LGPL) and Linux-native.
+6. **CTDB repair (parity, wrap `ctdb-cli`, bundled, explicit trigger)** — Phase 2 of KDD-14; the headline EAC++ differentiator. Confirmed feasible 2026-06-02.
 
 *Downgraded:* Test & Copy dual-pass — whipper already emits a per-track Test CRC and Copy CRC, so the guarantee is already delivered (see P2).
 
@@ -253,8 +253,9 @@ These remove most of the README's "until X happens" caveats. Done in order, they
 
 - **[x] Merge `claude/lucid-babbage-JYI8c` into `main`.** Done 2026-05-30 (`--allow-unrelated-histories`; main previously held only `.gitattributes`). Fresh `git clone` now lands on a working state. Removed the README dev-branch/authenticate steps and the `dev-setup.sh` branch-guard.
 - **[x] Flip the GitHub repo to Public.** Done 2026-05-30 by the user. Plain `git clone https://...` now works without `gh auth login` / SSH key setup. The LICENSE decision it was gated on is also resolved: **GPL-3.0-only** (KDD-10) — `LICENSE` committed, `pyproject.toml` classifier set, README updated. Follow-up: drop the README Method-C "private repo, authenticate first" blockquote (see Documentation backlog).
-- **[~] Tag `v0.0.1` and publish the AppImage as a release asset.** Promotes Method A to "the recommended path" and removes the "AppImage not yet published" caveat. Pre-req met: AppImage build verified end-to-end on hardware (T32). **Release prep + merge done 2026-05-31** (PR #2 → `main`): README rewritten for a published-AppImage world (tester quickstart, Method A download path, Uninstalling section, dropped pre-alpha/private-repo caveats), `CHANGELOG.md` added (doubles as the release body), and a real 512×512 CD-disc app icon (`build/make_icon.py` → committed `build/python-appimage/whipper-gui.png`). **Release publishing is now automated** (2026-05-31): `.github/workflows/release.yml` builds the AppImage via `build/build_appimage.sh` and attaches it (+ a `.sha256`) to a GitHub Release on any `v*` tag push — 0.x tags ship as pre-releases. `.github/workflows/ci.yml` runs `pytest` on push/PR. **Remaining:** confirm both workflows go green on a real Actions run, then cut the release: `git tag v0.0.1 && git push origin v0.0.1`. *(Workflows are YAML-validated locally but unrun in Actions — needs one live confirm, same caveat as `setup-host.sh`.)*
-- **Publish the wheel to PyPI.** Promotes Method B. `pipx install whipper-gui` works for any technical user. Pre-req: tag + release artifact pipeline established.
+- **[x] Tag `v0.1.0` and publish the AppImage as a release asset. Done 2026-06-01.** The first public release is live: [v0.1.0](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/tag/v0.1.0) with `whipper-gui-x86_64.AppImage` (+ `.sha256`), `install.sh`, and `install-appimage.sh` all attached by `release.yml`. Both CI workflows (`ci.yml`, the new `appimage.yml`) and the release workflow are confirmed green on real Actions runs. Method A (AppImage) is now the recommended path. **Note:** the GitHub release got marked as a *full* release rather than a pre-release (UI default; `release.yml` only sets `--prerelease` when it *creates* the release, and this one was created in the UI). Cosmetic — flip it in the UI if a pre-release badge is wanted; future `git tag`-driven `v0.*` releases will auto-mark correctly.
+      Earlier prep notes (2026-05-31): README rewritten for a published-AppImage world, `CHANGELOG.md` added, real app icon committed, release/CI workflows authored and YAML-validated.
+- **Publish the wheel to PyPI.** Promotes Method B. `pipx install whipper-gui` works for any technical user. Pre-req: tag + release artifact pipeline established (now done — this is unblocked).
 
 ### P1 — Install automation
 
@@ -320,6 +321,29 @@ Items that need real-system output to write authoritatively. Address as T32's sm
 - **Add a screenshot or two** of the GUI to the top of the README once T32 confirms it looks right on Bazzite KDE Plasma 6.
 - **Document Picard's actual auto-launch behavior** under Step 6 once T32 verifies it. The README currently says it works "if you enable the toggle"; T32 will confirm what the toggle UX actually feels like end-to-end.
 - **Sanity-check the "Where things live" table** against T32's real output — does whipper write `.log` and `.cue` files next to the FLACs? Does it write to `output_dir` or `working_dir` or both? Update the table if reality differs from the brief.
+
+### P1/P2 — Upstream open-source modification for EAC parity (investigation 2026-06-02)
+
+Previously it was out of scope to modify the programs underneath us; this is the first pass at "what would modifying open-source upstream buy us toward full EAC parity?" Full write-up, with reasoning and sources, in **[docs/upstream-modification-investigation.md](docs/upstream-modification-investigation.md)**. Headline: most of EAC's *correctness* is already delivered by whipper, so the wins are additive tools (CTDB), not whipper changes. **Guardrail:** prefer wrapping a separate maintained tool → upstream PR → (last resort) a maintained fork. Do **not** fork whipper (unmaintained; successor is `cyanrip`).
+
+**Feasible (prioritised):**
+- **[HIGH] CTDB verify (read-only).** Same as KDD-14 Phase 1 above. Not a whipper change — a new `CTDBClient` adapter wrapping the LGPL `ctdb-cli` (or a port of the LGPL reference client). Re-confirmed feasible 2026-06-02.
+- **[HIGH] CTDB parity repair.** Same as KDD-14 Phase 2 above. The one genuine "beyond EAC" everyday win; `ctdb-cli` implements repair today. Wrap + bundle in the AppImage; depends on verify.
+- **[LOW–MED] Upstream whipper bug fixes — contribute, don't fork.** `whipper cd info` non-zero exit on unknown discs (we already work around it) and HTOA accuracy edge cases (issues #75/#82). Open upstream PRs opportunistically; never maintain a fork.
+- **[LOW] EAC-style signed log checksum.** Scene-trust feature; emit an EAC-compatible logsigner checksum *from our own code* over whipper's log. No upstream change needed.
+
+**Non-feasible / not worth it — do NOT revisit without a rethink** (full rationale in the doc):
+- **AccurateRip submission** — permanently blocked by operator policy (EAC/dBpoweramp only). Not a code problem. *Verification stays in scope and works.*
+- **CTDB submission** — almost certainly the same trust-gate; shelved.
+- **C2 error-pointer reading** — would require deep C-level surgery on `libcdio`/`cd-paranoia` for marginal gain (whipper is already bit-perfect via overlap + AccurateRip). Treat as build-from-scratch.
+- **Literal two-full-disc-pass Test&Copy** — whipper already does per-track test+copy CRC; the whole-disc double pass adds marginal assurance at 2× time.
+- **Byte-for-byte EAC log format parity** — moving, semi-proprietary target; not worth it beyond the optional checksum above.
+- **Separate drive-offset/feature database** — redundant with AccurateRip's offset list (already used).
+- **In-house from-scratch ripper** — out of scope; the breakage path is migrate the adapter to `cyanrip`, not rewrite.
+
+### P1 — Install ergonomics follow-ups (2026-06-02)
+
+- **Add openSUSE / Tumbleweed (`zypper`) support to `setup-host.sh`.** Detection currently covers fedora/rhel, debian/ubuntu, arch; everything else falls back to the upstream Distrobox curl-installer and does **not** auto-install the `podman` backend. openSUSE users must `sudo zypper install podman` by hand (now documented in the README). Small code change: add `*suse*) zypper install -y distrobox podman` cases to `ensure_distrobox`/`ensure_backend`. (Documentation-only this round; the code change is the task.)
 
 ---
 

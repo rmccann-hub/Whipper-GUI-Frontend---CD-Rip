@@ -20,6 +20,7 @@ These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS
 |---|---|
 | `log-format-comparison.md` | Side-by-side comparison of whipper's rip log against EAC's, anchoring [PLANNING.md KDD-11](../PLANNING.md). The hand-authored EAC log at `tests/fixtures/rip_log_eac_reference.log` is the comparison's data. |
 | `appimage-testing.md` | How the AppImage is built (on every push to `main`, on demand for any branch, and at release) and how to test it in each case — including branches with no published release yet. |
+| `upstream-modification-investigation.md` | EAC-parity investigation (2026-06-02): what modifying the open-source programs underneath us would buy, what's feasible (→ task items), and a "do not revisit" non-feasible list. |
 
 ## Where the rest of the project context lives
 
