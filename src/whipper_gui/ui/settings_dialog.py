@@ -144,6 +144,19 @@ class SettingsDialog(QDialog):
         self._auto_picard_check.setChecked(config.auto_launch_picard)
         form.addRow("Picard integration:", self._auto_picard_check)
 
+        # Auto-eject the disc when a rip finishes successfully. Convenience
+        # only — the manual Eject button next to the drive picker works
+        # regardless of this toggle.
+        self._auto_eject_check: QCheckBox = QCheckBox(
+            "Eject the disc after a successful rip", self
+        )
+        self._auto_eject_check.setChecked(config.auto_eject_after_rip)
+        self._auto_eject_check.setToolTip(
+            "When a rip completes successfully, eject the disc automatically. "
+            "Leave off if you rip several discs from the same tray."
+        )
+        form.addRow("After rip:", self._auto_eject_check)
+
         # Continue on CD-R. Whipper refuses burned discs by default; this
         # opts into ripping them anyway (passes whipper's --cdr flag).
         self._continue_on_cdr_check: QCheckBox = QCheckBox(
@@ -252,6 +265,7 @@ class SettingsDialog(QDialog):
             read_offset=self._read_offset_spin.value(),
             override_read_offset=self._override_offset_check.isChecked(),
             auto_launch_picard=self._auto_picard_check.isChecked(),
+            auto_eject_after_rip=self._auto_eject_check.isChecked(),
             continue_on_cdr=self._continue_on_cdr_check.isChecked(),
             cover_art=self._cover_art_combo.currentData(),
             force_overread=self._force_overread_check.isChecked(),

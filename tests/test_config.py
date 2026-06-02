@@ -56,6 +56,19 @@ def test_save_then_load_roundtrip(
     assert reloaded.auto_launch_picard is True
 
 
+def test_auto_eject_defaults_off_and_round_trips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _redirect_config(tmp_path, monkeypatch)
+
+    cfg = config_module.load()
+    assert cfg.auto_eject_after_rip is False  # default
+
+    cfg.auto_eject_after_rip = True
+    config_module.save(cfg)
+    assert config_module.load().auto_eject_after_rip is True
+
+
 def test_save_is_atomic_no_tmp_left_behind(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

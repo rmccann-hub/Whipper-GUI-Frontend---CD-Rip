@@ -96,6 +96,12 @@ class Config:
     # --- UI toggles ---
     auto_launch_picard: bool = False
 
+    # Eject the disc automatically when a rip finishes successfully. Off by
+    # default — some users rip several discs in a row from the same tray and
+    # an auto-eject would be in the way. Purely a convenience; the manual
+    # Eject button works regardless of this setting.
+    auto_eject_after_rip: bool = False
+
     # Set once we've auto-offered the drive-setup wizard on first run (when no
     # read offset was configured). Keeps the offer to a single, dismissible
     # prompt — afterwards the user runs it from Tools → Set up drive…. Pure UI

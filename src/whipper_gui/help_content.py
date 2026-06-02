@@ -67,6 +67,9 @@ named from the album artist/title you type.
   read options.
 - **Read offset override** — set the drive read-offset by hand (the drive-setup
   wizard is the recommended way to set it).
+- **Eject after a successful rip** — automatically eject the disc when a rip
+  finishes (off by default). You can always eject by hand with the **Eject**
+  button next to the drive picker.
 
 ## Drive setup (Tools → Set up drive)
 

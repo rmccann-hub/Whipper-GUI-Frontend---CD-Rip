@@ -951,6 +951,85 @@ def test_auto_force_stop_is_noop_when_already_done(
     assert calls == []
 
 
+# --- Eject ---------------------------------------------------------------
+
+
+def _patch_eject(monkeypatch) -> list[dict]:
+    """Record eject_drive calls instead of touching a real drive."""
+    import whipper_gui.ui.main_window as mw
+
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        mw.drive_control, "eject_drive", lambda **kw: calls.append(kw)
+    )
+    return calls
+
+
+def _join_eject(window) -> None:
+    if window._eject_thread is not None:
+        window._eject_thread.join(timeout=2)
+
+
+def _rip_params(drive: str, unknown: bool = False):
+    from whipper_gui.workers.rip_worker import RipParameters
+
+    return RipParameters(
+        drive=drive,
+        release_id="mbid",
+        output_dir=Path("/tmp"),
+        track_template="t",
+        disc_template="d",
+        unknown=unknown,
+    )
+
+
+def test_manual_eject_request_calls_drive_control(
+    teardown_threads, monkeypatch
+) -> None:
+    calls = _patch_eject(monkeypatch)
+    window = teardown_threads()
+
+    window._on_eject_requested("/dev/sr0")
+    _join_eject(window)
+
+    assert calls == [{"device": "/dev/sr0"}]
+
+
+def test_auto_eject_on_successful_rip_when_enabled(
+    teardown_threads, monkeypatch
+) -> None:
+    calls = _patch_eject(monkeypatch)
+    window = teardown_threads(config=Config(auto_eject_after_rip=True))
+    window._active_rip_params = _rip_params("/dev/sr0")
+
+    window._on_rip_finished(True, "")
+    _join_eject(window)
+
+    assert calls == [{"device": "/dev/sr0"}]
+
+
+def test_no_auto_eject_when_disabled(teardown_threads, monkeypatch) -> None:
+    calls = _patch_eject(monkeypatch)
+    window = teardown_threads(config=Config(auto_eject_after_rip=False))
+    window._active_rip_params = _rip_params("/dev/sr0")
+
+    window._on_rip_finished(True, "")
+    _join_eject(window)
+
+    assert calls == []
+
+
+def test_no_auto_eject_on_failed_rip(teardown_threads, monkeypatch) -> None:
+    calls = _patch_eject(monkeypatch)
+    window = teardown_threads(config=Config(auto_eject_after_rip=True))
+    window._active_rip_params = _rip_params("/dev/sr0")
+
+    window._on_rip_finished(False, "")
+    _join_eject(window)
+
+    assert calls == []
+
+
 def test_force_stop_button_stops_timer_and_fires(
     teardown_threads, monkeypatch
 ) -> None:

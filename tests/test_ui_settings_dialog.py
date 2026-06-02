@@ -100,6 +100,18 @@ def test_to_config_reflects_user_edits(qapp: QApplication) -> None:
     assert out.continue_on_cdr is True
 
 
+def test_auto_eject_reflects_config_and_round_trips(qapp: QApplication) -> None:
+    # Reflects the incoming config…
+    dialog = SettingsDialog(Config(auto_eject_after_rip=True))
+    assert dialog._auto_eject_check.isChecked() is True
+
+    # …and a user toggle survives to_config().
+    dialog2 = SettingsDialog(Config())
+    assert dialog2._auto_eject_check.isChecked() is False
+    dialog2._auto_eject_check.setChecked(True)
+    assert dialog2.to_config().auto_eject_after_rip is True
+
+
 def test_to_config_preserves_schema_version(qapp: QApplication) -> None:
     config = Config(schema_version=99)
     dialog = SettingsDialog(config)

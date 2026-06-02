@@ -141,6 +141,8 @@ class MainWindow(QMainWindow):
         # Handle to the daemon thread that runs the (blocking) force-stop, so
         # callers/tests can join it; None when no force-stop is in flight.
         self._force_stop_thread: threading.Thread | None = None
+        # Holds the daemon thread for a manual/auto eject so tests can join it.
+        self._eject_thread: threading.Thread | None = None
         # Whether the user asked to launch Picard after an unknown rip.
         self._pending_picard_launch: bool = False
         # Guard so the "no drive — here's the fix" nudge auto-shows at most
@@ -245,6 +247,8 @@ class MainWindow(QMainWindow):
         self._drive_picker.drive_changed.connect(self._on_drive_changed)
         # No drive found → offer an actionable diagnosis (once per session).
         self._drive_picker.drives_unavailable.connect(self._on_drives_unavailable)
+        # Manual Eject button.
+        self._drive_picker.eject_requested.connect(self._on_eject_requested)
 
         # MB worker responses.
         self._mb_worker.releases_returned.connect(self._on_mb_releases)
@@ -462,6 +466,29 @@ class MainWindow(QMainWindow):
         self._force_stop_thread = thread
         thread.start()
 
+    def _on_eject_requested(self, device: str) -> None:
+        """User clicked Eject — eject the selected disc."""
+        self._eject_async(device, status="Ejecting the disc…")
+
+    def _eject_async(self, device: str, status: str) -> None:
+        """Eject `device` off a daemon thread.
+
+        `eject` can block for its subprocess timeout, so — like the
+        force-stop — we never call it on the GUI thread. Best-effort: the
+        status line is informational and we don't surface a failure modally
+        (a missing/empty tray isn't worth a dialog). The thread is stored so
+        tests can join it deterministically.
+        """
+        log.info("ejecting device=%s", device or "(default)")
+        self._rip_progress.set_status(status)
+        thread = threading.Thread(
+            target=drive_control.eject_drive,
+            kwargs={"device": device},
+            daemon=True,
+        )
+        self._eject_thread = thread
+        thread.start()
+
     def _on_rip_error(self, message: str) -> None:
         log.warning("rip error: %s", message)
         self._rip_progress.set_status(f"Error: {message}")
@@ -516,6 +543,16 @@ class MainWindow(QMainWindow):
                 )
             except Exception:  # noqa: BLE001 — tagging must never crash the GUI
                 log.exception("unknown-album post-processing failed")
+
+        # Auto-eject on a clean finish if the user opted in. Only on success —
+        # a failed/cancelled rip leaves the disc in so the user can retry, and
+        # ejecting mid-failure could fight the force-stop path.
+        if success and self._config.auto_eject_after_rip:
+            device = (
+                params.drive if params is not None
+                else self._drive_picker.current_device() or ""
+            )
+            self._eject_async(device, status="Rip complete — ejecting the disc…")
 
         # Clear references so a future rip starts cleanly. The thread
         # itself is auto-deleted via finished.connect(deleteLater) above.

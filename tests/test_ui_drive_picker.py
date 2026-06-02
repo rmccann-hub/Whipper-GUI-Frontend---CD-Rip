@@ -108,6 +108,33 @@ def test_refresh_emits_drive_changed_for_initial_selection(
     assert seen == ["/dev/sr0"]
 
 
+def test_eject_button_emits_selected_device(qapp: QApplication) -> None:
+    backend = _FakeBackend()
+    backend.set_drives([_drive("/dev/sr0"), _drive("/dev/sr1")])
+    picker = DrivePicker(backend)
+    picker.refresh()
+    seen: list[str] = []
+    picker.eject_requested.connect(seen.append)
+
+    picker._eject_button.click()
+
+    assert seen == ["/dev/sr0"]
+
+
+def test_eject_button_emits_empty_when_no_drive(qapp: QApplication) -> None:
+    """With only a placeholder shown, Eject targets the system default ("")."""
+    backend = _FakeBackend()
+    backend.set_drives([])
+    picker = DrivePicker(backend)
+    picker.refresh()  # "(no drives found)" placeholder
+    seen: list[str] = []
+    picker.eject_requested.connect(seen.append)
+
+    picker._eject_button.click()
+
+    assert seen == [""]
+
+
 def test_refresh_label_includes_vendor_model_device(
     qapp: QApplication,
 ) -> None:

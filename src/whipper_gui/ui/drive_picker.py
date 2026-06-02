@@ -43,6 +43,10 @@ class DrivePicker(QWidget):
     # which are a different failure already shown inline). MainWindow uses
     # this to offer the drive-access diagnosis.
     drives_unavailable = Signal()
+    # Emitted when the user clicks Eject. Carries the selected device path
+    # ("" if none is selected → eject the system default). MainWindow does
+    # the actual (off-thread) eject so this widget stays UI-only.
+    eject_requested = Signal(str)
 
     def __init__(
         self,
@@ -65,6 +69,13 @@ class DrivePicker(QWidget):
         self._refresh_button: QPushButton = QPushButton("Refresh", self)
         self._refresh_button.clicked.connect(self.refresh)
         layout.addWidget(self._refresh_button)
+
+        # Eject the selected disc. Re-emits as eject_requested so the main
+        # window can run the (potentially blocking) eject off the GUI thread.
+        self._eject_button: QPushButton = QPushButton("Eject", self)
+        self._eject_button.setToolTip("Eject the disc from the selected drive.")
+        self._eject_button.clicked.connect(self._on_eject_clicked)
+        layout.addWidget(self._eject_button)
 
     # --- Public surface -----------------------------------------------------
 
@@ -131,3 +142,8 @@ class DrivePicker(QWidget):
         device = self._combo.itemData(index)
         if isinstance(device, str):
             self.drive_changed.emit(device)
+
+    def _on_eject_clicked(self) -> None:
+        # current_device() is None when only a placeholder is shown; eject
+        # the system default ("") in that case rather than blocking the button.
+        self.eject_requested.emit(self.current_device() or "")

@@ -222,7 +222,7 @@ The sub-sections below are ordered by current priority for picking up work:
 
 High-level feature backlog (not bucketed into a sub-section because each is small):
 
-- Eject button + auto-eject toggle
+- **[x] Eject button + auto-eject toggle. Done 2026-06-02.** Manual **Eject** button on the `DrivePicker` (emits `eject_requested(device)`; MainWindow ejects off a daemon thread via the existing `drive_control.eject_drive`, mirroring the force-stop pattern). New `Config.auto_eject_after_rip` (default off) + Settings checkbox; on a *successful* rip `_on_rip_finished` auto-ejects the just-ripped drive (skipped on failure/cancel so the disc stays in for a retry). User guide updated. Tests in `test_ui_drive_picker`, `test_ui_settings_dialog`, `test_config`, `test_ui_main_window`.
 - Multi-disc queue
 - Live progress bars per track
 - Multi-drive support
