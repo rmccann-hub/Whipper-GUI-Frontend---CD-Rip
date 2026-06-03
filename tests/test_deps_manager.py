@@ -67,6 +67,19 @@ def test_check_all_classifies_present_and_missing() -> None:
     assert [m.spec.dep_id for m in report.missing] == ["missing"]
 
 
+def test_check_all_records_ok_versions() -> None:
+    specs = [
+        _spec("present", _present(version=(0, 10, 0))),
+        _spec("missing", _absent()),
+    ]
+    mgr = DependencyManager(specs=specs)
+
+    report = mgr.check_all()
+
+    # The OK dep's detected version is stamped; the missing one is absent.
+    assert report.ok_versions == {"present": (0, 10, 0)}
+
+
 def test_check_all_treats_too_old_as_missing() -> None:
     specs = [
         _spec(

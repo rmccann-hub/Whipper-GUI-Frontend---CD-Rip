@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from whipper_gui.deps.version import meets_minimum, parse_version
+from whipper_gui.deps.version import format_version, meets_minimum, parse_version
 
 
 # --- parse_version ---
@@ -59,3 +59,22 @@ def test_meets_minimum_pads_short_minimum() -> None:
 
 def test_meets_minimum_none_version() -> None:
     assert meets_minimum(None, (0, 1, 0)) is False
+
+
+# --- format_version ---
+
+
+def test_format_version_basic() -> None:
+    assert format_version((0, 10, 0)) == "0.10.0"
+
+
+def test_format_version_two_components() -> None:
+    assert format_version((1, 4)) == "1.4"
+
+
+def test_format_version_none_is_unknown() -> None:
+    assert format_version(None) == "unknown"
+
+
+def test_format_version_empty_tuple_is_unknown() -> None:
+    assert format_version(()) == "unknown"

@@ -484,6 +484,48 @@ def test_dep_summary_includes_failure_details(
     assert "log.txt" in text  # points user at the log for full detail
 
 
+def test_dep_summary_stamps_installed_versions(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OK deps are listed with the detected version (reproducibility), and
+    a probed-but-version-unknown dep renders as 'unknown'."""
+    from whipper_gui.deps.checks import ProbeResult
+    from whipper_gui.deps.manager import DependencyReport
+    from whipper_gui.deps.registry import DependencySpec, Tier
+
+    def _spec(dep_id: str, name: str) -> DependencySpec:
+        return DependencySpec(
+            dep_id=dep_id,
+            display_name=name,
+            probe=lambda: ProbeResult(present=True, version=None, location=None),
+            min_version=(0, 0, 0),
+            tier=Tier.MANUAL,
+            install_command=None,
+            search_string="x",
+        )
+
+    whipper = _spec("whipper", "whipper")
+    flac = _spec("flac", "FLAC")
+
+    window = teardown_threads()
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "whipper_gui.ui.main_window.QMessageBox.information",
+        lambda parent, title, text: captured.append((title, text)),
+    )
+
+    report = DependencyReport(
+        ok=[whipper, flac],
+        ok_versions={"whipper": (0, 10, 0)},  # flac omitted → "unknown"
+    )
+    window._show_dep_summary(report)
+
+    text = captured[0][1]
+    assert "Installed:" in text
+    assert "whipper 0.10.0" in text
+    assert "FLAC unknown" in text
+
+
 def test_dep_summary_does_not_show_user_declines_as_failures(
     teardown_threads, monkeypatch: pytest.MonkeyPatch
 ) -> None:

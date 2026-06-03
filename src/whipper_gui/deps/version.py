@@ -56,6 +56,17 @@ def parse_version(
     return tuple(parts)
 
 
+def format_version(version: tuple[int, ...] | None) -> str:
+    """Render a parsed version tuple for display, e.g. (0, 10, 0) → "0.10.0".
+
+    A `None` version (the probe found the tool but couldn't read a version)
+    renders as "unknown" so the dependency report can still name it.
+    """
+    if not version:
+        return "unknown"
+    return ".".join(str(part) for part in version)
+
+
 def meets_minimum(
     version: tuple[int, ...] | None, minimum: tuple[int, ...]
 ) -> bool:

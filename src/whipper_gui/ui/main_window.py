@@ -38,6 +38,7 @@ from whipper_gui.adapters.whipper_backend import (
 )
 from whipper_gui.config import Config
 from whipper_gui.deps.manager import DependencyManager
+from whipper_gui.deps.version import format_version
 from whipper_gui.deps.resolvers import (
     AutoInstaller,
     ManualPrompt,
@@ -784,13 +785,16 @@ class MainWindow(QMainWindow):
 
         The popup format:
             "<ok_count> ok, <missing_count> missing/needs-attention."
+            "Installed: <name> <version>, …"      ← when any deps are OK
             "Optional (not installed): <names>"   ← only when present
             (blank line)
             "Install failures:"           ← only when failures exist
             "  - <dep>: <error message>"  ← one per failure
         """
-        ok_count = len(getattr(report, "ok", []))
+        ok_specs = getattr(report, "ok", [])
+        ok_count = len(ok_specs)
         missing_count = len(getattr(report, "missing", []))
+        ok_versions = getattr(report, "ok_versions", {}) or {}
         # Collect real install failures (not user declines — those are
         # surfaced via the dialog the user already saw).
         install_results = getattr(report, "install_results", [])
@@ -800,6 +804,14 @@ class MainWindow(QMainWindow):
         ]
 
         message = f"{ok_count} ok, {missing_count} missing/needs-attention."
+        # Stamp the detected version next to each OK dep so the user knows
+        # exactly what's installed (reproducibility), not just that it's there.
+        if ok_specs:
+            installed = ", ".join(
+                f"{spec.display_name} {format_version(ok_versions.get(spec.dep_id))}"
+                for spec in ok_specs
+            )
+            message += f"\nInstalled: {installed}."
         if optional_missing:
             names = ", ".join(item.spec.display_name for item in optional_missing)
             message += f"\nOptional (not installed): {names}."
