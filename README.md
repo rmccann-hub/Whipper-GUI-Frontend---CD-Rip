@@ -305,7 +305,7 @@ Whipper GUI will auto-launch Picard with the rip folder when you mark a disc as 
 
 ### Step 7 — Install Whipper GUI
 
-> **Recommended: Method A (AppImage).** As of v0.0.1 it's published as a downloadable release asset — this is the simplest path for most people. Method B (`pipx` from PyPI) isn't published yet. Method C runs the GUI from a source clone and is aimed at developers.
+> **Recommended: Method A (AppImage).** As of v0.0.1 it's published as a downloadable release asset — this is the simplest path for most people. Method B (`pipx` from PyPI) publishes automatically on each tagged release (Trusted Publishing); if it's not on PyPI yet, install from a checkout (see Method B). Method C runs the GUI from a source clone and is aimed at developers.
 
 Pick **one** of the methods below.
 
@@ -349,7 +349,7 @@ Then install Whipper GUI:
 pipx install whipper-gui
 ```
 
-> The wheel is not yet published to PyPI. Until it is, install from a local checkout: `git clone …` then `pipx install .` from inside the repo.
+> Releases publish the wheel to PyPI automatically (via Trusted Publishing on each tagged release). If `pipx install whipper-gui` can't find it yet — e.g. before the first PyPI-published release — install from a local checkout instead: `git clone …` then `pipx install .` from inside the repo.
 
 Run with `whipper-gui` from any terminal.
 

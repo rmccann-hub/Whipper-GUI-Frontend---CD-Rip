@@ -5,6 +5,14 @@ All notable changes to Whipper GUI are recorded here. This project adheres to
 
 ## [Unreleased]
 
+### Added
+- **Automated PyPI publishing.** A new `.github/workflows/publish-pypi.yml`
+  builds the wheel + sdist and publishes them to PyPI when a release is
+  published (i.e. on every `v*` tag, alongside the AppImage). Uses PyPI
+  Trusted Publishing (OIDC) — no stored token. One-time PyPI-side setup is
+  documented in the workflow header. It's a separate workflow from
+  `release.yml`, so a PyPI misconfiguration can't block the AppImage release.
+
 ## [0.1.0] — 2026-06-01
 
 ### Added
