@@ -72,7 +72,7 @@ The line between these is judgment. When in doubt, the safer call is to stop and
 
 Read these alongside this file when picking up a session:
 
-- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-15)
+- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-16)
 - **`TASKS.md`** — active task checklist; update status (`[ ]` → `[~]` → `[x]`) as work progresses. Sections: P0 (v1 release, T01-T32), P1.1 (install/uninstall ease — highest-priority P1 subset), P1 (broader backlog), P2 (future), Out of scope.
 - **`DEPENDENCIES.md`** — dep table with last release dates and replacement plans; review per the cadence stated in that file
 - **`README.md`** — outward-facing project description and install instructions
@@ -81,6 +81,7 @@ Read these alongside this file when picking up a session:
 - **`docs/whipper-gui-session-start.md`** — bootstrap instructions a fresh Claude Code session uses to reproduce the initial planning artifacts
 - **`docs/whipper-gui-research-rerun-prompt.md`** — Research-mode prompt for refreshing tool-choice validation
 - **`docs/log-format-comparison.md`** — whipper rip log vs EAC log side-by-side (referenced by KDD-11)
+- **`docs/best-practices.md`** — engineering patterns and hard-won lessons (Qt threading, subprocess, adapters, testing, packaging, releasing, security); complements the locked *Code conventions* and *Critical rules* here
 
 If `PLANNING.md` and the brief conflict, the brief wins on requirements/scope and `PLANNING.md` wins on implementation choices. If `PLANNING.md` and the research output conflict, raise it with the user — don't silently pick.
 

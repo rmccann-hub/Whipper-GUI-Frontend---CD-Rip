@@ -39,7 +39,7 @@ Whipper-GUI-Frontend---CD-Rip/
 │       ├── whipper-gui.desktop          # desktop integration
 │       └── README.md                    # build-time prerequisites and gotchas
 │
-├── tests/                               # pytest test tree (301 tests at last count)
+├── tests/                               # pytest test tree (runs offscreen, no real hardware/network)
 │   ├── conftest.py                      # session-scoped QApplication fixture; QT_QPA_PLATFORM=offscreen
 │   ├── test_app.py                      # argparse / --version / module import smoke
 │   ├── test_build_harness.py            # AppImage recipe shape + executable bits

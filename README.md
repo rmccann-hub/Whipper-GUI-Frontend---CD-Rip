@@ -761,6 +761,7 @@ Core project documents (in this directory):
 Source documents and reference material (in `docs/`):
 
 - [`docs/README.md`](docs/README.md) — index of `docs/` contents + rebuild-from-scratch checklist
+- [`docs/best-practices.md`](docs/best-practices.md) — engineering patterns & hard-won lessons (read before contributing code)
 - [`docs/whipper-gui-research-brief-v2.1.md`](docs/whipper-gui-research-brief-v2.1.md) — the canonical project brief
 - [`docs/whipper-gui-session-start.md`](docs/whipper-gui-session-start.md) — bootstrap instructions for a fresh Claude Code session
 - [`docs/whipper-gui-research-rerun-prompt.md`](docs/whipper-gui-research-rerun-prompt.md) — Research-mode prompt for refreshing tool-choice validation

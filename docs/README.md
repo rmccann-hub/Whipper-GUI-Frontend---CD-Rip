@@ -19,6 +19,7 @@ These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS
 | File | What it is |
 |---|---|
 | `log-format-comparison.md` | Side-by-side comparison of whipper's rip log against EAC's, anchoring [PLANNING.md KDD-11](../PLANNING.md). The hand-authored EAC log at `tests/fixtures/rip_log_eac_reference.log` is the comparison's data. |
+| `best-practices.md` | Engineering patterns and hard-won lessons for contributors — Python/typing, adapter design, subprocess, Qt threading, testing, packaging/AppImage, releasing, security. Complements (does not replace) CLAUDE.md's locked rules. |
 | `appimage-testing.md` | How the AppImage is built (on every push to `main`, on demand for any branch, and at release) and how to test it in each case — including branches with no published release yet. |
 | `upstream-modification-investigation.md` | EAC-parity investigation (2026-06-02): what modifying the open-source programs underneath us would buy, what's feasible (→ task items), and a "do not revisit" non-feasible list. |
 
@@ -29,7 +30,7 @@ Outside this directory:
 | File | What it covers |
 |---|---|
 | [`../CLAUDE.md`](../CLAUDE.md) | Persistent rules and conventions; locked rules section; project operations |
-| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, 15 keyed design decisions |
+| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, keyed design decisions (KDD-01 … KDD-16) |
 | [`../TASKS.md`](../TASKS.md) | Active task checklist — P0 (T01-T32), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope |
 | [`../DEPENDENCIES.md`](../DEPENDENCIES.md) | Pinned versions, last upstream release dates, retirement-review log |
 | [`../README.md`](../README.md) | User-facing install instructions, troubleshooting, EAC comparison |
