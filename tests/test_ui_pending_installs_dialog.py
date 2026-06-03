@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from whipper_gui.deps.checks import ProbeResult
 from whipper_gui.deps.registry import DependencySpec, Tier
-from whipper_gui.deps.resolvers import MissingItem
+from whipper_gui.deps.resolvers import InstallResult, MissingItem
 from whipper_gui.ui.dialogs.pending_installs import PendingInstallsDialog
 
 
@@ -236,3 +236,79 @@ def test_close_button_accepts_dialog(qapp: QApplication) -> None:
     dialog._close_button.click()
 
     assert dialog.result() == int(dialog.DialogCode.Accepted)
+
+
+# --- Self-driven install loop (install_one mode) -------------------------
+
+
+def _ok(item: MissingItem) -> InstallResult:
+    return InstallResult(spec=item.spec, success=True, message="installed")
+
+
+def _fail(item: MissingItem) -> InstallResult:
+    return InstallResult(
+        spec=item.spec, success=False, message="boom: network down"
+    )
+
+
+def test_install_one_mode_drives_loop_and_updates_rows(
+    qapp: QApplication,
+) -> None:
+    """With install_one, clicking Install installs each ticked item, updates
+    its row, records a result, and swaps in the Close button."""
+    items = [_item("a"), _item("b")]
+    dialog = PendingInstallsDialog(items, install_one=_ok)
+
+    dialog._install_button.click()
+
+    assert dialog._status_labels["a"].text() == "OK"
+    assert dialog._status_labels["b"].text() == "OK"
+    assert [(r.spec.dep_id, r.success) for r in dialog.results()] == [
+        ("a", True), ("b", True)
+    ]
+    assert dialog._close_button is not None  # ready to dismiss
+
+
+def test_install_one_mode_records_failures(qapp: QApplication) -> None:
+    dialog = PendingInstallsDialog([_item("a")], install_one=_fail)
+
+    dialog._install_button.click()
+
+    result = dialog.results()[0]
+    assert result.success is False
+    assert "boom" in result.message
+    assert dialog._status_labels["a"].text().startswith("FAILED")
+
+
+def test_install_one_mode_skips_unticked_as_declined(
+    qapp: QApplication,
+) -> None:
+    """Unticked items are not installed; they come back as user_declined so
+    the manager won't cascade them to the next tier."""
+    items = [_item("a"), _item("b")]
+    installed: list[str] = []
+
+    def install_one(item: MissingItem) -> InstallResult:
+        installed.append(item.spec.dep_id)
+        return _ok(item)
+
+    dialog = PendingInstallsDialog(items, install_one=install_one)
+    dialog._checkboxes["b"].setChecked(False)
+
+    dialog._install_button.click()
+
+    assert installed == ["a"]  # b was never installed
+    by_id = {r.spec.dep_id: r for r in dialog.results()}
+    assert by_id["a"].success is True
+    assert by_id["b"].user_declined is True
+
+
+def test_cancel_in_install_one_mode_declines_all(qapp: QApplication) -> None:
+    """Cancelling before installing records a decline for every item."""
+    items = [_item("a"), _item("b")]
+    dialog = PendingInstallsDialog(items, install_one=_ok)
+
+    dialog._cancel_button.click()  # reject() before any install
+
+    assert all(r.user_declined for r in dialog.results())
+    assert {r.spec.dep_id for r in dialog.results()} == {"a", "b"}

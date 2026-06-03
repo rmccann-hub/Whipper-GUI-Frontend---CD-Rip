@@ -1093,3 +1093,59 @@ def test_manual_offset_saved_sets_override(teardown_threads) -> None:
     assert window._config.read_offset == 667
     assert window._config.override_read_offset is True
     assert saved and saved[-1].read_offset == 667
+
+
+# --- Dialog-driven queued resolver (live per-item install feedback) ------
+
+
+def test_dialog_queued_resolver_returns_install_results(
+    qapp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_DialogQueuedResolver drives the dialog's own install loop and returns
+    one InstallResult per item. We replace exec() (which would block on a
+    modal loop) with a stub that runs the loop and accepts, so the wiring is
+    tested without a real event loop."""
+    from whipper_gui.deps.checks import ProbeResult
+    from whipper_gui.deps.registry import DependencySpec, Tier
+    from whipper_gui.deps.resolvers import InstallResult, MissingItem
+    from whipper_gui.ui.dialogs.pending_installs import PendingInstallsDialog
+    from whipper_gui.ui.main_window import _DialogQueuedResolver
+
+    def _item(dep_id: str) -> MissingItem:
+        spec = DependencySpec(
+            dep_id=dep_id,
+            display_name=dep_id,
+            probe=lambda: ProbeResult(present=False, version=None, location=None),
+            min_version=(0, 0, 0),
+            tier=Tier.QUEUED,
+            install_command=["echo", dep_id],
+            search_string="x",
+        )
+        return MissingItem(
+            spec=spec,
+            probe=ProbeResult(present=False, version=None, location=None),
+        )
+
+    def fake_exec(self: PendingInstallsDialog) -> int:
+        self._run_install_loop()
+        return int(self.DialogCode.Accepted)
+
+    monkeypatch.setattr(PendingInstallsDialog, "exec", fake_exec)
+
+    install_one = lambda item: InstallResult(
+        spec=item.spec, success=True, message="installed"
+    )
+    resolver = _DialogQueuedResolver(parent=None, install_one=install_one)
+
+    results = resolver.resolve([_item("a"), _item("b")])
+
+    assert [(r.spec.dep_id, r.success) for r in results] == [
+        ("a", True), ("b", True)
+    ]
+
+
+def test_dialog_queued_resolver_empty_items_is_noop(qapp) -> None:
+    from whipper_gui.ui.main_window import _DialogQueuedResolver
+
+    resolver = _DialogQueuedResolver(parent=None, install_one=lambda i: None)
+    assert resolver.resolve([]) == []

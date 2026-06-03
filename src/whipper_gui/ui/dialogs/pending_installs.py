@@ -8,15 +8,21 @@ once, a Python wheel that needs network retry). Per the brief P0 #11:
    checkboxes, an 'Install selected' button, and per-item progress
    feedback. The user clicks once; the GUI handles the loop."
 
-The dialog itself is just the picker + status view. The caller drives
-the actual install loop (typically on a worker thread to avoid blocking
-the GUI) and updates this dialog via `mark_in_progress` / `mark_result`
-as each item completes.
+When an `install_one` callable is supplied, the dialog drives the install
+loop **itself** on "Install Selected": it installs each ticked item in turn,
+updating that row's status live (`mark_in_progress` → `mark_result`), then
+swaps in a Close button. `results()` then returns one `InstallResult` per
+item (a `user_declined` result for unticked items). This is what lets the
+user watch progress instead of the dialog vanishing the instant they click.
+
+If `install_one` is omitted the dialog keeps its original passive behaviour
+(emit `install_requested` and stay open for an external driver) — used by
+older callers and the unit tests.
 """
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Callable, Iterable
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -30,7 +36,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from whipper_gui.deps.resolvers import MissingItem
+from whipper_gui.deps.resolvers import InstallResult, MissingItem
+
+# Installs a single item and returns its outcome. Injected so the dialog
+# doesn't depend on a concrete installer (tests pass a fake; the GUI passes
+# an AutoInstaller-backed one).
+InstallOne = Callable[[MissingItem], InstallResult]
 
 
 class PendingInstallsDialog(QDialog):
@@ -46,10 +57,15 @@ class PendingInstallsDialog(QDialog):
     def __init__(
         self,
         items: Iterable[MissingItem],
+        install_one: InstallOne | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._items: list[MissingItem] = list(items)
+        self._install_one: InstallOne | None = install_one
+        # Populated when the dialog drives its own install loop; one entry
+        # per item (a user_declined result for unticked / not-attempted ones).
+        self._results: list[InstallResult] = []
         self._checkboxes: dict[str, QCheckBox] = {}
         self._status_labels: dict[str, QLabel] = {}
 
@@ -110,6 +126,14 @@ class PendingInstallsDialog(QDialog):
             if self._checkboxes[item.spec.dep_id].isChecked()
         ]
 
+    def results(self) -> list[InstallResult]:
+        """Outcomes of a self-driven install loop, one per item.
+
+        Empty until the dialog has driven an install (or been cancelled).
+        Only meaningful when constructed with an `install_one`.
+        """
+        return list(self._results)
+
     def mark_in_progress(self, dep_id: str) -> None:
         """Show 'installing…' on the row for `dep_id`."""
         label = self._status_labels.get(dep_id)
@@ -159,11 +183,62 @@ class PendingInstallsDialog(QDialog):
 
     # --- Internals ---------------------------------------------------------
 
+    def reject(self) -> None:
+        """Cancel / close-before-installing → record a decline for every item.
+
+        So the resolver/manager see "the user declined", not an empty result
+        set (which would look like nothing was offered). Guarded by
+        `not self._results` so closing the window *after* a completed install
+        doesn't clobber the real outcomes. No-op for the passive (legacy) mode.
+        """
+        if self._install_one is not None and not self._results:
+            self._results = [self._declined(item) for item in self._items]
+        super().reject()
+
     def _on_install_clicked(self) -> None:
-        """Emit `install_requested` so the caller starts the install loop."""
-        # Don't accept() the dialog — we stay open so the caller can
-        # update per-row status during installs.
+        """Start the install. Either drive the loop here (when we have an
+        `install_one`) or just signal an external driver (legacy mode)."""
+        # Emit for observers/tests regardless of mode.
         self.install_requested.emit()
+        if self._install_one is None:
+            # Passive mode: caller drives the loop; we stay open, no accept().
+            return
+        self._run_install_loop()
+
+    def _run_install_loop(self) -> None:
+        """Install each ticked item in turn, updating its row live."""
+        assert self._install_one is not None
+        self.set_install_phase_active(True)
+        self._results = []
+        for item in self._items:
+            dep_id = item.spec.dep_id
+            if not self._checkboxes[dep_id].isChecked():
+                # Unticked → the user declined this one; don't install it.
+                self._results.append(self._declined(item))
+                continue
+            self.mark_in_progress(dep_id)
+            # Force an immediate synchronous repaint so the "installing…"
+            # label shows before the (blocking) install. We use repaint()
+            # rather than QApplication.processEvents() on purpose: this runs
+            # as a slot inside the modal exec() loop, and processEvents() would
+            # re-enter that loop (and pump unrelated timers/threads) — a
+            # re-entrancy hazard. repaint() just paints, synchronously.
+            self.repaint()
+            result = self._install_one(item)
+            self._results.append(result)
+            self.mark_result(dep_id, result.success, result.message)
+            self.repaint()
+        # Loop done — let the user dismiss with Close.
+        self.show_close_button()
+
+    @staticmethod
+    def _declined(item: MissingItem) -> InstallResult:
+        return InstallResult(
+            spec=item.spec,
+            success=False,
+            message="not selected for install",
+            user_declined=True,
+        )
 
     def _row_label(self, item: MissingItem) -> str:
         version = ".".join(str(part) for part in item.spec.min_version)

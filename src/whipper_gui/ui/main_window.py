@@ -41,9 +41,9 @@ from whipper_gui.deps.manager import DependencyManager
 from whipper_gui.deps.version import format_version
 from whipper_gui.deps.resolvers import (
     AutoInstaller,
+    InstallResult,
     ManualPrompt,
     MissingItem,
-    QueuedInstaller,
 )
 from whipper_gui.drive_access import (
     SEVERITY_NO_DEVICE,
@@ -79,6 +79,38 @@ log = logging.getLogger(__name__)
 # in-container reader can keep it spinning). The user can hit Force stop to
 # escalate sooner.
 _FORCE_STOP_COUNTDOWN_MS: int = 5000
+
+
+class _DialogQueuedResolver:
+    """Tier-(b) resolver for the GUI: drives `PendingInstallsDialog` with live
+    per-item progress, then returns the `InstallResult`s.
+
+    Replaces `QueuedInstaller` in the GUI path. `QueuedInstaller` installs
+    *after* its dialog callback returns — which closes the dialog — so it can't
+    show per-item progress. Here the dialog stays open and installs inline,
+    updating each row as it goes. Duck-typed to the resolver interface the
+    `DependencyManager` dispatches to (`resolve(items) -> list[InstallResult]`).
+    """
+
+    def __init__(
+        self,
+        parent: QWidget | None,
+        install_one: "Callable[[MissingItem], InstallResult]",
+    ) -> None:
+        self._parent = parent
+        self._install_one = install_one
+
+    def resolve(self, items: list[MissingItem]) -> list[InstallResult]:
+        if not items:
+            return []
+        dialog = PendingInstallsDialog(
+            items, install_one=self._install_one, parent=self._parent
+        )
+        # The dialog drives the install loop itself and populates results();
+        # exec() blocks until the user closes it (Close after install, or
+        # Cancel → all declined). results() always has one entry per item.
+        dialog.exec()
+        return dialog.results()
 
 
 class MainWindow(QMainWindow):
@@ -716,7 +748,7 @@ class MainWindow(QMainWindow):
         dialogs still appear for items that need attention.
         """
         auto = AutoInstaller(consent=self._gui_auto_consent)
-        queued = QueuedInstaller(dialog_callback=self._gui_queued_dialog)
+        queued = _DialogQueuedResolver(self, self._make_install_one())
         manual = ManualPrompt(dialog_callback=self._gui_manual_dialog)
 
         # Reuse the registry from the injected DependencyManager so the
@@ -757,22 +789,28 @@ class MainWindow(QMainWindow):
         )
         return choice == QMessageBox.StandardButton.Yes
 
-    def _gui_queued_dialog(
-        self, items: list[MissingItem]
-    ) -> list[MissingItem]:
-        dialog = PendingInstallsDialog(items, self)
-        # PendingInstallsDialog emits install_requested when the user
-        # clicks Install Selected but doesn't accept itself — its
-        # original design called for the caller to drive a per-item
-        # progress loop while the dialog stayed open. We don't do that
-        # yet (the AutoInstaller runs synchronously after the callback
-        # returns). Connect install_requested → accept so exec() unblocks
-        # when the user clicks the button; otherwise the dialog sits
-        # there forever and the user has to Cancel.
-        dialog.install_requested.connect(dialog.accept)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            return dialog.selected_items()
-        return []
+    def _make_install_one(self) -> "Callable[[MissingItem], InstallResult]":
+        """Build the per-item installer the PendingInstallsDialog drives.
+
+        Reuses AutoInstaller's install machinery (subprocess run + error
+        handling) with an always-yes consent — the user already consented
+        per-item via the dialog's checkboxes.
+        """
+        installer = AutoInstaller(consent=lambda _: True)
+
+        def install_one(item: MissingItem) -> InstallResult:
+            results = installer.resolve([item])
+            if results:
+                return results[0]
+            # AutoInstaller skips items with no install_command; a queued-tier
+            # item should always have one, but never return an empty list.
+            return InstallResult(
+                spec=item.spec,
+                success=False,
+                message="no install command available",
+            )
+
+        return install_one
 
     def _gui_manual_dialog(self, item: MissingItem) -> None:
         dialog = ManualInstallDialog(item.spec, item.probe, self)
