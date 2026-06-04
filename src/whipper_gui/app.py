@@ -25,7 +25,6 @@ from pathlib import Path
 
 from whipper_gui import __version__
 
-
 log = logging.getLogger(__name__)
 
 
@@ -80,9 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     mb_client = MusicBrainzNgsImpl(
         app="whipper-gui",
         version=__version__,
-        contact=(
-            "https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip"
-        ),
+        contact=("https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip"),
     )
     metaflac = MetaflacAdapter(binary_name=cfg.metaflac_path)
 

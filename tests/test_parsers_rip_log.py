@@ -8,11 +8,13 @@ https://github.com/whipper-team/whipper/blob/master/whipper/test/test_result_log
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
+
+import pytest
 
 from whipper_gui.parsers.rip_log import (
     AccurateRipResult,
-    RipLog,
     RippingInfo,
     TrackResult,
     parse_rip_log,
@@ -187,26 +189,17 @@ def test_parse_handles_ar_missing_from_database() -> None:
 
 def test_track_result_is_frozen() -> None:
     t = TrackResult(number=1)
-    try:
+    with pytest.raises(FrozenInstanceError):
         t.number = 2  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except Exception:
-        pass
 
 
 def test_ripping_info_is_frozen() -> None:
     info = RippingInfo()
-    try:
+    with pytest.raises(FrozenInstanceError):
         info.drive = "x"  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except Exception:
-        pass
 
 
 def test_accuraterip_result_is_frozen() -> None:
     ar = AccurateRipResult(version=1)
-    try:
+    with pytest.raises(FrozenInstanceError):
         ar.confidence = 5  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except Exception:
-        pass

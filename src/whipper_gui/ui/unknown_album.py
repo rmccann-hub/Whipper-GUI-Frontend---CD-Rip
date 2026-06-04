@@ -25,8 +25,9 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -80,13 +81,10 @@ class UnknownAlbumDialog(QDialog):
         root.addWidget(self._picard_check)
 
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
-            "Rip as unknown"
-        )
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Rip as unknown")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         root.addWidget(button_box)
@@ -137,8 +135,8 @@ def apply_placeholder_tags(
 def apply_track_tags(
     metaflac: MetaflacAdapter,
     flac_files: Sequence[Path],
-    album: "AlbumMetadata",
-    tracks: Sequence["TrackSummary"],
+    album: AlbumMetadata,
+    tracks: Sequence[TrackSummary],
 ) -> list[Path]:
     """Apply the user's (possibly edited) album + per-track tags to FLACs.
 
@@ -195,7 +193,10 @@ def launch_picard_for(folder: Path) -> bool:
     (flatpak missing) or OSError. Doesn't block — Picard runs detached.
     """
     argv: list[str] = [
-        "flatpak", "run", _PICARD_FLATPAK_ID, str(folder),
+        "flatpak",
+        "run",
+        _PICARD_FLATPAK_ID,
+        str(folder),
     ]
     try:
         subprocess.Popen(argv)

@@ -7,15 +7,14 @@ import zlib
 from pathlib import Path
 
 from whipper_gui.adapters.ctdb_client import (
+    CTDBClient,
     CtdbEntry,
     CtdbLookupError,
     CtdbLookupResult,
-    CTDBClient,
 )
 from whipper_gui.ctdb import crc as crc_mod
 from whipper_gui.ctdb.toc import SAMPLES_PER_SECTOR, DiscToc
 from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict, verify_rip
-
 
 # --- crc -------------------------------------------------------------------
 
@@ -118,3 +117,27 @@ def test_decoder_unavailable_after_db_hit() -> None:
 def test_trustworthy_true_for_non_match_verdicts() -> None:
     res = CtdbVerifyResult(Verdict.NOT_IN_DATABASE)
     assert res.trustworthy is True
+
+
+def test_toc_build_error_is_lookup_error() -> None:
+    # A probe failure while building the TOC (before any lookup) → LOOKUP_ERROR.
+    def bad_probe(_p: Path) -> int:
+        raise RuntimeError("metaflac exploded")
+
+    client = _FakeClient(CtdbLookupResult(entries=()))
+    res = verify_rip(_FLACS, client, decoder=_decoder, samples_probe=bad_probe)
+    assert res.verdict is Verdict.LOOKUP_ERROR
+    assert "TOC error" in res.message
+
+
+def test_decode_oserror_after_db_hit_is_lookup_error() -> None:
+    # DB hit, then the decode raises a non-DecoderUnavailable error.
+    entry = CtdbEntry(crc=123, confidence=4)
+    client = _FakeClient(CtdbLookupResult(entries=(entry,)))
+
+    def bad_decoder(_p: Path) -> bytes:
+        raise OSError("disk vanished mid-read")
+
+    res = verify_rip(_FLACS, client, decoder=bad_decoder, samples_probe=_probe)
+    assert res.verdict is Verdict.LOOKUP_ERROR
+    assert res.confidence == 4  # DB hit still surfaced

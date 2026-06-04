@@ -84,12 +84,12 @@ class ReleaseSummary:
     mbid: str
     title: str
     artist_credit: str
-    date: str = ""              # YYYY or YYYY-MM-DD per MB
-    country: str = ""           # ISO-3166-1 alpha-2
+    date: str = ""  # YYYY or YYYY-MM-DD per MB
+    country: str = ""  # ISO-3166-1 alpha-2
     track_count: int | None = None
     label: str = ""
     catalog_number: str = ""
-    medium_format: str = ""     # e.g. "CD"
+    medium_format: str = ""  # e.g. "CD"
     disambiguation: str = ""
 
 
@@ -167,7 +167,7 @@ class MusicBrainzNgsImpl(MusicBrainzClient):
         try:
             response = musicbrainzngs.get_releases_by_discid(
                 "-",  # MB requires a disc-id; "-" is the documented
-                      # placeholder when only `toc=` is meaningful
+                # placeholder when only `toc=` is meaningful
                 toc=toc.to_query(),
                 includes=["artists", "labels"],
                 cdstubs=False,
@@ -216,10 +216,7 @@ def _summaries_from_disc_response(
 ) -> list[ReleaseSummary]:
     """Extract release summaries from `get_releases_by_discid` payload."""
     disc = response.get("disc") or {}
-    return [
-        _summary_from_release_dict(r)
-        for r in disc.get("release-list", [])
-    ]
+    return [_summary_from_release_dict(r) for r in disc.get("release-list", [])]
 
 
 def _summary_from_release_dict(release: dict) -> ReleaseSummary:
@@ -269,9 +266,7 @@ def _tracks_from_release_dict(release: dict) -> tuple[TrackSummary, ...]:
             TrackSummary(
                 number=number,
                 title=recording.get("title", "") or track.get("title", ""),
-                artist_credit=_artist_credit_string(
-                    recording.get("artist-credit", [])
-                ),
+                artist_credit=_artist_credit_string(recording.get("artist-credit", [])),
                 length_ms=length_ms,
             )
         )

@@ -23,9 +23,9 @@ unit-tested for *what we intend*; hardware confirms the intent matches CTDB.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
 # CD-DA geometry: 75 sectors per second; each sector is 588 stereo 16-bit
 # samples (2352 bytes). The 150-sector (2-second) lead-in offset is part of

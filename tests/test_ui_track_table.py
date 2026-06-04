@@ -140,9 +140,7 @@ def test_model_headers(qapp: QApplication) -> None:
     model = TrackTableModel()
     expected = ["#", "Title", "Artist", "Length"]
     for i, header in enumerate(expected):
-        assert (
-            model.headerData(i, Qt.Orientation.Horizontal) == header
-        )
+        assert model.headerData(i, Qt.Orientation.Horizontal) == header
 
 
 # --- TrackTable widget ----------------------------------------------------
@@ -221,7 +219,7 @@ def test_highlight_track_ignores_out_of_range(qapp: QApplication) -> None:
     widget.set_release(_detail())  # 2 tracks
     widget.highlight_track(1)  # select row 0
 
-    widget.highlight_track(0)   # below range — ignored
+    widget.highlight_track(0)  # below range — ignored
     widget.highlight_track(99)  # above range — ignored
 
     selected = widget._view.selectionModel().selectedRows()
@@ -296,6 +294,7 @@ def test_validate_rejects_blank_track_title(qapp: QApplication) -> None:
 
 def test_album_artist_propagates_to_track_rows(qapp) -> None:
     from whipper_gui.ui.track_table import TrackTable
+
     table = TrackTable()
     table.set_placeholder_tracks(3)
     # Simulate the user typing an album artist and tabbing away.
@@ -307,8 +306,8 @@ def test_album_artist_propagates_to_track_rows(qapp) -> None:
 
 
 def test_per_track_artist_edit_holds_after_propagation(qapp) -> None:
-    from whipper_gui.ui.track_table import TrackTable
-    from whipper_gui.ui.track_table import _COL_ARTIST
+    from whipper_gui.ui.track_table import _COL_ARTIST, TrackTable
+
     table = TrackTable()
     table.set_placeholder_tracks(2)
     table._album_artist_edit.setText("Various")

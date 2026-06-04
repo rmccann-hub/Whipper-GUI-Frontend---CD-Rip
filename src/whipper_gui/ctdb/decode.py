@@ -17,8 +17,8 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ def _which(name: str) -> str | None:
     return None
 
 
-def _default_runner(argv: list[str]) -> "subprocess.CompletedProcess[bytes]":
+def _default_runner(argv: list[str]) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         argv, capture_output=True, timeout=_DECODE_TIMEOUT_S, check=False
     )
@@ -73,8 +73,14 @@ def decode_flac_to_pcm(path: Path, runner: Runner | None = None) -> bytes:
         raise DecoderUnavailable("the `flac` decoder is not installed on the host")
     run = runner or _default_runner
     argv = [
-        flac, "-d", "-s", "--force-raw-format",
-        "--endian=little", "--sign=signed", "-c", str(path),
+        flac,
+        "-d",
+        "-s",
+        "--force-raw-format",
+        "--endian=little",
+        "--sign=signed",
+        "-c",
+        str(path),
     ]
     proc = run(argv)
     if proc.returncode != 0:
@@ -88,7 +94,7 @@ def decode_flac_to_pcm(path: Path, runner: Runner | None = None) -> bytes:
 ProbeRunner = Callable[[list[str]], "subprocess.CompletedProcess[str]"]
 
 
-def _default_probe_runner(argv: list[str]) -> "subprocess.CompletedProcess[str]":
+def _default_probe_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         argv, capture_output=True, text=True, timeout=_PROBE_TIMEOUT_S, check=False
     )

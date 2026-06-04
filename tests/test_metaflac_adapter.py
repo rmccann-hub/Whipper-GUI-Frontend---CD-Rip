@@ -60,11 +60,7 @@ def test_read_tags_parses_key_value_lines(
 def test_read_tags_ignores_lines_without_equals(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    sample = (
-        "ARTIST=Pink Floyd\n"
-        "garbage-line-without-equals\n"
-        "TITLE=Track\n"
-    )
+    sample = "ARTIST=Pink Floyd\ngarbage-line-without-equals\nTITLE=Track\n"
     monkeypatch.setattr(
         metaflac_module.subprocess, "run", lambda *a, **kw: _ok(stdout=sample)
     )
@@ -109,12 +105,8 @@ def test_write_tags_emits_remove_then_set_for_each_key(
     argv = captured[0]
     assert argv[0] == "metaflac"
     # All --remove-tag come before all --set-tag.
-    remove_indices = [
-        i for i, a in enumerate(argv) if a.startswith("--remove-tag")
-    ]
-    set_indices = [
-        i for i, a in enumerate(argv) if a.startswith("--set-tag")
-    ]
+    remove_indices = [i for i, a in enumerate(argv) if a.startswith("--remove-tag")]
+    set_indices = [i for i, a in enumerate(argv) if a.startswith("--set-tag")]
     assert all(r < s for r in remove_indices for s in set_indices)
     # Path is last.
     assert argv[-1] == "/x/track.flac"
@@ -148,7 +140,8 @@ def test_read_tags_raises_on_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        metaflac_module.subprocess, "run",
+        metaflac_module.subprocess,
+        "run",
         lambda *a, **kw: _fail(stderr="ERROR: bad FLAC\n"),
     )
 

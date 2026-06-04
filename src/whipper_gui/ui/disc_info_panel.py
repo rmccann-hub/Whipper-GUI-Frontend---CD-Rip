@@ -112,13 +112,9 @@ class DiscInfoPanel(QWidget):
         if matched == 0:
             self._accuraterip_value.setText("not in database")
         elif matched == total:
-            self._accuraterip_value.setText(
-                f"verified — all {total} tracks matched"
-            )
+            self._accuraterip_value.setText(f"verified — all {total} tracks matched")
         else:
-            self._accuraterip_value.setText(
-                f"{matched} of {total} tracks matched"
-            )
+            self._accuraterip_value.setText(f"{matched} of {total} tracks matched")
 
     # --- Disc info (from `whipper cd info`) ---------------------------------
 
@@ -155,9 +151,7 @@ class DiscInfoPanel(QWidget):
             title = release.title or "Unknown Title"
             self._mb_match_value.setText(f"1 match: {artist} — {title}")
         else:
-            self._mb_match_value.setText(
-                f"{len(releases)} matches found — pick one"
-            )
+            self._mb_match_value.setText(f"{len(releases)} matches found — pick one")
 
     def set_mb_error(self, message: str) -> None:
         self._mb_match_value.setText(f"MusicBrainz error: {message}")

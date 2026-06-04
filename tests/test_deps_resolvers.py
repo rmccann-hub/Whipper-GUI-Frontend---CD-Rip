@@ -7,7 +7,6 @@ install machinery on the test host.
 
 from __future__ import annotations
 
-import subprocess
 from types import SimpleNamespace
 from typing import Any
 
@@ -22,7 +21,6 @@ from whipper_gui.deps.resolvers import (
     MissingItem,
     QueuedInstaller,
 )
-
 
 # --- Helpers --------------------------------------------------------------
 

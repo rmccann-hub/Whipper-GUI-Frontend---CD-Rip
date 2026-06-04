@@ -26,9 +26,7 @@ _DRIVE_LINE = re.compile(
     r"model:\s*(?P<model>.+?),\s*"
     r"release:\s*(?P<release>\S+)\s*$"
 )
-_READ_OFFSET = re.compile(
-    r"^\s*Configured read offset:\s*(?P<offset>-?\d+)\s*$"
-)
+_READ_OFFSET = re.compile(r"^\s*Configured read offset:\s*(?P<offset>-?\d+)\s*$")
 _CACHE_DEFEAT = re.compile(
     r"^\s*Can defeat audio cache:\s*(?P<value>True|False|Yes|No)\s*$",
     re.IGNORECASE,

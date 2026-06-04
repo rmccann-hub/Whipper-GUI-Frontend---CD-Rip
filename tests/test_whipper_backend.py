@@ -24,7 +24,6 @@ from whipper_gui.adapters.whipper_backend import (
     WhipperHostExportedImpl,
 )
 
-
 # --- Fakes for subprocess --------------------------------------------------
 
 
@@ -44,11 +43,9 @@ class _FakePopen:
     construction, and a configurable .stdout iterator for log-line tests.
     """
 
-    instances: list["_FakePopen"] = []
+    instances: list[_FakePopen] = []
 
-    def __init__(
-        self, argv: list[str], *args: Any, **kwargs: Any
-    ) -> None:
+    def __init__(self, argv: list[str], *args: Any, **kwargs: Any) -> None:
         self.argv: list[str] = argv
         self.popen_args: dict[str, Any] = kwargs
         self.stdout = iter(())  # type: ignore[assignment]
@@ -105,7 +102,8 @@ def test_list_drives_raises_whipper_error_on_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        whipper_backend.subprocess, "run",
+        whipper_backend.subprocess,
+        "run",
         lambda *a, **kw: _fail_run(stderr="error: device busy\n"),
     )
 
@@ -186,7 +184,8 @@ def test_disc_info_returns_empty_for_disc_not_in_database(
         "--unknown argument not passed\n"
     )
     monkeypatch.setattr(
-        whipper_backend.subprocess, "run",
+        whipper_backend.subprocess,
+        "run",
         lambda *a, **kw: _fail_run(stderr=failed_output),
     )
 
@@ -215,7 +214,8 @@ def test_disc_info_salvages_track_count_from_failed_output(
         "--unknown argument not passed\n"
     )
     monkeypatch.setattr(
-        whipper_backend.subprocess, "run",
+        whipper_backend.subprocess,
+        "run",
         lambda *a, **kw: _fail_run(stdout=failed_output),
     )
 
@@ -233,7 +233,8 @@ def test_disc_info_still_raises_on_other_failures(
     """Failures that aren't the "disc not in database" case must still
     surface as WhipperError so the GUI shows a real error message."""
     monkeypatch.setattr(
-        whipper_backend.subprocess, "run",
+        whipper_backend.subprocess,
+        "run",
         lambda *a, **kw: _fail_run(stderr="error: drive is empty\n"),
     )
 
@@ -248,7 +249,8 @@ def test_disc_info_still_raises_on_other_failures(
 
 def test_version_returns_trimmed_string(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        whipper_backend.subprocess, "run",
+        whipper_backend.subprocess,
+        "run",
         lambda *a, **kw: _ok_run(stdout="whipper 0.10.0\n"),
     )
 
@@ -418,9 +420,7 @@ def test_rip_creates_working_and_output_dirs(
     work_dir = tmp_path / "cache" / "whipper-gui"
     assert not out_dir.exists() and not work_dir.exists()
 
-    impl = WhipperHostExportedImpl(
-        binary_path=Path("/x/whipper"), working_dir=work_dir
-    )
+    impl = WhipperHostExportedImpl(binary_path=Path("/x/whipper"), working_dir=work_dir)
     impl.rip(
         drive="/dev/sr0",
         release_id="x",
@@ -580,9 +580,7 @@ def test_analyze_drive_returns_false_when_cache_cannot_be_defeated(
 def test_analyze_drive_raises_friendly_error_without_disc(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch_setup_popen(
-        monkeypatch, "cannot analyze the drive: is there a CD in it?\n"
-    )
+    _patch_setup_popen(monkeypatch, "cannot analyze the drive: is there a CD in it?\n")
     with pytest.raises(WhipperError) as info:
         _impl().analyze_drive("/dev/sr0")
     assert "Insert a CD" in str(info.value)

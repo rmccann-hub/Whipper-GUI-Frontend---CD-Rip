@@ -19,9 +19,11 @@ def test_main_version_flag_prints_and_exits(capsys: pytest.CaptureFixture) -> No
     with pytest.raises(SystemExit) as excinfo:
         app_module.main(["--version"])
     assert excinfo.value.code == 0
-    out = capsys.readouterr().out + capsys.readouterr().err
+    captured = capsys.readouterr()
+    out = captured.out + captured.err
     # argparse may print to stdout or stderr depending on version.
     # Verify the version string appears at least once in either stream.
+    assert "whipper-gui" in out
 
 
 def test_main_version_text_matches_package_version(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QDialogButtonBox
 
 from whipper_gui.adapters.musicbrainz_client import ReleaseSummary
-from whipper_gui.ui.release_picker import ReleasePickerDialog, _COLUMNS
+from whipper_gui.ui.release_picker import _COLUMNS, ReleasePickerDialog
 
 
 def _release(
@@ -44,9 +44,7 @@ def test_window_title_and_modality(qapp: QApplication) -> None:
 
 
 def test_table_has_row_per_release(qapp: QApplication) -> None:
-    dialog = ReleasePickerDialog(
-        [_release("a"), _release("b"), _release("c")]
-    )
+    dialog = ReleasePickerDialog([_release("a"), _release("b"), _release("c")])
     assert dialog._table.rowCount() == 3
 
 
@@ -126,9 +124,7 @@ def test_first_row_selected_by_default(qapp: QApplication) -> None:
 
 
 def test_selected_mbid_reflects_current_row(qapp: QApplication) -> None:
-    dialog = ReleasePickerDialog(
-        [_release("a"), _release("b"), _release("c")]
-    )
+    dialog = ReleasePickerDialog([_release("a"), _release("b"), _release("c")])
     dialog._table.selectRow(2)
     assert dialog.selected_mbid() == "c"
 
@@ -155,17 +151,13 @@ def _button_box(dialog: ReleasePickerDialog) -> QDialogButtonBox:
 
 def test_pick_button_accepts_dialog(qapp: QApplication) -> None:
     dialog = ReleasePickerDialog([_release()])
-    _button_box(dialog).button(
-        QDialogButtonBox.StandardButton.Ok
-    ).click()
+    _button_box(dialog).button(QDialogButtonBox.StandardButton.Ok).click()
     assert dialog.result() == int(dialog.DialogCode.Accepted)
 
 
 def test_cancel_button_rejects_dialog(qapp: QApplication) -> None:
     dialog = ReleasePickerDialog([_release()])
-    _button_box(dialog).button(
-        QDialogButtonBox.StandardButton.Cancel
-    ).click()
+    _button_box(dialog).button(QDialogButtonBox.StandardButton.Cancel).click()
     assert dialog.result() == int(dialog.DialogCode.Rejected)
 
 
@@ -183,7 +175,5 @@ def test_double_click_on_row_accepts(qapp: QApplication) -> None:
 
 def test_pick_button_label_is_descriptive(qapp: QApplication) -> None:
     dialog = ReleasePickerDialog([_release()])
-    label = _button_box(dialog).button(
-        QDialogButtonBox.StandardButton.Ok
-    ).text()
+    label = _button_box(dialog).button(QDialogButtonBox.StandardButton.Ok).text()
     assert "Pick" in label or "pick" in label

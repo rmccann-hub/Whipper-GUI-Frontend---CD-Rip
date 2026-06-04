@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8,<9",
+    "ruff>=0.15,<1",
 ]
 
 [project.scripts]
@@ -58,6 +59,29 @@ where = ["src"]
 # (`importlib.metadata.version`) is generated from this at build time.
 [tool.setuptools.dynamic]
 version = { attr = "whipper_gui.__version__" }
+
+# Ruff is the project linter + formatter (added 2026-06-04). `ruff check`
+# lints, `ruff format` formats; CI runs both in --check/no-fix mode. Defaults
+# (88-col, double quotes) match the existing code, so adoption was low-churn.
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+# E/W=pycodestyle, F=pyflakes, I=isort (import order), B=flake8-bugbear
+# (likely-bug patterns), UP=pyupgrade (modern 3.11+ syntax).
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    # Long lines are largely comments/strings; the formatter wraps code and
+    # we don't want it splitting prose or URLs. Keep E501 off.
+    "E501",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Qt's model/view override signatures legitimately default index args to a
+# fresh QModelIndex() (the documented PySide idiom); treat it as immutable so
+# B008 doesn't flag every rowCount/columnCount/data/parent override.
+extend-immutable-calls = ["PySide6.QtCore.QModelIndex"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

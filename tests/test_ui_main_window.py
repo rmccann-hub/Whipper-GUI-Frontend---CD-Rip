@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from whipper_gui.adapters.metaflac import MetaflacAdapter
@@ -31,11 +30,10 @@ from whipper_gui.adapters.whipper_backend import (
 )
 from whipper_gui.config import Config
 from whipper_gui.deps.manager import DependencyManager
-from whipper_gui.parsers.drive_list import DriveDescriptor
 from whipper_gui.drive_access import DriveAccessDiagnosis
+from whipper_gui.parsers.drive_list import DriveDescriptor
 from whipper_gui.parsers.rip_log import RipLog, TrackResult
 from whipper_gui.ui.main_window import MainWindow, _fidelity_summary
-
 
 # --- Fakes ---------------------------------------------------------------
 
@@ -188,7 +186,8 @@ def test_menus_have_settings_but_not_duplicate_dep_check(teardown_threads) -> No
 
 
 def test_drive_change_triggers_disc_info_and_mb_lookup(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     backend = _FakeBackend()
     backend.disc_info_return = DiscInfo(
@@ -215,7 +214,8 @@ def test_drive_change_triggers_disc_info_and_mb_lookup(
 
 
 def test_no_mb_match_shows_blank_track_rows(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An unknown disc (no MB ID) still shows numbered blank rows.
 
@@ -226,7 +226,8 @@ def test_no_mb_match_shows_blank_track_rows(
     window = teardown_threads(backend=backend)
     prompted: list[bool] = []
     monkeypatch.setattr(
-        window, "open_unknown_album_dialog",
+        window,
+        "open_unknown_album_dialog",
         lambda: prompted.append(True) or False,
     )
 
@@ -239,13 +240,12 @@ def test_no_mb_match_shows_blank_track_rows(
 
 
 def test_zero_mb_results_shows_blank_track_rows(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A disc with an MB ID but no registered release also gets blank rows."""
     backend = _FakeBackend()
-    backend.disc_info_return = DiscInfo(
-        musicbrainz_disc_id="mb-id", num_tracks=12
-    )
+    backend.disc_info_return = DiscInfo(musicbrainz_disc_id="mb-id", num_tracks=12)
     mb = _FakeMb()  # returns [] for the lookup
     window = teardown_threads(backend=backend, mb_client=mb)
     monkeypatch.setattr(window, "open_unknown_album_dialog", lambda: False)
@@ -293,9 +293,7 @@ def test_mb_releases_single_match_fetches_detail(teardown_threads) -> None:
 
     # Single-match path goes through fetch_release on the MB worker;
     # We exercise it via the slot directly to avoid thread timing.
-    summary = ReleaseSummary(
-        mbid="some-mbid", title="Album", artist_credit="Artist"
-    )
+    summary = ReleaseSummary(mbid="some-mbid", title="Album", artist_credit="Artist")
     window._on_mb_releases([summary])
 
     # The fetch is queued via signal; we can't deterministically observe
@@ -331,9 +329,7 @@ def test_rip_requested_blocked_when_track_table_invalid(
         warnings.append((title, text))
         return QMessageBox.StandardButton.Ok
 
-    monkeypatch.setattr(
-        "whipper_gui.ui.main_window.QMessageBox.warning", fake_warning
-    )
+    monkeypatch.setattr("whipper_gui.ui.main_window.QMessageBox.warning", fake_warning)
 
     from whipper_gui.workers.rip_worker import RipParameters
 
@@ -422,9 +418,7 @@ def test_dep_summary_with_no_failures_omits_failure_block(
         captured.append((title, text))
         return None
 
-    monkeypatch.setattr(
-        "whipper_gui.ui.main_window.QMessageBox.information", fake_info
-    )
+    monkeypatch.setattr("whipper_gui.ui.main_window.QMessageBox.information", fake_info)
 
     report = DependencyReport(ok=[], missing=[], install_results=[])
     window._show_dep_summary(report)
@@ -468,13 +462,9 @@ def test_dep_summary_includes_failure_details(
         captured.append((title, text))
         return None
 
-    monkeypatch.setattr(
-        "whipper_gui.ui.main_window.QMessageBox.information", fake_info
-    )
+    monkeypatch.setattr("whipper_gui.ui.main_window.QMessageBox.information", fake_info)
 
-    report = DependencyReport(
-        ok=[], missing=[], install_results=[failure]
-    )
+    report = DependencyReport(ok=[], missing=[], install_results=[failure])
     window._show_dep_summary(report)
 
     text = captured[0][1]
@@ -560,9 +550,7 @@ def test_dep_summary_does_not_show_user_declines_as_failures(
         lambda parent, title, text: captured.append((title, text)) or None,
     )
 
-    report = DependencyReport(
-        ok=[], missing=[], install_results=[decline]
-    )
+    report = DependencyReport(ok=[], missing=[], install_results=[decline])
     window._show_dep_summary(report)
 
     text = captured[0][1]
@@ -731,7 +719,8 @@ def _diag(severity: str, fix: str | None) -> DriveAccessDiagnosis:
 
 
 def test_drives_unavailable_nudges_once_when_actionable(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     window = teardown_threads()
     shown: list[DriveAccessDiagnosis] = []
@@ -748,7 +737,8 @@ def test_drives_unavailable_nudges_once_when_actionable(
 
 
 def test_drives_unavailable_quiet_when_not_actionable(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     window = teardown_threads()
     shown: list[DriveAccessDiagnosis] = []
@@ -764,7 +754,8 @@ def test_drives_unavailable_quiet_when_not_actionable(
 
 
 def test_tools_diagnose_always_shows(
-    teardown_threads, monkeypatch: pytest.MonkeyPatch,
+    teardown_threads,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     window = teardown_threads()
     shown: list[DriveAccessDiagnosis] = []
@@ -790,9 +781,14 @@ def test_unknown_rip_folder_uses_album_fields(
     backend = _FakeBackend()
 
     class _StubHandle:
-        def log_lines(self): return iter(())
-        def wait(self, timeout=None): return 0
-        def cancel(self, term_timeout: float = 5.0): return -15
+        def log_lines(self):
+            return iter(())
+
+        def wait(self, timeout=None):
+            return 0
+
+        def cancel(self, term_timeout: float = 5.0):
+            return -15
 
     backend.rip = lambda **kw: _StubHandle()  # type: ignore[assignment]
     window = teardown_threads(backend=backend)
@@ -800,16 +796,23 @@ def test_unknown_rip_folder_uses_album_fields(
     window._track_table._album_title_edit.setText("for")
 
     from whipper_gui.workers.rip_worker import RipParameters
-    window._on_rip_requested(RipParameters(
-        drive="/dev/sr0", release_id="", output_dir=Path("/tmp/x"),
-        track_template="literal-unknown", disc_template="literal-unknown",
-        unknown=True,
-    ))
+
+    window._on_rip_requested(
+        RipParameters(
+            drive="/dev/sr0",
+            release_id="",
+            output_dir=Path("/tmp/x"),
+            track_template="literal-unknown",
+            disc_template="literal-unknown",
+            unknown=True,
+        )
+    )
 
     assert window._active_rip_params.track_template == "jimmy2/for/%t - Track %t"
     assert window._active_rip_params.disc_template == "jimmy2/for/for"
     if window._rip_thread is not None and window._rip_thread.isRunning():
-        window._rip_thread.quit(); window._rip_thread.wait(2000)
+        window._rip_thread.quit()
+        window._rip_thread.wait(2000)
 
 
 def test_unknown_rip_folder_falls_back_when_album_blank(
@@ -818,31 +821,45 @@ def test_unknown_rip_folder_falls_back_when_album_blank(
     backend = _FakeBackend()
 
     class _StubHandle:
-        def log_lines(self): return iter(())
-        def wait(self, timeout=None): return 0
-        def cancel(self, term_timeout: float = 5.0): return -15
+        def log_lines(self):
+            return iter(())
+
+        def wait(self, timeout=None):
+            return 0
+
+        def cancel(self, term_timeout: float = 5.0):
+            return -15
 
     backend.rip = lambda **kw: _StubHandle()  # type: ignore[assignment]
     window = teardown_threads(backend=backend)
     # album fields left blank
     from whipper_gui.workers.rip_worker import RipParameters
-    window._on_rip_requested(RipParameters(
-        drive="/dev/sr0", release_id="", output_dir=Path("/tmp/x"),
-        track_template="t", disc_template="d", unknown=True,
-    ))
+
+    window._on_rip_requested(
+        RipParameters(
+            drive="/dev/sr0",
+            release_id="",
+            output_dir=Path("/tmp/x"),
+            track_template="t",
+            disc_template="d",
+            unknown=True,
+        )
+    )
     assert window._active_rip_params.track_template.startswith(
         "Unknown Artist/Unknown Album/"
     )
     if window._rip_thread is not None and window._rip_thread.isRunning():
-        window._rip_thread.quit(); window._rip_thread.wait(2000)
+        window._rip_thread.quit()
+        window._rip_thread.wait(2000)
 
 
 def test_safe_path_segment() -> None:
     from whipper_gui.ui.main_window import _safe_path_segment
+
     assert _safe_path_segment("  jimmy2 ") == "jimmy2"
-    assert _safe_path_segment("AC/DC") == "AC-DC"          # no stray subdir
-    assert _safe_path_segment("50%off") == "50off"          # no whipper code
-    assert _safe_path_segment("") == ""                      # blank → fallback
+    assert _safe_path_segment("AC/DC") == "AC-DC"  # no stray subdir
+    assert _safe_path_segment("50%off") == "50off"  # no whipper code
+    assert _safe_path_segment("") == ""  # blank → fallback
 
 
 # --- First-run drive-setup offer + manual offset -------------------------
@@ -852,6 +869,7 @@ def test_should_offer_when_unconfigured_and_not_prompted(
     teardown_threads, monkeypatch
 ) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
     window = teardown_threads(config=Config(drive_setup_prompted=False))
     assert window._should_offer_drive_setup() is True
@@ -859,15 +877,15 @@ def test_should_offer_when_unconfigured_and_not_prompted(
 
 def test_no_offer_when_already_prompted(teardown_threads, monkeypatch) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
     window = teardown_threads(config=Config(drive_setup_prompted=True))
     assert window._should_offer_drive_setup() is False
 
 
-def test_no_offer_when_offset_already_configured(
-    teardown_threads, monkeypatch
-) -> None:
+def test_no_offer_when_offset_already_configured(teardown_threads, monkeypatch) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
     window = teardown_threads(config=Config(drive_setup_prompted=False))
     assert window._should_offer_drive_setup() is False
@@ -877,6 +895,7 @@ def test_maybe_offer_records_prompt_and_launches_on_yes(
     teardown_threads, monkeypatch
 ) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
     saved: list[Config] = []
     window = teardown_threads(
@@ -898,6 +917,7 @@ def test_maybe_offer_records_prompt_and_launches_on_yes(
 
 def test_maybe_offer_no_launch_on_no(teardown_threads, monkeypatch) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
     window = teardown_threads(config=Config(drive_setup_prompted=False))
     monkeypatch.setattr(
@@ -914,6 +934,7 @@ def test_maybe_offer_no_launch_on_no(teardown_threads, monkeypatch) -> None:
 
 def test_maybe_offer_skips_when_configured(teardown_threads, monkeypatch) -> None:
     import whipper_gui.ui.main_window as mw
+
     monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
     window = teardown_threads(config=Config(drive_setup_prompted=False))
     launched: list[bool] = []
@@ -937,7 +958,8 @@ def _patch_force_stop(monkeypatch) -> list[dict]:
 
     calls: list[dict] = []
     monkeypatch.setattr(
-        mw.drive_control, "force_stop_drive",
+        mw.drive_control,
+        "force_stop_drive",
         lambda **kw: calls.append(kw),
     )
     return calls
@@ -1001,9 +1023,7 @@ def _patch_eject(monkeypatch) -> list[dict]:
     import whipper_gui.ui.main_window as mw
 
     calls: list[dict] = []
-    monkeypatch.setattr(
-        mw.drive_control, "eject_drive", lambda **kw: calls.append(kw)
-    )
+    monkeypatch.setattr(mw.drive_control, "eject_drive", lambda **kw: calls.append(kw))
     return calls
 
 
@@ -1072,9 +1092,7 @@ def test_no_auto_eject_on_failed_rip(teardown_threads, monkeypatch) -> None:
     assert calls == []
 
 
-def test_force_stop_button_stops_timer_and_fires(
-    teardown_threads, monkeypatch
-) -> None:
+def test_force_stop_button_stops_timer_and_fires(teardown_threads, monkeypatch) -> None:
     calls = _patch_force_stop(monkeypatch)
     window = teardown_threads()
     window._force_stop_timer.start(60000)
@@ -1132,16 +1150,14 @@ def test_dialog_queued_resolver_returns_install_results(
 
     monkeypatch.setattr(PendingInstallsDialog, "exec", fake_exec)
 
-    install_one = lambda item: InstallResult(
-        spec=item.spec, success=True, message="installed"
-    )
+    def install_one(item):
+        return InstallResult(spec=item.spec, success=True, message="installed")
+
     resolver = _DialogQueuedResolver(parent=None, install_one=install_one)
 
     results = resolver.resolve([_item("a"), _item("b")])
 
-    assert [(r.spec.dep_id, r.success) for r in results] == [
-        ("a", True), ("b", True)
-    ]
+    assert [(r.spec.dep_id, r.success) for r in results] == [("a", True), ("b", True)]
 
 
 def test_dialog_queued_resolver_empty_items_is_noop(qapp) -> None:

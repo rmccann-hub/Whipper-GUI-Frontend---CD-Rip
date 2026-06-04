@@ -23,9 +23,8 @@ def test_build_script_exists_and_is_executable() -> None:
     # On POSIX, the executable bit must be set for `bash build/...` to
     # work without an explicit interpreter prefix.
     import os
-    assert os.access(script, os.X_OK), (
-        f"{script} is not executable; run chmod +x"
-    )
+
+    assert os.access(script, os.X_OK), f"{script} is not executable; run chmod +x"
 
 
 # python-appimage globs the entrypoint as `entrypoint.*`, so it MUST carry
@@ -50,6 +49,7 @@ def test_entrypoint_has_extension_for_glob() -> None:
 
 def test_entrypoint_is_executable() -> None:
     import os
+
     assert os.access(ENTRYPOINT, os.X_OK)
 
 
@@ -85,7 +85,7 @@ def test_desktop_name_has_no_space() -> None:
     space splits the appimagetool command and the AppImage is never built."""
     for line in (RECIPE_DIR / "whipper-gui.desktop").read_text().splitlines():
         if line.startswith("Name="):
-            assert " " not in line[len("Name="):], (
+            assert " " not in line[len("Name=") :], (
                 "desktop Name must not contain spaces"
             )
             break

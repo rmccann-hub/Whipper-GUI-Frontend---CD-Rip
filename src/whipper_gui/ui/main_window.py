@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Callable
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from whipper_gui import drive_control
 from whipper_gui.adapters.metaflac import MetaflacAdapter
 from whipper_gui.adapters.musicbrainz_client import (
     MusicBrainzClient,
@@ -38,28 +39,26 @@ from whipper_gui.adapters.whipper_backend import (
 )
 from whipper_gui.config import Config
 from whipper_gui.deps.manager import DependencyManager
-from whipper_gui.deps.version import format_version
 from whipper_gui.deps.resolvers import (
     AutoInstaller,
     InstallResult,
     ManualPrompt,
     MissingItem,
 )
+from whipper_gui.deps.version import format_version
 from whipper_gui.drive_access import (
     SEVERITY_NO_DEVICE,
     SEVERITY_OK,
     DriveAccessDiagnosis,
     diagnose_drive_access,
 )
-from whipper_gui import drive_control
 from whipper_gui.offset_config import is_offset_configured
-from whipper_gui.parsers.cd_info import DiscInfo
 from whipper_gui.parsers.rip_log import parse_rip_log
-from whipper_gui.ui.disc_info_panel import DiscInfoPanel
-from whipper_gui.ui.drive_setup_dialog import DriveSetupDialog
 from whipper_gui.ui.dialogs.manual_install import ManualInstallDialog
 from whipper_gui.ui.dialogs.pending_installs import PendingInstallsDialog
+from whipper_gui.ui.disc_info_panel import DiscInfoPanel
 from whipper_gui.ui.drive_picker import DrivePicker
+from whipper_gui.ui.drive_setup_dialog import DriveSetupDialog
 from whipper_gui.ui.release_picker import ReleasePickerDialog
 from whipper_gui.ui.rip_controls import RipControls
 from whipper_gui.ui.rip_progress import RipProgress
@@ -95,7 +94,7 @@ class _DialogQueuedResolver:
     def __init__(
         self,
         parent: QWidget | None,
-        install_one: "Callable[[MissingItem], InstallResult]",
+        install_one: Callable[[MissingItem], InstallResult],
     ) -> None:
         self._parent = parent
         self._install_one = install_one
@@ -144,6 +143,7 @@ class MainWindow(QMainWindow):
         # whipper_gui.config.save. Defaults to the real save() function.
         if save_config is None:
             from whipper_gui import config as config_module
+
             save_config = config_module.save
         self._save_config: Callable[[Config], None] = save_config
 
@@ -487,7 +487,11 @@ class MainWindow(QMainWindow):
         """
         self._force_stop_done = True
         device = self._drive_picker.current_device() or ""
-        log.info("force-stopping drive (%s trigger), device=%s", trigger, device or "(default)")
+        log.info(
+            "force-stopping drive (%s trigger), device=%s",
+            trigger,
+            device or "(default)",
+        )
         self._rip_progress.set_status(
             "Force-stopping the drive (eject + stopping the reader)…"
         )
@@ -554,9 +558,7 @@ class MainWindow(QMainWindow):
                 # the old misleading static "verified during rip".
                 self._disc_info_panel.set_accuraterip_result(rip_log)
                 if success:
-                    self._rip_progress.set_status(
-                        _fidelity_summary(rip_log)
-                    )
+                    self._rip_progress.set_status(_fidelity_summary(rip_log))
             except OSError as exc:
                 log.warning("could not read rip log %s: %s", log_file, exc)
 
@@ -571,9 +573,7 @@ class MainWindow(QMainWindow):
         if success and params is not None and params.unknown:
             rip_dir = Path(log_path).parent if log_path else params.output_dir
             try:
-                self.run_unknown_post_processing(
-                    rip_dir, self._pending_picard_launch
-                )
+                self.run_unknown_post_processing(rip_dir, self._pending_picard_launch)
             except Exception:  # noqa: BLE001 — tagging must never crash the GUI
                 log.exception("unknown-album post-processing failed")
 
@@ -582,7 +582,8 @@ class MainWindow(QMainWindow):
         # ejecting mid-failure could fight the force-stop path.
         if success and self._config.auto_eject_after_rip:
             device = (
-                params.drive if params is not None
+                params.drive
+                if params is not None
                 else self._drive_picker.current_device() or ""
             )
             self._eject_async(device, status="Rip complete — ejecting the disc…")
@@ -619,9 +620,7 @@ class MainWindow(QMainWindow):
         """
         device = self._drive_picker.current_device()
         if not device:
-            QMessageBox.warning(
-                self, "Set up drive", "Select a drive first."
-            )
+            QMessageBox.warning(self, "Set up drive", "Select a drive first.")
             return
         dialog = DriveSetupDialog(
             self._backend, device, self, current_offset=self._config.read_offset
@@ -706,8 +705,7 @@ class MainWindow(QMainWindow):
         info = diagnosis.detail
         if diagnosis.fix_command:
             info += (
-                "\n\nRun this, then log out and back in:\n    "
-                f"{diagnosis.fix_command}"
+                f"\n\nRun this, then log out and back in:\n    {diagnosis.fix_command}"
             )
         box.setInformativeText(info)
         # Let the user select/copy the fix command out of the dialog.
@@ -727,9 +725,7 @@ class MainWindow(QMainWindow):
             try:
                 self._save_config(self._config)
             except OSError as exc:
-                QMessageBox.warning(
-                    self, "Couldn't save settings", f"{exc}"
-                )
+                QMessageBox.warning(self, "Couldn't save settings", f"{exc}")
 
     def _on_check_dependencies(self) -> None:
         """Run the dependency subsystem with GUI-backed resolvers.
@@ -754,6 +750,7 @@ class MainWindow(QMainWindow):
         # Reuse the registry from the injected DependencyManager so the
         # menu-driven check sees exactly the deps the app cares about.
         from whipper_gui.deps.manager import DependencyManager
+
         gui_manager = DependencyManager(
             auto=auto,
             queued=queued,
@@ -765,12 +762,10 @@ class MainWindow(QMainWindow):
         # Optional deps (e.g. Picard) shouldn't nag at launch or count as a
         # problem — set them aside so only required deps drive resolution.
         optional_missing = [
-            item for item in report.missing
-            if getattr(item.spec, "optional", False)
+            item for item in report.missing if getattr(item.spec, "optional", False)
         ]
         report.missing = [
-            item for item in report.missing
-            if not getattr(item.spec, "optional", False)
+            item for item in report.missing if not getattr(item.spec, "optional", False)
         ]
         if report.missing:
             gui_manager.resolve_missing(report)
@@ -789,7 +784,7 @@ class MainWindow(QMainWindow):
         )
         return choice == QMessageBox.StandardButton.Yes
 
-    def _make_install_one(self) -> "Callable[[MissingItem], InstallResult]":
+    def _make_install_one(self) -> Callable[[MissingItem], InstallResult]:
         """Build the per-item installer the PendingInstallsDialog drives.
 
         Reuses AutoInstaller's install machinery (subprocess run + error
@@ -837,7 +832,8 @@ class MainWindow(QMainWindow):
         # surfaced via the dialog the user already saw).
         install_results = getattr(report, "install_results", [])
         failures = [
-            r for r in install_results
+            r
+            for r in install_results
             if not r.success and not getattr(r, "user_declined", False)
         ]
 
@@ -862,9 +858,7 @@ class MainWindow(QMainWindow):
                 f"Full output is in ~/.local/share/whipper-gui/log.txt."
             )
 
-        QMessageBox.information(
-            self, "Dependency check complete", message
-        )
+        QMessageBox.information(self, "Dependency check complete", message)
 
     # --- Convenience for the Unknown Album flow ----------------------------
 
@@ -939,7 +933,7 @@ def _safe_path_segment(value: str) -> str:
     return (value or "").strip().replace("/", "-").replace("%", "")
 
 
-def _fidelity_summary(rip_log: "object") -> str:
+def _fidelity_summary(rip_log: object) -> str:
     """One-line rip-quality verdict for the status label.
 
     whipper rips each track twice and records a Test CRC and Copy CRC; a

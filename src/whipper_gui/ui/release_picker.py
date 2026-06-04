@@ -13,7 +13,7 @@ MusicBrainzWorker) and reads back the chosen MBID via
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
 )
 
 from whipper_gui.adapters.musicbrainz_client import ReleaseSummary
-
 
 # Column layout for the candidates table. Defined once so the test can
 # assert on positions without magic numbers.
@@ -75,20 +74,12 @@ class ReleasePickerDialog(QDialog):
         self._table: QTableWidget = QTableWidget(
             len(self._releases), len(_COLUMNS), self
         )
-        self._table.setHorizontalHeaderLabels(
-            [header for header, _ in _COLUMNS]
-        )
+        self._table.setHorizontalHeaderLabels([header for header, _ in _COLUMNS])
         # Select whole rows, one at a time — the user is picking a
         # release, not editing cells.
-        self._table.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self._table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self._table.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         # Stretch the Title and Artist columns; the rest fit content.
         header = self._table.horizontalHeader()
         for i in range(len(_COLUMNS)):
@@ -111,8 +102,7 @@ class ReleasePickerDialog(QDialog):
         # Button box. Pick is the primary; we default to row 0 so the
         # user can just press Enter to accept the top result.
         self._button_box: QDialogButtonBox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
         self._button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
@@ -155,8 +145,5 @@ class ReleasePickerDialog(QDialog):
                 item = QTableWidgetItem(text)
                 # Cells aren't editable but should support copy via
                 # selection (per the disc_info_panel precedent).
-                item.setFlags(
-                    item.flags()
-                    & ~Qt.ItemFlag.ItemIsEditable
-                )
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row, col, item)

@@ -27,9 +27,9 @@ from whipper_gui.workers.rip_worker import RipParameters
 class RipControls(QWidget):
     """Start / Cancel button pair plus the RipParameters assembly."""
 
-    rip_requested = Signal(object)        # carries a RipParameters
+    rip_requested = Signal(object)  # carries a RipParameters
     cancel_requested = Signal()
-    force_stop_requested = Signal()       # drastic stop: eject + kill reader
+    force_stop_requested = Signal()  # drastic stop: eject + kill reader
 
     def __init__(
         self,
@@ -155,9 +155,7 @@ class RipControls(QWidget):
             max_retries=self._config.max_retries,
             keep_going=self._config.keep_going,
             read_offset_override=(
-                self._config.read_offset
-                if self._config.override_read_offset
-                else None
+                self._config.read_offset if self._config.override_read_offset else None
             ),
         )
         self.rip_requested.emit(params)

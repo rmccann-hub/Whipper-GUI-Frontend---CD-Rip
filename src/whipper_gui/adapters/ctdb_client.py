@@ -22,8 +22,8 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from whipper_gui import __version__
 from whipper_gui.ctdb.toc import DiscToc
@@ -156,10 +156,11 @@ def parse_lookup_response(raw: bytes) -> CtdbLookupResult:
         npar = _to_int(el.get("npar")) or 0
         has_parity = (el.get("hasParity") or "").strip().lower() in {"1", "true", "yes"}
         track_crcs = tuple(
-            v for v in (
-                _to_int(tok, base=16)
-                for tok in (el.get("trackcrcs") or "").split()
-            ) if v is not None
+            v
+            for v in (
+                _to_int(tok, base=16) for tok in (el.get("trackcrcs") or "").split()
+            )
+            if v is not None
         )
         entries.append(
             CtdbEntry(

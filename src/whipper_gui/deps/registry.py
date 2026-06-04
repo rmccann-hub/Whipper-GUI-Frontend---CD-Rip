@@ -12,9 +12,9 @@ handles cascade-on-failure (tier (a) failures spill to (b), etc.).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 from whipper_gui.deps.checks import (
     ProbeResult,
@@ -29,9 +29,9 @@ from whipper_gui.paths import WHIPPER_BINARY_DEFAULT
 class Tier(Enum):
     """Resolution tier for a missing dependency (brief P0 #11 a/b/c)."""
 
-    AUTO = "auto"           # tier (a) — silent install after one OK
-    QUEUED = "queued"       # tier (b) — Pending Installs dialog
-    MANUAL = "manual"       # tier (c) — copyable search string only
+    AUTO = "auto"  # tier (a) — silent install after one OK
+    QUEUED = "queued"  # tier (b) — Pending Installs dialog
+    MANUAL = "manual"  # tier (c) — copyable search string only
 
 
 @dataclass(frozen=True)
@@ -138,12 +138,14 @@ SPECS: list[DependencySpec] = [
         # "error: No remote refs found for 'flathub'", as verified by
         # real-user testing on Bazzite (chat 2026-05-28).
         install_command=[
-            "flatpak", "install", "--user", "-y",
+            "flatpak",
+            "install",
+            "--user",
+            "-y",
             "https://dl.flathub.org/repo/appstream/org.musicbrainz.Picard.flatpakref",
         ],
         search_string=(
-            "install MusicBrainz Picard Flathub user "
-            "org.musicbrainz.Picard"
+            "install MusicBrainz Picard Flathub user org.musicbrainz.Picard"
         ),
         description=(
             "Optional. Auto-launched on unknown discs when the "
@@ -158,7 +160,7 @@ SPECS: list[DependencySpec] = [
         probe=_probe_musicbrainzngs,
         min_version=(0, 7, 1),
         tier=Tier.MANUAL,  # bundled in the AppImage; if missing the
-                           # AppImage is broken — point user at reinstall
+        # AppImage is broken — point user at reinstall
         install_command=None,
         search_string="reinstall whipper-gui AppImage musicbrainzngs",
         description=(

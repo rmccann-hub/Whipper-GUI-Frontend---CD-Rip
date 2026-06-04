@@ -83,15 +83,11 @@ def check_whipper(binary_path: Path) -> ProbeResult:
     user's Settings override is honored.
     """
     if not binary_path.exists():
-        return ProbeResult(
-            present=False, version=None, location=str(binary_path)
-        )
+        return ProbeResult(present=False, version=None, location=str(binary_path))
 
     ran, output, _ = _run_version_command([str(binary_path), "--version"])
     if not ran:
-        return ProbeResult(
-            present=False, version=None, location=str(binary_path)
-        )
+        return ProbeResult(present=False, version=None, location=str(binary_path))
 
     version = parse_version(output)
     return ProbeResult(
