@@ -2,7 +2,7 @@
 
 A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whipper) audio-CD ripping CLI. Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage.
 
-> **Status: v0.1.0 — public test release.** Implemented end-to-end with 450+ unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Recent additions: a **Force stop** for runaway drives on cancel, AppImage **desktop integration** (`install-appimage.sh`), and a **Help menu** (About + User Guide). This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
+> **Status: v0.1.0 — public test release.** Implemented end-to-end with 525 unit tests and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Recent additions: a **Force stop** for runaway drives on cancel, AppImage **desktop integration** (`install-appimage.sh`), and a **Help menu** (About + User Guide). This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/issues) for anything you hit.
 
 ## At a glance
 
@@ -511,15 +511,16 @@ The widely-cited [Perfect CD Ripping to FLAC with Exact Audio Copy guide](https:
 - **AccurateRip submission** (writing new entries to the database). Blocked by AccurateRip's operators, who accept submissions only from EAC and dBpoweramp. Verification (reading) works fine — see "AccurateRip" in the audit above.
 - **CTDB metadata plugin.** CUETools' database is queryable in principle but no Linux client exists. CTDB verification is on the P1 backlog (see [TASKS.md](TASKS.md)).
 
-**Coming in P1** (toggles EAC exposes that whipper supports but we don't yet surface):
+**Now in Settings** (EAC toggles whipper supports, surfaced in the Settings dialog — all shipped in the v0.1.x line):
 
-- Cover art (fetch + embed in FLAC, or save next to it)
+- Cover art — fetch + embed in FLAC, save next to it, or both (defaults to *embed*)
 - Force overread into lead-out
-- Max retries per track
+- Max retries per track (default 5)
 - Keep going on track failure
 - Continue ripping CD-Rs
+- Auto-eject after a successful rip, plus read-offset calibration via the drive-setup wizard
 
-Each is a small Settings dialog field — you can track them in [TASKS.md](TASKS.md) under "EAC bit-perfect parity gaps".
+See [TASKS.md](TASKS.md) under "EAC bit-perfect parity gaps" for the history.
 
 ---
 

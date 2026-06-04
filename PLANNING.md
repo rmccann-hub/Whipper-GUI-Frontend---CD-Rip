@@ -17,11 +17,22 @@ Whipper-GUI-Frontend---CD-Rip/
 ├── TASKS.md                             # active task checklist (P0/P1.1/P1/P2)
 ├── DEPENDENCIES.md                      # dep table with release dates + replacement plans
 ├── README.md                            # outward-facing description + install instructions
-├── pyproject.toml                       # package metadata + pinned deps + entry points + pytest config
+├── CHANGELOG.md                         # Keep-a-Changelog release notes
+├── LICENSE                              # GPL-3.0-only
+├── pyproject.toml                       # package metadata + pinned deps + entry points + pytest/ruff config
 ├── dev-setup.sh                         # one-command post-clone bootstrap (venv + pip + editable install)
-├── uninstall.sh                         # tear-down counterpart to dev-setup.sh
+├── setup-host.sh                        # host bootstrap (Distrobox + ripping container + whipper + exports)
+├── install.sh                           # end-user installer (host stack + download AppImage + desktop integration)
+├── install-appimage.sh                  # desktop integration for a downloaded AppImage (+ uninstall launcher)
+├── uninstall.sh                         # comprehensive tear-down for both install paths
 ├── .gitignore
 ├── .gitattributes
+│
+├── .github/workflows/                   # CI + release automation
+│   ├── ci.yml                           # pytest + ruff (lint/format) on push to main + PRs
+│   ├── appimage.yml                     # build + smoke-test the AppImage (push to main; on-demand per branch)
+│   ├── release.yml                      # tag-driven: build AppImage + attach to a GitHub Release
+│   └── publish-pypi.yml                 # publish wheel+sdist to PyPI via Trusted Publishing on release
 │
 ├── docs/                                # archived source docs + reference material
 │   ├── README.md                        # index of docs/ contents + rebuild-from-scratch checklist
@@ -29,58 +40,31 @@ Whipper-GUI-Frontend---CD-Rip/
 │   ├── whipper-gui-session-start.md     # bootstrap instructions for a fresh Claude Code session
 │   ├── whipper-gui-research-rerun-prompt.md # how to refresh tool-choice research
 │   ├── log-format-comparison.md         # whipper rip log vs EAC log side-by-side (KDD-11)
+│   ├── best-practices.md                # engineering patterns + hard-won lessons
+│   ├── appimage-testing.md              # how the AppImage is built + tested
+│   ├── upstream-modification-investigation.md # EAC-parity investigation (CTDB, whipper)
+│   ├── test-plan.md                     # manual/hardware test checklist (CTDB, drive analyze, …)
 │   └── (compass_artifact_*.md if/when produced — see docs/README.md)
+│
+├── scripts/                             # standalone (non-packaged) helper scripts
+│   └── ctdb_verify.py                   # CTDB verify hardware-validation runner (KDD-16)
 │
 ├── build/                               # everything related to producing the AppImage
 │   ├── build_appimage.sh                # one-shot build script (calls python-appimage)
+│   ├── make_icon.py                     # regenerate the committed app icon (needs Pillow)
 │   └── python-appimage/
 │       ├── requirements.txt             # pip deps bundled into the AppImage
-│       ├── entrypoint                   # executable AppRun script
+│       ├── entrypoint.sh                # executable AppRun script (needs .sh extension — T31)
 │       ├── whipper-gui.desktop          # desktop integration
+│       ├── whipper-gui.png              # committed app icon
 │       └── README.md                    # build-time prerequisites and gotchas
 │
 ├── tests/                               # pytest test tree (runs offscreen, no real hardware/network)
 │   ├── conftest.py                      # session-scoped QApplication fixture; QT_QPA_PLATFORM=offscreen
-│   ├── test_app.py                      # argparse / --version / module import smoke
-│   ├── test_build_harness.py            # AppImage recipe shape + executable bits
-│   ├── test_cd_info_parser.py
-│   ├── test_config.py
-│   ├── test_dependency_manager.py       # NOTE: actual filename is test_deps_manager.py
-│   ├── test_deps_checks.py
-│   ├── test_deps_manager.py             # 11 tests incl. decline-no-cascade + failure-still-cascades
-│   ├── test_deps_resolvers.py
-│   ├── test_deps_version.py
-│   ├── test_drive_list_parser.py        # NOTE: actual filename is test_parsers_drive_list.py
-│   ├── test_mb_worker.py
-│   ├── test_metaflac_adapter.py
-│   ├── test_musicbrainz_client.py
-│   ├── test_parsers_cd_info.py
-│   ├── test_parsers_drive_list.py
-│   ├── test_parsers_rip_log.py
-│   ├── test_rip_worker.py
-│   ├── test_ui_disc_info_panel.py
-│   ├── test_ui_drive_picker.py
-│   ├── test_ui_main_window.py           # 13 tests incl. dep-summary failure/decline rendering
-│   ├── test_ui_manual_install_dialog.py
-│   ├── test_ui_pending_installs_dialog.py
-│   ├── test_ui_release_picker.py
-│   ├── test_ui_rip_controls.py
-│   ├── test_ui_rip_progress.py
-│   ├── test_ui_settings_dialog.py
-│   ├── test_ui_track_table.py
-│   ├── test_ui_unknown_album.py
-│   ├── test_uninstall_script.py         # smoke tests for uninstall.sh (--help, --dry-run, safety)
-│   ├── test_whipper_backend.py          # incl. unknown-disc handling, no -d flag
-│   └── fixtures/
-│       ├── README.md
-│       ├── cd_info_pink_floyd.txt
-│       ├── cd_info_with_noise.txt
-│       ├── drive_list_empty.txt
-│       ├── drive_list_pioneer.txt
-│       ├── drive_list_pioneer_unconfigured.txt
-│       ├── drive_list_two_drives.txt
-│       ├── rip_log_eac_reference.log    # representative EAC log for format comparison only
-│       └── rip_log_real_whipper_0_7.log # pulled verbatim from upstream whipper test suite
+│   ├── test_*.py                        # one suite per module (~42 files; run `ls tests/`), incl.
+│   │                                    #   test_ctdb_{toc,decode,crc,client,verify}.py, the deps/parsers/
+│   │                                    #   ui/workers suites, and *_script.py smoke tests for the installers
+│   └── fixtures/                        # whipper cd-info / drive-list / rip-log sample data (+ README)
 │
 └── src/
     └── whipper_gui/
@@ -90,12 +74,24 @@ Whipper-GUI-Frontend---CD-Rip/
         ├── config.py                    # TOML config load/save + defaults + schema
         ├── logging_setup.py             # logging configuration (rotating file + console)
         ├── paths.py                     # user dirs, config path, log path constants
+        ├── offset_config.py             # read/detect whipper.conf read-offset state
+        ├── drive_access.py              # diagnose no-drive cause (no_device / permission / ok)
+        ├── drive_control.py             # eject + force-stop a runaway drive on cancel (Critical Rule #3)
+        ├── help_content.py              # in-code User Guide markdown (avoids AppImage package-data)
         │
-        ├── adapters/                    # ALL calls into external tools go through here
+        ├── adapters/                    # ALL calls into external tools/services go through here
         │   ├── __init__.py
         │   ├── whipper_backend.py       # WhipperBackend ABC + WhipperHostExportedImpl
         │   ├── musicbrainz_client.py    # MusicBrainzClient ABC + MusicBrainzNgsImpl
-        │   └── metaflac.py              # MetaflacAdapter (tag write-back)
+        │   ├── metaflac.py              # MetaflacAdapter (tag write-back)
+        │   └── ctdb_client.py           # CTDBClient ABC + CtdbHttpImpl (CUETools DB lookup; KDD-16)
+        │
+        ├── ctdb/                        # CTDB verify library (clean-room; KDD-16; not yet GUI-wired)
+        │   ├── __init__.py
+        │   ├── toc.py                   # DiscToc + `toc=` wire string + disc-TOC math
+        │   ├── decode.py                # host flac→PCM + metaflac sample-count probe
+        │   ├── crc.py                   # the audio CRC (hardware-validation-gated; CRC_VALIDATED=False)
+        │   └── verify.py                # verify_rip() orchestration + Verdict enum
         │
         ├── deps/                        # dependency self-management subsystem (brief P0 #11)
         │   ├── __init__.py
@@ -122,6 +118,8 @@ Whipper-GUI-Frontend---CD-Rip/
         │   ├── rip_progress.py          # live progress + AccurateRip results + log viewer
         │   ├── settings_dialog.py       # settings page
         │   ├── unknown_album.py         # unknown-album helper flow
+        │   ├── drive_setup_dialog.py    # drive-setup wizard (analyze + offset find; KDD-15)
+        │   ├── help_dialogs.py          # Help → About + User Guide dialogs
         │   └── dialogs/
         │       ├── __init__.py
         │       ├── pending_installs.py  # tier (b) queued installs dialog
@@ -130,7 +128,8 @@ Whipper-GUI-Frontend---CD-Rip/
         └── workers/                     # long-running operations off the GUI thread
             ├── __init__.py
             ├── rip_worker.py            # drives the whipper rip subprocess
-            └── mb_worker.py             # drives MusicBrainz queries
+            ├── mb_worker.py             # drives MusicBrainz queries
+            └── drive_setup_worker.py    # drives drive analyze / offset find off-thread
 ```
 
 ---
@@ -147,14 +146,28 @@ One paragraph per module, no more. If a module's paragraph creeps beyond a few s
 - **`config.py`** — pure-Python TOML config loader/saver. Reads `~/.config/whipper-gui/config.toml` via `tomllib` (stdlib in 3.11+), writes via `tomli-w`. Defines the default config dict and a schema version. Atomic writes (temp file + rename) so a crash mid-save doesn't corrupt the file.
 - **`logging_setup.py`** — configures Python's `logging` module once at startup. Rotating file handler at `~/.local/share/whipper-gui/log.txt`, plus a console handler at INFO. Project modules use `logging.getLogger(__name__)` everywhere; no module configures handlers itself.
 - **`paths.py`** — module-level constants for the user config dir, log dir, and any other path computed from `XDG_*` env vars or hard-coded fallbacks. Single source of truth so paths aren't recomputed at call sites.
+- **`offset_config.py`** — reads `whipper.conf` (and the GUI's `--offset` override) to tell whether a read offset is configured; backs the drive-setup wizard's first-run auto-offer.
+- **`drive_access.py`** — pure-stdlib `diagnose_drive_access()` classifying the no-drive case as `no_device` / `permission` (gives the `usermod -aG` fix) / `ok`. Probes are injectable for testing.
+- **`drive_control.py`** — host-first best-effort `eject_drive()` and `force_stop_drive()` for a runaway drive on cancel. This is the one approved exception to Critical Rule #3 (force-stop only; see CLAUDE.md).
+- **`help_content.py`** — the User Guide Markdown kept *in code* (not packaged data, to dodge AppImage package-data pitfalls); rendered by the Help dialogs.
 
 ### Adapters (`adapters/`)
 
 Every call into an external tool goes through this layer. CLAUDE.md Critical Rule #1 makes adapter layers mandatory for unmaintained deps; we apply the same pattern to `metaflac` for consistency.
 
-- **`whipper_backend.py`** — defines `WhipperBackend`, an abstract base class with the methods the GUI needs (`list_drives()`, `disc_info(drive)`, `rip(...)`, `cancel()`). The v1 concrete implementation is `WhipperHostExportedImpl`, which `subprocess`-invokes `~/.local/bin/whipper`. A future `CyanripImpl` could implement the same ABC; the choice would be a config setting.
-- **`musicbrainz_client.py`** — defines `MusicBrainzClient` ABC with `releases_by_disc_id(disc_id)`, `releases_by_toc(toc)`, `release_by_mbid(mbid)`. v1 implementation `MusicBrainzNgsImpl` wraps `musicbrainzngs`. A `RequestsJsonImpl` is reserved for the day `musicbrainzngs` finally bitrots — it would hit `https://musicbrainz.org/ws/2/...?fmt=json` directly with `requests`.
+- **`whipper_backend.py`** — defines `WhipperBackend`, an abstract base class with the methods the GUI needs (`list_drives()`, `disc_info(drive)`, `rip(...)`, `version()`, plus the optional `analyze_drive()`/`find_offset()` used by the drive-setup wizard — these default to `NotImplementedError` so other backends and test fakes still construct). The returned `RipHandle` carries `log_lines()`, `wait()`, `cancel()`, `returncode`. The v1 concrete implementation is `WhipperHostExportedImpl`, which `subprocess`-invokes `~/.local/bin/whipper`. A future `CyanripImpl` could implement the same ABC; the choice would be a config setting.
+- **`musicbrainz_client.py`** — defines `MusicBrainzClient` ABC with `releases_by_disc_id(disc_id)`, `releases_by_toc(toc)`, `release_by_mbid(mbid)`, `set_user_agent(...)`. v1 implementation `MusicBrainzNgsImpl` wraps `musicbrainzngs`. A `RequestsJsonImpl` is reserved for the day `musicbrainzngs` finally bitrots — it would hit `https://musicbrainz.org/ws/2/...?fmt=json` directly with `requests`.
 - **`metaflac.py`** — `MetaflacAdapter` wrapping the `metaflac` CLI. Used by the Unknown Album helper to apply `Track NN` placeholder tags after a `--unknown` rip.
+- **`ctdb_client.py`** — `CTDBClient` ABC + `CtdbHttpImpl` for CUETools-DB lookups (`db.cuetools.net/lookup2.php`). Clean-room per Critical Rule #1 and KDD-16; the injectable fetcher keeps the transport swappable and unit-testable. Backs the `ctdb/` verify library.
+
+### CTDB verify library (`ctdb/`)
+
+Clean-room CTDB verify support (KDD-16), kept as a standalone library so the deterministic parts are unit-tested while the two hardware-validation-gated pieces (the `toc=` wire format and the audio CRC) stay isolated behind a single seam. **Not yet wired into the GUI** by deliberate decision — see TASKS.md and `docs/test-plan.md` Test 1.
+
+- **`toc.py`** — `DiscToc` value object, the `toc=` query string, and the disc-TOC math (MSF/sector helpers, build-from-files via `metaflac` sample counts).
+- **`decode.py`** — host `flac`→raw-PCM decode + `metaflac` sample-count probe (best-effort, optional `flac` dependency; degrades to `DecoderUnavailable`). Injectable runners.
+- **`crc.py`** — the CTDB audio CRC. ⚠️ Placeholder zlib CRC-32 with `CRC_VALIDATED=False`; the bit-exact variant + ±2939 offset sweep is the hardware task. Fails safe (a wrong CRC yields `NO_MATCH`, never a false "verified").
+- **`verify.py`** — `verify_rip()` orchestration tying lookup + decode + CRC into a single `CtdbVerifyResult`/`Verdict`; every expected failure is a verdict, not a raise.
 
 ### Dependency self-management subsystem (`deps/`)
 
@@ -187,6 +200,8 @@ PySide6 widgets and dialogs. Each module is one screen or one widget; nothing he
 - **`rip_progress.py`** — three panes: live whipper stdout (read-only), per-track AccurateRip results table (populated when the rip log is parsed at the end), and a "View log" button that opens the saved `.log` file in the default text viewer.
 - **`settings_dialog.py`** — `SettingsDialog(QDialog)`. Fields for output dir, working dir, track template, disc template, read offset, whipper/metaflac paths, auto-launch-Picard toggle. Persists through `config.py`.
 - **`unknown_album.py`** — `UnknownAlbumDialog(QDialog)` + helper functions. Triggers a `whipper cd rip --unknown`, applies placeholder tags via `MetaflacAdapter`, optionally invokes `flatpak run org.musicbrainz.Picard <output_folder>`.
+- **`drive_setup_dialog.py`** — `DriveSetupDialog`, the drive-setup wizard (KDD-15). Runs whipper's own `drive analyze` + `offset find` off-thread via `DriveSetupWorker` (they persist to `whipper.conf`), with a manual-offset fallback that uses the GUI's `--offset` override.
+- **`help_dialogs.py`** — `AboutDialog` (version + Python/Qt/PySide6 versions + config/log/whipper paths) and `HelpDialog` (renders `help_content.USER_GUIDE`).
 - **`dialogs/pending_installs.py`** — `PendingInstallsDialog(QDialog)`. Tier (b) UI: per-item checkboxes, "Install selected" button, per-item progress feedback. Backed by `QueuedInstaller`.
 - **`dialogs/manual_install.py`** — `ManualInstallDialog(QDialog)`. Tier (c) UI: shows missing item, minimum version, why it can't auto-install, copyable search string in a read-only `QLineEdit`. Primary action: Copy. Secondary: Close.
 
@@ -196,6 +211,7 @@ Long-running operations on background `QThread`s so the GUI stays responsive.
 
 - **`rip_worker.py`** — `RipWorker(QObject)` moved to a `QThread`. Owns the rip subprocess. Emits `log_line(str)` for each line of whipper output, `progress(...)` for parseable progress events, `finished(success, rip_log_path)` on exit, `error(message)` on failure. Supports cancel via subprocess terminate + child-process cleanup.
 - **`mb_worker.py`** — `MusicBrainzWorker(QObject)` moved to a `QThread`. Drives `MusicBrainzClient` calls (which can take a few seconds and shouldn't block input). Emits `releases_returned(list)` or `error(message)`.
+- **`drive_setup_worker.py`** — `DriveSetupWorker(QObject)` moved to a `QThread`. Runs the wizard's `drive analyze` / `offset find` via cancellable `Popen` so closing the dialog mid-detection can't orphan a running process or strand the drive.
 
 ---
 
@@ -210,6 +226,7 @@ Full table with release dates and replacement plans lives in `DEPENDENCIES.md`. 
 | `tomli-w` | `>=1.0,<2` | TOML writer (stdlib `tomllib` reads only). Small, MIT, actively maintained. |
 | `python-appimage` | `>=1.4,<2` | AppImage builder (dev/build-time only — not a runtime dep). Per CLAUDE.md Critical Rule #2 the chosen tool. |
 | `pytest` | `>=8,<9` | Test runner (dev only). |
+| `ruff` | `>=0.15,<1` | Linter + formatter (dev only); CI runs `ruff check` + `ruff format --check`. Rules `E,F,W,I,B,UP`, `E501` off. |
 
 System dependencies (not Python packages, surfaced to the user via the dependency subsystem):
 
@@ -550,7 +567,7 @@ These are listed in TASKS.md under "P1 — EAC bit-perfect parity gaps" and shou
 
 The CUETools Database adds two capabilities beyond AccurateRip: a second cryptographic *verification* path, and — uniquely — *active parity repair* that reconstructs corrupted samples in a damaged rip from a downloaded whole-CD recovery record. Both are confirmed in scope (user request, 2026-05-30). Sequenced as two phases sharing one `CTDBClient` adapter:
 
-- **Phase 1 — verify (read-only).** *Library landed 2026-06-03* (`adapters/ctdb_client.py` + `whipper_gui/ctdb/`, with `scripts/ctdb_verify.py` and unit tests); GUI wiring + the bit-exact CRC and `toc=` wire format are gated on hardware validation — see [docs/test-plan.md](docs/test-plan.md) Test 1. Pure-Python client (same shape as `MusicBrainzClient`): compute the disc CRC over the decoded audio, query CTDB by TOC, render confidence next to the AccurateRip result. No new system dependency; bundles in the AppImage trivially. Protocol is derivable from the LGPL reference (`gchudov/cuetools.net`), and a Python reference exists (`bmwalters/python-cuetoolsdb`). This is the existing P1 "CTDB verification" item (KDD-12). **Concrete spec + open issues (incl. a GPL-2.0→GPL-3.0-only license gate and the need for real-CD validation): [docs/upstream-modification-investigation.md](docs/upstream-modification-investigation.md).** Cannot be completed in the cloud dev env — it needs a real CD that's in CTDB to validate the CRC, so it's a hardware-validated follow-up.
+- **Phase 1 — verify (read-only).** *Library landed 2026-06-03* (`adapters/ctdb_client.py` + `whipper_gui/ctdb/`, with `scripts/ctdb_verify.py` and 35 unit tests). Pure-Python client (same shape as `MusicBrainzClient`): compute the disc CRC over the decoded audio, query CTDB by TOC, render confidence next to the AccurateRip result. No new system dependency; bundles in the AppImage trivially. Built **clean-room from the LGPL reference** (`gchudov/cuetools.net`) per KDD-16 — we deliberately did **not** read or port the GPL-2.0-only `python-cuetoolsdb`. This is the existing P1 "CTDB verification" item (KDD-12). **Concrete spec + open issues: [docs/upstream-modification-investigation.md](docs/upstream-modification-investigation.md).** Two pieces remain gated on a real CD that's in CTDB — the `toc=` wire format and the bit-exact CRC (`crc.CRC_VALIDATED=False`, fails safe) — plus the GUI wiring; see [docs/test-plan.md](docs/test-plan.md) Test 1.
 
 - **Phase 2 — repair (parity).** Download the recovery record (~180 KB, parity is whole-CD, not per-track), reconstruct corrupted samples via erasure coding, then re-verify. **Decision: Option A — wrap the existing `ctdb-cli` tool** (`github.com/Masterisk-F/ctdb-cli`; builds with `./configure && make`), NOT a pure-Python port of `CUETools.Parity`. Rationale: this is the same "orchestrate a trusted tool, don't reimplement forensic math" thesis that made us delegate extraction to whipper rather than to libcdio directly. A Python Galois-field Reed-Solomon port would have to bit-match CUETools' format exactly — high risk for no architectural gain. **CORRECTION (2026-06-02): `ctdb-cli` is C#/.NET 10, NOT a C tool** (an earlier research note had this backwards). It is therefore **not cheap to vendor** — bundling it pulls in the .NET runtime. Re-decide bundling vs. optional-install when Phase 2 starts; see the investigation doc.
 

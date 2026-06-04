@@ -17,6 +17,7 @@ All dependencies, with last upstream release date and replacement plan. Reviewed
 | python-appimage | `>=1.4,<2` (current: 1.4.5) | 2025-07-02 | GPL-3.0 (package itself); MIT for files under `python_appimage/data` | Active | `appimage-builder` only if `python-appimage` cannot express a required build step (CLAUDE.md Critical Rule #2). The recipe must avoid `appimage-builder`-specific features so swapping back is cheap. |
 | build | `>=1,<2` | (per PyPI at first install) | MIT | Active | — (PEP 517 build frontend; used by `build/build_appimage.sh`) |
 | pytest | `>=8,<9` | (per PyPI at first install) | MIT | Active | — |
+| ruff | `>=0.15,<1` | (per PyPI at first install) | MIT | Active | — (linter + formatter; CI runs `ruff check` + `ruff format --check`. Rules `E,F,W,I,B,UP`, `E501` off. Config in `pyproject.toml`.) |
 | Pillow | (unpinned; per PyPI) | Active | HPND (PIL license) | Active | — **Optional, not required for normal builds.** Only `build/make_icon.py` uses it, to regenerate the committed app icon (`build/python-appimage/whipper-gui.png`). The icon is committed, so a normal AppImage build needs no image tooling. |
 
 ## System dependencies (user-system, surfaced via the dependency subsystem)
