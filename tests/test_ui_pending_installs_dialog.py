@@ -9,7 +9,6 @@ from whipper_gui.deps.registry import DependencySpec, Tier
 from whipper_gui.deps.resolvers import InstallResult, MissingItem
 from whipper_gui.ui.dialogs.pending_installs import PendingInstallsDialog
 
-
 # --- Spec / item factories ------------------------------------------------
 
 
@@ -246,9 +245,7 @@ def _ok(item: MissingItem) -> InstallResult:
 
 
 def _fail(item: MissingItem) -> InstallResult:
-    return InstallResult(
-        spec=item.spec, success=False, message="boom: network down"
-    )
+    return InstallResult(spec=item.spec, success=False, message="boom: network down")
 
 
 def test_install_one_mode_drives_loop_and_updates_rows(
@@ -264,7 +261,8 @@ def test_install_one_mode_drives_loop_and_updates_rows(
     assert dialog._status_labels["a"].text() == "OK"
     assert dialog._status_labels["b"].text() == "OK"
     assert [(r.spec.dep_id, r.success) for r in dialog.results()] == [
-        ("a", True), ("b", True)
+        ("a", True),
+        ("b", True),
     ]
     assert dialog._close_button is not None  # ready to dismiss
 

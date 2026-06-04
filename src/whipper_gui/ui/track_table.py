@@ -20,8 +20,8 @@ Editable columns: Title, Artist. Track number and length are read-only.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from typing import Sequence
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtWidgets import (
@@ -96,9 +96,7 @@ class TrackTableModel(QAbstractTableModel):
         """
         if not self._tracks:
             return
-        self._tracks = [
-            replace(track, artist_credit=artist) for track in self._tracks
-        ]
+        self._tracks = [replace(track, artist_credit=artist) for track in self._tracks]
         top = self.index(0, _COL_ARTIST)
         bottom = self.index(len(self._tracks) - 1, _COL_ARTIST)
         self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
@@ -130,7 +128,8 @@ class TrackTableModel(QAbstractTableModel):
         role: int = Qt.ItemDataRole.DisplayRole,
     ) -> object:
         if not index.isValid() or role not in (
-            Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole
+            Qt.ItemDataRole.DisplayRole,
+            Qt.ItemDataRole.EditRole,
         ):
             return None
         track = self._tracks[index.row()]
@@ -197,17 +196,13 @@ class TrackTable(QWidget):
         # not textChanged — so it fires once on focus-out/Enter, not on
         # every keystroke, and programmatic setText() (set_release /
         # set_placeholder_tracks) does NOT trigger it.
-        self._album_artist_edit.editingFinished.connect(
-            self._propagate_album_artist
-        )
+        self._album_artist_edit.editingFinished.connect(self._propagate_album_artist)
 
         # Track table.
         self._model: TrackTableModel = TrackTableModel(self)
         self._view: QTableView = QTableView(self)
         self._view.setModel(self._model)
-        self._view.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
+        self._view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._view.verticalHeader().setVisible(False)
         self._view.setAlternatingRowColors(True)
         # Title + Artist columns stretch; # + Length are content-sized.

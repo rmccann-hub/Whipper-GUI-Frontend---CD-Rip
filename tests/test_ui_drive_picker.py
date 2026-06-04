@@ -15,7 +15,6 @@ from whipper_gui.adapters.whipper_backend import (
 from whipper_gui.parsers.drive_list import DriveDescriptor
 from whipper_gui.ui.drive_picker import DrivePicker
 
-
 # --- Fake backend ---------------------------------------------------------
 
 
@@ -139,9 +138,7 @@ def test_refresh_label_includes_vendor_model_device(
     qapp: QApplication,
 ) -> None:
     backend = _FakeBackend()
-    backend.set_drives(
-        [_drive("/dev/sr0", vendor="PIONEER", model="BD-RW  BDR-209D")]
-    )
+    backend.set_drives([_drive("/dev/sr0", vendor="PIONEER", model="BD-RW  BDR-209D")])
     picker = DrivePicker(backend)
 
     picker.refresh()

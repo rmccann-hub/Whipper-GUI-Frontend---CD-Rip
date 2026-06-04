@@ -62,7 +62,7 @@ class AboutDialog(QDialog):
     @staticmethod
     def _build_markdown(whipper_path: str | None) -> str:
         whipper = whipper_path or str(WHIPPER_BINARY_DEFAULT)
-        py = "%d.%d.%d" % sys.version_info[:3]
+        py = "{}.{}.{}".format(*sys.version_info[:3])
         return (
             f"# Whipper GUI\n\n"
             f"**Version {__version__}**\n\n"

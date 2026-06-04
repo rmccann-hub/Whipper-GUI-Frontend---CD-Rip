@@ -15,9 +15,7 @@ from whipper_gui import config as config_module
 from whipper_gui.config import SCHEMA_VERSION
 
 
-def _redirect_config(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Path:
+def _redirect_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point the config module at tmp_path. Returns the redirected file path."""
     config_file = tmp_path / "config.toml"
     monkeypatch.setattr(config_module, "CONFIG_DIR", tmp_path)
@@ -89,9 +87,7 @@ def test_unknown_keys_are_dropped(
     config_file = _redirect_config(tmp_path, monkeypatch)
     # Hand-write a config with one known key and one future key.
     config_file.write_text(
-        'schema_version = 1\n'
-        'read_offset = 100\n'
-        'future_key_not_in_v1 = "value"\n'
+        'schema_version = 1\nread_offset = 100\nfuture_key_not_in_v1 = "value"\n'
     )
 
     cfg = config_module.load()
@@ -108,7 +104,7 @@ def test_v1_to_v2_upgrades_untouched_templates(
     to the v2 Artist/Album layout on load."""
     config_file = _redirect_config(tmp_path, monkeypatch)
     config_file.write_text(
-        'schema_version = 1\n'
+        "schema_version = 1\n"
         'track_template = "%A - %d/%t. %a - %n"\n'
         'disc_template = "%A - %d/%A - %d"\n'
     )
@@ -127,10 +123,7 @@ def test_v1_to_v2_preserves_custom_templates(
 ) -> None:
     """A user who hand-edited their template keeps it through the upgrade."""
     config_file = _redirect_config(tmp_path, monkeypatch)
-    config_file.write_text(
-        'schema_version = 1\n'
-        'track_template = "my/custom/%t %n"\n'
-    )
+    config_file.write_text('schema_version = 1\ntrack_template = "my/custom/%t %n"\n')
 
     cfg = config_module.load()
 

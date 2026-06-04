@@ -13,9 +13,7 @@ from whipper_gui.ui.disc_info_panel import DiscInfoPanel
 def _track(number: int, *, matched: bool) -> TrackResult:
     """A TrackResult whose AccurateRip v1 either matched or wasn't in the DB."""
     result = (
-        "Found, exact match"
-        if matched
-        else "Track not present in AccurateRip database"
+        "Found, exact match" if matched else "Track not present in AccurateRip database"
     )
     return TrackResult(
         number=number,
@@ -206,7 +204,11 @@ def test_accuraterip_partial_match_reports_fraction(
 ) -> None:
     panel = DiscInfoPanel()
     rip_log = RipLog(
-        tracks=(_track(1, matched=True), _track(2, matched=False), _track(3, matched=True))
+        tracks=(
+            _track(1, matched=True),
+            _track(2, matched=False),
+            _track(3, matched=True),
+        )
     )
     panel.set_accuraterip_result(rip_log)
     assert panel._accuraterip_value.text() == "2 of 3 tracks matched"
@@ -221,9 +223,7 @@ def test_accuraterip_no_tracks_stays_placeholder(qapp: QApplication) -> None:
 def test_set_drive_clears_accuraterip_result(qapp: QApplication) -> None:
     """A new disc means the old AccurateRip verdict no longer applies."""
     panel = DiscInfoPanel()
-    panel.set_accuraterip_result(
-        RipLog(tracks=(_track(1, matched=True),))
-    )
+    panel.set_accuraterip_result(RipLog(tracks=(_track(1, matched=True),)))
     panel.set_drive("/dev/sr1")
     assert panel._accuraterip_value.text() == "—"
 
@@ -237,9 +237,7 @@ def test_set_drive_called_twice_resets_in_between(
     """A user changing drives mid-flow must always see a clean panel."""
     panel = DiscInfoPanel()
     panel.set_drive("/dev/sr0")
-    panel.set_disc_info(
-        DiscInfo(cddb_disc_id="aaa", musicbrainz_disc_id="bbb")
-    )
+    panel.set_disc_info(DiscInfo(cddb_disc_id="aaa", musicbrainz_disc_id="bbb"))
     panel.set_drive("/dev/sr1")
     panel.set_disc_info_loading()
 

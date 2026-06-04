@@ -58,9 +58,7 @@ class DependencyReport:
             return True
         # When resolution happened, success requires every previously-
         # missing item to have a matching success in install_results.
-        installed_ok = {
-            r.spec.dep_id for r in self.install_results if r.success
-        }
+        installed_ok = {r.spec.dep_id for r in self.install_results if r.success}
         return all(item.spec.dep_id in installed_ok for item in self.missing)
 
 
@@ -93,7 +91,9 @@ class DependencyManager:
             probe = spec.probe()
             log.debug(
                 "probe %s: present=%s version=%s",
-                spec.dep_id, probe.present, probe.version,
+                spec.dep_id,
+                probe.present,
+                probe.version,
             )
             if probe.present and meets_minimum(probe.version, spec.min_version):
                 report.ok.append(spec)
@@ -123,9 +123,7 @@ class DependencyManager:
                 item for item in cascade if self._next_tier(item) == tier
             ]
             # Remove cascaded items we just queued.
-            cascade = [
-                item for item in cascade if self._next_tier(item) != tier
-            ]
+            cascade = [item for item in cascade if self._next_tier(item) != tier]
             if not batch:
                 continue
 
@@ -139,13 +137,16 @@ class DependencyManager:
             # phrasing. Real install failures (network, permission,
             # etc.) DO cascade because the user hasn't said no to the
             # dep itself, just to the current install method.
-            for item, result in zip(batch, results):
+            # strict=: results come 1:1 from running batch, so a length
+            # mismatch is a bug we want surfaced, not silently truncated.
+            for item, result in zip(batch, results, strict=True):
                 if result.success:
                     continue
                 if result.user_declined:
                     log.info(
                         "%s declined at tier %s — not cascading",
-                        item.spec.dep_id, tier.value,
+                        item.spec.dep_id,
+                        tier.value,
                     )
                     continue
                 if not item.spec.fallback_tiers:
@@ -168,9 +169,7 @@ class DependencyManager:
 
         return report
 
-    def _dispatch(
-        self, tier: Tier, items: list[MissingItem]
-    ) -> list[InstallResult]:
+    def _dispatch(self, tier: Tier, items: list[MissingItem]) -> list[InstallResult]:
         if tier == Tier.AUTO:
             return self._auto.resolve(items)
         if tier == Tier.QUEUED:
@@ -192,4 +191,5 @@ def _clone_with_tier(spec: DependencySpec, tier: Tier) -> DependencySpec:
     because cascade is an internal concern.
     """
     from dataclasses import replace
+
     return replace(spec, tier=tier)

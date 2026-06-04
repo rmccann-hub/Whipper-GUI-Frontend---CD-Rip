@@ -97,10 +97,10 @@ class AccurateRipResult:
     """One of the two AccurateRip checks per track (v1 or v2)."""
 
     version: int
-    result: str = ""              # "Found, exact match" / etc.
+    result: str = ""  # "Found, exact match" / etc.
     confidence: int | None = None
     local_crc: str | None = None  # uppercase hex
-    remote_crc: str | None = None # uppercase hex
+    remote_crc: str | None = None  # uppercase hex
 
 
 @dataclass(frozen=True)
@@ -111,8 +111,8 @@ class TrackResult:
     filename: str = ""
     peak_level: float | None = None
     pre_emphasis: bool | None = None
-    extraction_speed: float | None = None     # in X (drive multiplier)
-    extraction_quality: float | None = None   # percentage 0..100
+    extraction_speed: float | None = None  # in X (drive multiplier)
+    extraction_quality: float | None = None  # percentage 0..100
     test_crc: str = ""
     copy_crc: str = ""
     status: str = ""
@@ -149,9 +149,7 @@ _AR_HEADER = re.compile(r"^\s+AccurateRip v(?P<version>\d+):\s*$")
 
 # A general "Key: value" line. `value` may be empty (some fields like
 # Pre-emphasis are emitted with an empty value).
-_FIELD = re.compile(
-    r"^(?P<indent>\s+)(?P<key>[\w][\w\s\-]*?):\s*(?P<value>.*?)\s*$"
-)
+_FIELD = re.compile(r"^(?P<indent>\s+)(?P<key>[\w][\w\s\-]*?):\s*(?P<value>.*?)\s*$")
 
 _SPEED = re.compile(r"^(?P<value>-?\d+(?:\.\d+)?)\s*X\s*$")
 _QUALITY = re.compile(r"^(?P<value>-?\d+(?:\.\d+)?)\s*%\s*$")
@@ -213,17 +211,17 @@ def parse_rip_log(text: str) -> RipLog:
         if section == "ripping":
             field_match = _FIELD.match(line)
             if field_match:
-                ripping_data[field_match.group("key").strip()] = (
-                    field_match.group("value").strip()
-                )
+                ripping_data[field_match.group("key").strip()] = field_match.group(
+                    "value"
+                ).strip()
             continue
 
         if section == "status":
             field_match = _FIELD.match(line)
             if field_match:
-                status_data[field_match.group("key").strip()] = (
-                    field_match.group("value").strip()
-                )
+                status_data[field_match.group("key").strip()] = field_match.group(
+                    "value"
+                ).strip()
             continue
 
         if section == "tracks":
@@ -232,9 +230,7 @@ def parse_rip_log(text: str) -> RipLog:
             if header:
                 if current_track is not None:
                     tracks.append(current_track.build())
-                current_track = _MutableTrack(
-                    number=int(header.group("number"))
-                )
+                current_track = _MutableTrack(number=int(header.group("number")))
                 current_ar = None
                 continue
 
@@ -312,9 +308,7 @@ class _MutableTrack:
         )
 
 
-def _build_ar(
-    version: int, raw: dict[str, str] | None
-) -> AccurateRipResult | None:
+def _build_ar(version: int, raw: dict[str, str] | None) -> AccurateRipResult | None:
     if raw is None:
         return None
     return AccurateRipResult(
@@ -371,9 +365,7 @@ def _parse_yes_no(s: str | None) -> bool | None:
     return None
 
 
-def _parse_with_pattern(
-    s: str | None, pattern: re.Pattern[str]
-) -> float | None:
+def _parse_with_pattern(s: str | None, pattern: re.Pattern[str]) -> float | None:
     """Extract the float `value` named-group from `pattern` applied to `s`."""
     if s is None:
         return None

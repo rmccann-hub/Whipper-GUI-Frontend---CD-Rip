@@ -6,6 +6,7 @@ the format documented in whipper-team/whipper master (command/drive.py).
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -70,5 +71,5 @@ def test_parse_yes_no_cache_values() -> None:
 
 def test_drive_descriptor_is_frozen() -> None:
     d = DriveDescriptor(device="/dev/sr0", vendor="x", model="y", release="z")
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         d.device = "/dev/sr1"  # type: ignore[misc]

@@ -12,7 +12,9 @@ from whipper_gui.ctdb import decode
 
 
 def _completed(returncode: int, stdout: bytes = b"", stderr: bytes = b""):
-    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(
+        args=[], returncode=returncode, stdout=stdout, stderr=stderr
+    )
 
 
 def test_decode_raises_when_flac_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -48,7 +50,9 @@ def test_flac_available_reflects_which(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_total_samples_parses_metaflac(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(decode, "_which", lambda name: "/usr/bin/metaflac")
-    out = subprocess.CompletedProcess(args=[], returncode=0, stdout="17640\n", stderr="")
+    out = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="17640\n", stderr=""
+    )
     assert decode.total_samples(Path("a.flac"), runner=lambda argv: out) == 17640
 
 

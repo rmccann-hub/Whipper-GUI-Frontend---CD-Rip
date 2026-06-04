@@ -14,7 +14,6 @@ from whipper_gui.parsers.rip_log import (
 )
 from whipper_gui.ui.rip_progress import RipProgress, _ar_cell, _basename
 
-
 # --- Helpers --------------------------------------------------------------
 
 
@@ -99,13 +98,21 @@ def test_set_rip_log_populates_table(qapp: QApplication) -> None:
             _track(
                 1,
                 filename="Pink Floyd/Dark Side/01. Speak to Me.flac",
-                v1=AccurateRipResult(version=1, result="Found, exact match", confidence=14),
-                v2=AccurateRipResult(version=2, result="Found, exact match", confidence=11),
+                v1=AccurateRipResult(
+                    version=1, result="Found, exact match", confidence=14
+                ),
+                v2=AccurateRipResult(
+                    version=2, result="Found, exact match", confidence=11
+                ),
             ),
             _track(
                 2,
                 filename="Pink Floyd/Dark Side/02. Breathe.flac",
-                v1=AccurateRipResult(version=1, result="Track not present in AccurateRip database", confidence=0),
+                v1=AccurateRipResult(
+                    version=1,
+                    result="Track not present in AccurateRip database",
+                    confidence=0,
+                ),
                 v2=None,
             ),
         )
@@ -180,9 +187,7 @@ def test_clear_resets_all_state(qapp: QApplication, tmp_path: Path) -> None:
     widget = RipProgress()
     widget.append_log_line("noise")
     widget.set_progress(70.0, 90.0)
-    widget.set_rip_log(
-        RipLog(tracks=(_track(),))
-    )
+    widget.set_rip_log(RipLog(tracks=(_track(),)))
     widget.set_log_path(tmp_path / "x.log")
 
     widget.clear()

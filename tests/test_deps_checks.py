@@ -8,6 +8,7 @@ ProbeResult is what we care about — not whether whipper itself runs.
 from __future__ import annotations
 
 import subprocess
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -57,9 +58,7 @@ def test_check_whipper_parses_version(
     assert probe.location == str(binary)
 
 
-def test_check_whipper_timeout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_check_whipper_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     binary = tmp_path / "whipper"
     binary.write_text("#!/bin/sh\nsleep 60\n")
     binary.chmod(0o755)
@@ -163,5 +162,5 @@ def test_check_python_pkg_missing() -> None:
 
 def test_probe_result_is_frozen() -> None:
     probe = ProbeResult(present=True, version=(0, 1, 0), location="/x")
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         probe.present = False  # type: ignore[misc]

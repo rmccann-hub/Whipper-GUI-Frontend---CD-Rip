@@ -71,9 +71,7 @@ class RipParameters:
 #   "Verifying track 3 of 16 (3 of 9) ... 42 %"
 #   "Encoding track to FLAC (5 of 9) ...   0 %"
 #   "Getting length of audio track (1 of 16) ... 100 %"
-_DISC_SCAN_PATTERN = re.compile(
-    r"Reading (?P<what>TOC|table)\s+(?P<pct>\d+)\s*%"
-)
+_DISC_SCAN_PATTERN = re.compile(r"Reading (?P<what>TOC|table)\s+(?P<pct>\d+)\s*%")
 _TRACK_PHASE_PATTERN = re.compile(
     r"(?P<verb>Reading|Verifying) track (?P<track>\d+) of (?P<total>\d+)"
     r".*?(?P<pct>\d+)\s*%"
@@ -109,12 +107,12 @@ class RipWorker(QObject):
     # Two-tier progress so the GUI can show an overall bar (whole rip) and
     # a task bar (current operation). Overall is monotonic; task resets per
     # operation (read → verify → encode each sweep 0-100%).
-    progress = Signal(float, float)        # overall_percent, task_percent
-    status = Signal(str)                   # human-readable current phase
+    progress = Signal(float, float)  # overall_percent, task_percent
+    status = Signal(str)  # human-readable current phase
     # Emitted with the 1-based track number whenever whipper starts working
     # on a new track, so the GUI can follow along by highlighting that row.
     current_track = Signal(int)
-    finished = Signal(bool, str)           # success, log_path
+    finished = Signal(bool, str)  # success, log_path
     error = Signal(str)
 
     def __init__(
@@ -315,10 +313,7 @@ def _describe_activity(line: str) -> str | None:
 
     match = _LENGTH_PHASE_PATTERN.search(line)
     if match:
-        return (
-            f"Checking track {match.group('track')} "
-            f"of {match.group('total')}…"
-        )
+        return f"Checking track {match.group('track')} of {match.group('total')}…"
 
     for phrase, friendly in _NAMED_PHASES.items():
         if phrase in line:

@@ -8,12 +8,12 @@ docs and the upstream return-value shapes.
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from typing import Any
 
-import pytest
 import musicbrainzngs
+import pytest
 
-from whipper_gui.adapters import musicbrainz_client
 from whipper_gui.adapters.musicbrainz_client import (
     MusicBrainzClient,
     MusicBrainzNgsImpl,
@@ -23,7 +23,6 @@ from whipper_gui.adapters.musicbrainz_client import (
     TocSignature,
     TrackSummary,
 )
-
 
 # --- Sample MB response shapes --------------------------------------------
 
@@ -122,7 +121,8 @@ def client(monkeypatch: pytest.MonkeyPatch) -> MusicBrainzNgsImpl:
     """A constructed client with `set_useragent` stubbed out."""
     calls: list[tuple[str, str, str]] = []
     monkeypatch.setattr(
-        musicbrainzngs, "set_useragent",
+        musicbrainzngs,
+        "set_useragent",
         lambda app, ver, ctx: calls.append((app, ver, ctx)),
     )
     impl = MusicBrainzNgsImpl(
@@ -156,7 +156,8 @@ def test_releases_by_disc_id_parses_summary_fields(
     client: MusicBrainzNgsImpl, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        musicbrainzngs, "get_releases_by_discid",
+        musicbrainzngs,
+        "get_releases_by_discid",
         lambda *a, **kw: _sample_disc_response(),
     )
 
@@ -242,7 +243,8 @@ def test_release_by_mbid_returns_detail_with_tracks(
     client: MusicBrainzNgsImpl, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        musicbrainzngs, "get_release_by_id",
+        musicbrainzngs,
+        "get_release_by_id",
         lambda *a, **kw: _sample_release_by_id(),
     )
 
@@ -331,17 +333,11 @@ def test_abstract_base_blocks_instantiation() -> None:
 
 def test_release_summary_is_frozen() -> None:
     s = ReleaseSummary(mbid="x", title="t", artist_credit="a")
-    try:
+    with pytest.raises(FrozenInstanceError):
         s.title = "z"  # type: ignore[misc]
-        assert False
-    except Exception:
-        pass
 
 
 def test_track_summary_is_frozen() -> None:
     t = TrackSummary(number=1, title="x")
-    try:
+    with pytest.raises(FrozenInstanceError):
         t.title = "z"  # type: ignore[misc]
-        assert False
-    except Exception:
-        pass

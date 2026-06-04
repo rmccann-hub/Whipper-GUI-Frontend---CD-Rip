@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QDialogButtonBox
 
-from whipper_gui.config import Config, SCHEMA_VERSION
+from whipper_gui.config import SCHEMA_VERSION, Config
 from whipper_gui.ui.settings_dialog import SettingsDialog
-
 
 # --- Construction --------------------------------------------------------
 
@@ -221,9 +220,7 @@ def test_parity_gap_widgets_round_trip_through_to_config(
     qapp: QApplication,
 ) -> None:
     dialog = SettingsDialog(Config())
-    dialog._cover_art_combo.setCurrentIndex(
-        dialog._cover_art_combo.findData("file")
-    )
+    dialog._cover_art_combo.setCurrentIndex(dialog._cover_art_combo.findData("file"))
     dialog._force_overread_check.setChecked(True)
     dialog._max_retries_spin.setValue(3)
     dialog._keep_going_check.setChecked(True)
@@ -240,7 +237,5 @@ def test_cover_art_blank_option_maps_to_empty_string(
     qapp: QApplication,
 ) -> None:
     dialog = SettingsDialog(Config(cover_art="embed"))
-    dialog._cover_art_combo.setCurrentIndex(
-        dialog._cover_art_combo.findData("")
-    )
+    dialog._cover_art_combo.setCurrentIndex(dialog._cover_art_combo.findData(""))
     assert dialog.to_config().cover_art == ""

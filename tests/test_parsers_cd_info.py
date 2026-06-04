@@ -52,9 +52,7 @@ def test_parse_partial_input() -> None:
 
 def test_parse_num_tracks_from_disc_duration_line() -> None:
     """The track count comes from "Disc duration: ..., N audio tracks"."""
-    info = parse_cd_info(
-        "Disc duration: 01:02:08.026, 16 audio tracks\n"
-    )
+    info = parse_cd_info("Disc duration: 01:02:08.026, 16 audio tracks\n")
     assert info.num_tracks == 16
 
 

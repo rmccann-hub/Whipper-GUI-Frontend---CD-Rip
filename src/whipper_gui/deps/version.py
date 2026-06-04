@@ -13,7 +13,7 @@ regexes, not column-index splits" rule.
 from __future__ import annotations
 
 import re
-from typing import Pattern
+from re import Pattern
 
 # Generic semver-like matcher. Greedy on `\d+` so `0.10.0` parses to
 # (0, 10, 0) rather than (0, 1, 0). Patch is optional so "1.4" and
@@ -67,9 +67,7 @@ def format_version(version: tuple[int, ...] | None) -> str:
     return ".".join(str(part) for part in version)
 
 
-def meets_minimum(
-    version: tuple[int, ...] | None, minimum: tuple[int, ...]
-) -> bool:
+def meets_minimum(version: tuple[int, ...] | None, minimum: tuple[int, ...]) -> bool:
     """True if `version >= minimum` component-wise.
 
     A `None` version (the probe couldn't determine one) returns False —

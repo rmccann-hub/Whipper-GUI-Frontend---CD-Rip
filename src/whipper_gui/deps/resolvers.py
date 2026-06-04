@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from whipper_gui.deps.checks import ProbeResult
 from whipper_gui.deps.registry import DependencySpec
@@ -159,12 +159,14 @@ class AutoInstaller:
             tail = (proc.stderr or proc.stdout or "").strip().splitlines()
             last_line = tail[-1] if tail else f"rc={proc.returncode}"
             full_output = (
-                (proc.stdout or "").strip() + "\n" +
-                (proc.stderr or "").strip()
+                (proc.stdout or "").strip() + "\n" + (proc.stderr or "").strip()
             ).strip()
             log.warning(
                 "auto-install %s failed (rc=%d): %s\nFull output:\n%s",
-                item.spec.dep_id, proc.returncode, last_line, full_output,
+                item.spec.dep_id,
+                proc.returncode,
+                last_line,
+                full_output,
             )
             return InstallResult(
                 spec=item.spec,
@@ -173,9 +175,7 @@ class AutoInstaller:
             )
 
         log.info("auto-install %s succeeded", item.spec.dep_id)
-        return InstallResult(
-            spec=item.spec, success=True, message="installed"
-        )
+        return InstallResult(spec=item.spec, success=True, message="installed")
 
 
 class QueuedInstaller:
@@ -196,9 +196,7 @@ class QueuedInstaller:
         # Reuse AutoInstaller's _install_one for consistency. We pass a
         # consent that always-approves because the user already approved
         # per-item in the dialog.
-        self._installer = auto_installer or AutoInstaller(
-            consent=lambda _: True
-        )
+        self._installer = auto_installer or AutoInstaller(consent=lambda _: True)
 
     def resolve(self, items: list[MissingItem]) -> list[InstallResult]:
         approved = self._dialog(items)
@@ -237,8 +235,7 @@ class ManualPrompt:
                     spec=item.spec,
                     success=False,
                     message=(
-                        f"manual install required — search: "
-                        f"{item.spec.search_string}"
+                        f"manual install required — search: {item.spec.search_string}"
                     ),
                 )
             )

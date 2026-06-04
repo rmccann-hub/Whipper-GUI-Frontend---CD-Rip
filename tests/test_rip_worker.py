@@ -11,10 +11,9 @@ whipper binary.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from whipper_gui.adapters.whipper_backend import (
@@ -27,7 +26,6 @@ from whipper_gui.workers.rip_worker import (
     RipWorker,
     _describe_activity,
 )
-
 
 # The `qapp` fixture comes from tests/conftest.py. Worker tests don't
 # strictly need a QApplication (QCoreApplication would be enough), but
@@ -51,8 +49,7 @@ class _FakeHandle:
         self.cancel_calls: int = 0
 
     def log_lines(self) -> Iterable[str]:
-        for line in self._lines:
-            yield line
+        yield from self._lines
 
     def wait(self, timeout: float | None = None) -> int:
         return self._exit_code
@@ -99,13 +96,20 @@ class _FakeBackend(WhipperBackend):
         keep_going: bool = False,
         read_offset_override: int | None = None,
     ) -> RipHandle:
-        self.rip_calls.append({
-            "drive": drive, "release_id": release_id,
-            "output_dir": output_dir, "unknown": unknown, "cdr": cdr,
-            "cover_art": cover_art, "force_overread": force_overread,
-            "max_retries": max_retries, "keep_going": keep_going,
-            "read_offset_override": read_offset_override,
-        })
+        self.rip_calls.append(
+            {
+                "drive": drive,
+                "release_id": release_id,
+                "output_dir": output_dir,
+                "unknown": unknown,
+                "cdr": cdr,
+                "cover_art": cover_art,
+                "force_overread": force_overread,
+                "max_retries": max_retries,
+                "keep_going": keep_going,
+                "read_offset_override": read_offset_override,
+            }
+        )
         if self._raise_on_rip:
             raise self._raise_on_rip
         assert self._handle is not None
@@ -115,9 +119,7 @@ class _FakeBackend(WhipperBackend):
         return "fake 0.0.0"
 
 
-def _params(
-    tmp_path: Path, unknown: bool = False, cdr: bool = False
-) -> RipParameters:
+def _params(tmp_path: Path, unknown: bool = False, cdr: bool = False) -> RipParameters:
     return RipParameters(
         drive="/dev/sr0",
         release_id="mbid-abc",
@@ -149,17 +151,13 @@ class _Signals:
         )
         worker.current_track.connect(self.current_tracks.append)
         worker.error.connect(self.errors.append)
-        worker.finished.connect(
-            lambda ok, path: self.finished.append((ok, path))
-        )
+        worker.finished.connect(lambda ok, path: self.finished.append((ok, path)))
 
 
 # --- Happy-path tests -----------------------------------------------------
 
 
-def test_emits_log_lines_in_order(
-    qapp: QApplication, tmp_path: Path
-) -> None:
+def test_emits_log_lines_in_order(qapp: QApplication, tmp_path: Path) -> None:
     handle = _FakeHandle(lines=["one", "two", "three"], exit_code=0)
     backend = _FakeBackend(handle=handle)
     worker = RipWorker(backend, _params(tmp_path))
@@ -186,9 +184,7 @@ def test_finished_reports_success_on_zero_exit(
     assert sigs.finished[0][0] is True
 
 
-def test_cdr_param_forwarded_to_backend(
-    qapp: QApplication, tmp_path: Path
-) -> None:
+def test_cdr_param_forwarded_to_backend(qapp: QApplication, tmp_path: Path) -> None:
     """RipParameters.cdr must reach WhipperBackend.rip()."""
     handle = _FakeHandle(lines=[], exit_code=0)
     backend = _FakeBackend(handle=handle)
@@ -223,9 +219,9 @@ def test_progress_two_tier_overall_monotonic_and_task_resets(
     "bar goes by track; want an overall bar and a task bar")."""
     handle = _FakeHandle(
         lines=[
-            "Reading TOC  50 %",                          # scan → 0-5% band
+            "Reading TOC  50 %",  # scan → 0-5% band
             "Reading table  100 %",
-            "Reading track 1 of 2 (1 of 9) ...  50 %",    # track → 5-95% band
+            "Reading track 1 of 2 (1 of 9) ...  50 %",  # track → 5-95% band
             "Verifying track 1 of 2 (3 of 9) ... 100 %",
             "Reading track 2 of 2 (1 of 9) ...  50 %",
             "Getting length of audio track (2 of 2) ... 100 %",  # 95-100%
@@ -258,12 +254,12 @@ def test_emits_current_track_once_per_new_track(
     rip by highlighting the active row."""
     handle = _FakeHandle(
         lines=[
-            "Reading TOC  100 %",                          # no track yet
-            "Reading track 1 of 3 (1 of 9) ...  10 %",     # → track 1
-            "Reading track 1 of 3 (1 of 9) ...  90 %",     # same track, no re-emit
-            "Verifying track 1 of 3 (3 of 9) ... 100 %",   # still track 1
-            "Reading track 2 of 3 (1 of 9) ...  50 %",     # → track 2
-            "Reading track 3 of 3 (1 of 9) ...  50 %",     # → track 3
+            "Reading TOC  100 %",  # no track yet
+            "Reading track 1 of 3 (1 of 9) ...  10 %",  # → track 1
+            "Reading track 1 of 3 (1 of 9) ...  90 %",  # same track, no re-emit
+            "Verifying track 1 of 3 (3 of 9) ... 100 %",  # still track 1
+            "Reading track 2 of 3 (1 of 9) ...  50 %",  # → track 2
+            "Reading track 3 of 3 (1 of 9) ...  50 %",  # → track 3
         ],
         exit_code=0,
     )
@@ -293,9 +289,7 @@ def test_progress_for_ignores_lines_without_usable_percent(
 
 def test_describe_activity_recognizes_disc_scan() -> None:
     assert _describe_activity("Reading TOC  50 %") == "Reading disc TOC… 50%"
-    assert (
-        _describe_activity("Reading table  12 %") == "Reading disc table… 12%"
-    )
+    assert _describe_activity("Reading table  12 %") == "Reading disc table… 12%"
 
 
 def test_describe_activity_recognizes_track_phases() -> None:

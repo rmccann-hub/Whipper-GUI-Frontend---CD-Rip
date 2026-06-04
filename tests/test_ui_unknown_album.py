@@ -19,7 +19,6 @@ from whipper_gui.ui.unknown_album import (
     launch_picard_for,
 )
 
-
 # --- UnknownAlbumDialog --------------------------------------------------
 
 
@@ -174,9 +173,14 @@ def test_launch_picard_invokes_flatpak_with_folder(
     ok = launch_picard_for(tmp_path)
 
     assert ok is True
-    assert captured == [[
-        "flatpak", "run", "org.musicbrainz.Picard", str(tmp_path),
-    ]]
+    assert captured == [
+        [
+            "flatpak",
+            "run",
+            "org.musicbrainz.Picard",
+            str(tmp_path),
+        ]
+    ]
 
 
 def test_launch_picard_returns_false_when_flatpak_missing(

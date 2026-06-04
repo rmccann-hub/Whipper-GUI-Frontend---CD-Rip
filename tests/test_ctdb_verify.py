@@ -7,15 +7,14 @@ import zlib
 from pathlib import Path
 
 from whipper_gui.adapters.ctdb_client import (
+    CTDBClient,
     CtdbEntry,
     CtdbLookupError,
     CtdbLookupResult,
-    CTDBClient,
 )
 from whipper_gui.ctdb import crc as crc_mod
 from whipper_gui.ctdb.toc import SAMPLES_PER_SECTOR, DiscToc
 from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict, verify_rip
-
 
 # --- crc -------------------------------------------------------------------
 

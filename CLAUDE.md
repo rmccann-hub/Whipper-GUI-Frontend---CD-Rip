@@ -124,7 +124,10 @@ There is no `compass_artifact_*.md` in the repo; the original v1 research valida
 
 ### Lint / format commands
 
-*(Not yet configured. Likely additions: `ruff check .` and `ruff format .`. Add when a linting task lands.)*
+- **Lint:** `ruff check src tests` (config in `pyproject.toml` `[tool.ruff]`; rules `E,F,W,I,B,UP`, `E501` off). Auto-fix: `ruff check src tests --fix`.
+- **Format:** `ruff format src tests` (88-col, double quotes — matches the existing code). CI checks with `ruff format --check`.
+- **CI:** the `lint` job in `.github/workflows/ci.yml` runs both in check mode on every push/PR, in parallel with `test`.
+- `ruff` is in the `dev` extra (`pip install -e ".[dev]"`).
 
 ### Important paths
 

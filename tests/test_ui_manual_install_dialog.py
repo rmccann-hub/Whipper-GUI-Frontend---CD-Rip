@@ -7,15 +7,12 @@ platform plugin.
 
 from __future__ import annotations
 
-from typing import Callable
-
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
 from whipper_gui.deps.checks import ProbeResult
 from whipper_gui.deps.registry import DependencySpec, Tier
 from whipper_gui.ui.dialogs.manual_install import ManualInstallDialog
-
 
 # --- Spec / probe factories -----------------------------------------------
 

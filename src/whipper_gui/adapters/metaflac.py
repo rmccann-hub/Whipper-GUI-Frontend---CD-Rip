@@ -83,9 +83,7 @@ class MetaflacAdapter:
         args.append(str(flac_path))
 
         self._run(args)
-        log.debug(
-            "wrote %d tag(s) to %s", len(tags), flac_path
-        )
+        log.debug("wrote %d tag(s) to %s", len(tags), flac_path)
 
     # --- Internals ---
 
@@ -100,9 +98,7 @@ class MetaflacAdapter:
                 timeout=_METAFLAC_TIMEOUT_S,
             )
         except FileNotFoundError as exc:
-            raise MetaflacError(
-                f"metaflac binary not found ({self._binary})"
-            ) from exc
+            raise MetaflacError(f"metaflac binary not found ({self._binary})") from exc
         except subprocess.TimeoutExpired as exc:
             raise MetaflacError(
                 f"metaflac timed out after {_METAFLAC_TIMEOUT_S:.0f}s"

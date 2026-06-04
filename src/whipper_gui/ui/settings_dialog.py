@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
 
 from whipper_gui.config import Config
 
-
 # Read offset range. AccurateRip's per-drive offsets are typically in
 # the low hundreds of samples; ±5000 is well outside any realistic
 # value and prevents typos like "60000".
@@ -55,14 +54,10 @@ class SettingsDialog(QDialog):
         form = QFormLayout()
 
         # --- Path rows (QLineEdit + Browse button) ---
-        self._output_dir_edit, output_row = self._build_dir_row(
-            config.output_dir
-        )
+        self._output_dir_edit, output_row = self._build_dir_row(config.output_dir)
         form.addRow("Output directory:", output_row)
 
-        self._working_dir_edit, working_row = self._build_dir_row(
-            config.working_dir
-        )
+        self._working_dir_edit, working_row = self._build_dir_row(config.working_dir)
         form.addRow("Working directory:", working_row)
 
         # --- Templates ---
@@ -127,9 +122,7 @@ class SettingsDialog(QDialog):
         form.addRow("", self._override_offset_check)
 
         # --- Tool paths ---
-        self._whipper_path_edit, whipper_row = self._build_file_row(
-            config.whipper_path
-        )
+        self._whipper_path_edit, whipper_row = self._build_file_row(config.whipper_path)
         form.addRow("whipper path:", whipper_row)
 
         self._metaflac_path_edit, metaflac_row = self._build_file_row(
@@ -226,18 +219,13 @@ class SettingsDialog(QDialog):
         # This sits between the form and the OK/Cancel row so it's
         # visually associated with the settings (which is where the
         # paths live that the dep check verifies).
-        self._check_deps_button: QPushButton = QPushButton(
-            "Check dependencies", self
-        )
-        self._check_deps_button.clicked.connect(
-            self.check_dependencies_requested
-        )
+        self._check_deps_button: QPushButton = QPushButton("Check dependencies", self)
+        self._check_deps_button.clicked.connect(self.check_dependencies_requested)
         root.addWidget(self._check_deps_button)
 
         # --- OK / Cancel ---
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
         button_box.accepted.connect(self.accept)
@@ -276,9 +264,7 @@ class SettingsDialog(QDialog):
 
     # --- Internals ---------------------------------------------------------
 
-    def _build_dir_row(
-        self, initial_path: str
-    ) -> tuple[QLineEdit, QWidget]:
+    def _build_dir_row(self, initial_path: str) -> tuple[QLineEdit, QWidget]:
         """Build a row: QLineEdit + 'Browse…' button (for directories)."""
         row = QWidget(self)
         layout = QHBoxLayout(row)
@@ -292,9 +278,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(button)
         return edit, row
 
-    def _build_file_row(
-        self, initial_path: str
-    ) -> tuple[QLineEdit, QWidget]:
+    def _build_file_row(self, initial_path: str) -> tuple[QLineEdit, QWidget]:
         """Build a row: QLineEdit + 'Browse…' button (for an executable)."""
         row = QWidget(self)
         layout = QHBoxLayout(row)
@@ -309,15 +293,11 @@ class SettingsDialog(QDialog):
         return edit, row
 
     def _pick_directory(self, edit: QLineEdit) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "Choose directory", edit.text()
-        )
+        path = QFileDialog.getExistingDirectory(self, "Choose directory", edit.text())
         if path:
             edit.setText(path)
 
     def _pick_file(self, edit: QLineEdit) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Choose binary", edit.text()
-        )
+        path, _ = QFileDialog.getOpenFileName(self, "Choose binary", edit.text())
         if path:
             edit.setText(path)

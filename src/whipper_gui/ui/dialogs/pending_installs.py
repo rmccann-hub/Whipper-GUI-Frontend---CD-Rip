@@ -22,7 +22,7 @@ older callers and the unit tests.
 
 from __future__ import annotations
 
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
@@ -90,7 +90,7 @@ class PendingInstallsDialog(QDialog):
 
             checkbox = QCheckBox(self._row_label(item), row_widget)
             checkbox.setChecked(True)  # default to "yes, install"; user
-                                       # can uncheck individual items
+            # can uncheck individual items
             self._checkboxes[item.spec.dep_id] = checkbox
             row.addWidget(checkbox, stretch=1)
 
@@ -140,9 +140,7 @@ class PendingInstallsDialog(QDialog):
         if label is not None:
             label.setText("installing…")
 
-    def mark_result(
-        self, dep_id: str, success: bool, message: str = ""
-    ) -> None:
+    def mark_result(self, dep_id: str, success: bool, message: str = "") -> None:
         """Update the status label for `dep_id` with the install outcome."""
         label = self._status_labels.get(dep_id)
         if label is None:

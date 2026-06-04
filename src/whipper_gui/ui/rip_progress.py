@@ -13,8 +13,8 @@ text viewer via QDesktopServices.openUrl().
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
@@ -106,12 +106,8 @@ class RipProgress(QWidget):
         self._ar_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
-        self._ar_table.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self._ar_table.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers
-        )
+        self._ar_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._ar_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._ar_table.verticalHeader().setVisible(False)
         header = self._ar_table.horizontalHeader()
         header.setSectionResizeMode(_AR_COL_TITLE, QHeaderView.ResizeMode.Stretch)

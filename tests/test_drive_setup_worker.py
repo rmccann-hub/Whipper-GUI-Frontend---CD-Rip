@@ -88,9 +88,7 @@ def test_worker_reports_offset_and_cache(qapp: QApplication) -> None:
 def test_worker_records_offset_failure_but_keeps_cache(
     qapp: QApplication,
 ) -> None:
-    backend = _FakeBackend(
-        cache=True, offset_exc=WhipperError("not in AccurateRip")
-    )
+    backend = _FakeBackend(cache=True, offset_exc=WhipperError("not in AccurateRip"))
     result = _run(DriveSetupWorker(backend, "/dev/sr0"))
 
     assert result.offset is None

@@ -105,8 +105,14 @@ def test_in_container_uses_distrobox_enter() -> None:
     rec = _Recorder(returncode=0)
     assert drive_control.force_stop_in_container("ripping", runner=rec) is True
     assert _base(rec.calls[0]) == [
-        "distrobox", "enter", "ripping", "--",
-        "pkill", "-KILL", "-f", drive_control._WHIPPER_CLI,
+        "distrobox",
+        "enter",
+        "ripping",
+        "--",
+        "pkill",
+        "-KILL",
+        "-f",
+        drive_control._WHIPPER_CLI,
     ]
 
 

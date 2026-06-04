@@ -175,9 +175,7 @@ class DriveSetupDialog(QDialog):
         if self._closing:
             return
         self._progress.setVisible(False)
-        self._status_label.setText(
-            "Done." if result.ok else "Finished with issues."
-        )
+        self._status_label.setText("Done." if result.ok else "Finished with issues.")
         self._results_label.setPlainText(_format_result(result))
         self._detect_button.setEnabled(True)
         self._detect_button.setText("Re-detect")
@@ -241,9 +239,7 @@ def _format_result(result: DriveSetupResult) -> str:
     if result.can_defeat_cache is True:
         lines.append("✓ Audio cache: will be defeated for secure rips (saved).")
     elif result.can_defeat_cache is False:
-        lines.append(
-            "• Audio cache: this drive doesn't need cache-defeating (saved)."
-        )
+        lines.append("• Audio cache: this drive doesn't need cache-defeating (saved).")
     else:
         lines.append(
             f"• Audio cache: {result.analyze_error or 'could not be determined'}"

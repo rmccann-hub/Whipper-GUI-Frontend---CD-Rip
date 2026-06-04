@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from whipper_gui.deps.version import format_version, meets_minimum, parse_version
 
-
 # --- parse_version ---
 
 

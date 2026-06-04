@@ -19,8 +19,8 @@ from __future__ import annotations
 import glob
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 log = logging.getLogger(__name__)
 
@@ -47,10 +47,10 @@ class DriveAccessDiagnosis:
     """Result of probing optical-drive accessibility."""
 
     severity: str
-    summary: str          # one-line headline
-    detail: str           # fuller explanation
-    fix_command: str | None = None   # shell command the user can run, if any
-    devices: tuple[str, ...] = ()    # device nodes we found
+    summary: str  # one-line headline
+    detail: str  # fuller explanation
+    fix_command: str | None = None  # shell command the user can run, if any
+    devices: tuple[str, ...] = ()  # device nodes we found
 
     @property
     def actionable(self) -> bool:

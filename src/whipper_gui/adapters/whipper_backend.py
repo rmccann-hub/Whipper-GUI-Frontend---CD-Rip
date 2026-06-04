@@ -19,8 +19,8 @@ import shutil
 import signal
 import subprocess
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from whipper_gui.parsers.cd_info import DiscInfo, parse_cd_info
 from whipper_gui.parsers.drive_list import DriveDescriptor, parse_drive_list
@@ -56,7 +56,7 @@ def _last_line(text: str, rc: int) -> str:
     return lines[-1] if lines else f"rc={rc}"
 
 
-def _kill_group(proc: "subprocess.Popen[str]", sig: int) -> None:
+def _kill_group(proc: subprocess.Popen[str], sig: int) -> None:
     """Send `sig` to the subprocess's whole process group.
 
     whipper spawns children (the `~/.local/bin/whipper` wrapper →
@@ -235,10 +235,11 @@ class WhipperBackend(ABC):
         """
         raise NotImplementedError
 
-    def cancel_setup(self) -> None:
+    def cancel_setup(self) -> None:  # noqa: B027 — intentional optional no-op hook
         """Terminate an in-progress `analyze_drive`/`find_offset` subprocess.
 
-        Default no-op. The host-exported impl overrides it so the drive-
+        Default no-op (deliberately concrete, not abstract: most backends have
+        nothing to cancel and shouldn't be forced to implement it). The host-
         setup wizard can stop the (slow, disc-spinning) whipper process
         when the user closes the dialog — otherwise it keeps the optical
         drive busy long after the GUI is done with it.
@@ -330,9 +331,7 @@ class WhipperHostExportedImpl(WhipperBackend):
             args += ["-d", device]
         rc, out = self._run_setup_capture(args)
         if _NO_DISC_MARKER in out:
-            raise WhipperError(
-                "Insert a CD so the drive can be analyzed.", output=out
-            )
+            raise WhipperError("Insert a CD so the drive can be analyzed.", output=out)
         if _CACHE_CAN in out:
             return True
         if _CACHE_CANNOT in out:
@@ -402,19 +401,17 @@ class WhipperHostExportedImpl(WhipperBackend):
                 start_new_session=True,
             )
         except FileNotFoundError as exc:
-            raise WhipperError(
-                f"whipper binary not found at {self._binary}"
-            ) from exc
+            raise WhipperError(f"whipper binary not found at {self._binary}") from exc
         self._setup_proc = proc
         try:
             out, _ = proc.communicate(timeout=_SETUP_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
             proc.kill()
             out, _ = proc.communicate()
             self._setup_proc = None
             raise WhipperError(
                 f"whipper timed out after {_SETUP_TIMEOUT_S:.0f}s", output=out or ""
-            )
+            ) from exc
         finally:
             self._setup_proc = None
         return proc.returncode, out or ""
@@ -442,14 +439,20 @@ class WhipperHostExportedImpl(WhipperBackend):
         del drive  # explicit: parameter intentionally unused for v1
         argv: list[str] = [
             str(self._binary),
-            "cd", "rip",
-            "--release-id", release_id,
-            "--output-directory", str(output_dir),
-            "--track-template", track_template,
-            "--disc-template", disc_template,
+            "cd",
+            "rip",
+            "--release-id",
+            release_id,
+            "--output-directory",
+            str(output_dir),
+            "--track-template",
+            track_template,
+            "--disc-template",
+            disc_template,
             # Always pass max-retries (defaults to whipper's own 5, so this
             # is a no-op unless the user changed it in Settings).
-            "--max-retries", str(max_retries),
+            "--max-retries",
+            str(max_retries),
         ]
         if read_offset_override is not None:
             # Manual offset from Settings — overrides whipper.conf for this rip.
@@ -515,13 +518,9 @@ class WhipperHostExportedImpl(WhipperBackend):
                 timeout=timeout,
             )
         except FileNotFoundError as exc:
-            raise WhipperError(
-                f"whipper binary not found at {self._binary}"
-            ) from exc
+            raise WhipperError(f"whipper binary not found at {self._binary}") from exc
         except subprocess.TimeoutExpired as exc:
-            raise WhipperError(
-                f"whipper timed out after {timeout:.0f}s"
-            ) from exc
+            raise WhipperError(f"whipper timed out after {timeout:.0f}s") from exc
         return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
     def _run_info(self, args: list[str]) -> str:

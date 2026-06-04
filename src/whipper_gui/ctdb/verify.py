@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import enum
 import logging
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
 from whipper_gui.adapters.ctdb_client import (
     CTDBClient,
@@ -34,7 +34,7 @@ from whipper_gui.adapters.ctdb_client import (
 )
 from whipper_gui.ctdb import crc as crc_mod
 from whipper_gui.ctdb import decode
-from whipper_gui.ctdb.toc import DiscToc, SamplesProbe, disc_toc_from_files
+from whipper_gui.ctdb.toc import SamplesProbe, disc_toc_from_files
 
 log = logging.getLogger(__name__)
 
@@ -42,11 +42,11 @@ log = logging.getLogger(__name__)
 class Verdict(enum.Enum):
     """The possible outcomes of a CTDB verify."""
 
-    MATCH = "match"                 # our CRC matched a DB entry
-    NO_MATCH = "no_match"           # disc in DB, but our CRC didn't match
-    NOT_IN_DATABASE = "not_in_db"   # TOC not found in CTDB
+    MATCH = "match"  # our CRC matched a DB entry
+    NO_MATCH = "no_match"  # disc in DB, but our CRC didn't match
+    NOT_IN_DATABASE = "not_in_db"  # TOC not found in CTDB
     DECODER_UNAVAILABLE = "no_decoder"  # can't compute local CRC (no flac)
-    LOOKUP_ERROR = "lookup_error"   # network/parse failure
+    LOOKUP_ERROR = "lookup_error"  # network/parse failure
 
 
 @dataclass(frozen=True)

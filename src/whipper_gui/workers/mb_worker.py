@@ -39,10 +39,10 @@ log = logging.getLogger(__name__)
 class MusicBrainzWorker(QObject):
     """QObject worker for MusicBrainz queries via MusicBrainzClient."""
 
-    releases_returned = Signal(list)    # list[ReleaseSummary]
-    release_returned = Signal(object)   # ReleaseDetail (object so PySide
-                                        # doesn't need an explicit type
-                                        # registration for the dataclass)
+    releases_returned = Signal(list)  # list[ReleaseSummary]
+    release_returned = Signal(object)  # ReleaseDetail (object so PySide
+    # doesn't need an explicit type
+    # registration for the dataclass)
     error = Signal(str)
 
     def __init__(

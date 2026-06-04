@@ -48,7 +48,7 @@ def test_parse_entry_hex_crc_and_fields() -> None:
 
 
 def test_parse_tolerates_missing_attributes() -> None:
-    result = parse_lookup_response(b'<ctdb><entry/></ctdb>')
+    result = parse_lookup_response(b"<ctdb><entry/></ctdb>")
     (entry,) = result.entries
     assert entry.crc is None
     assert entry.confidence == 0

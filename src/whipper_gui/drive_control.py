@@ -43,7 +43,7 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Callable
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def _resolve(name: str, *fallbacks: str) -> str:
     return name
 
 
-def _default_runner(argv: list[str]) -> "subprocess.CompletedProcess[str]":
+def _default_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
     """Run a command, swallowing its output; never inherit stdin (so a
     `distrobox enter` can't block waiting on a TTY). Bounded by a timeout so a
     wedged container can't hang the caller forever."""
@@ -120,8 +120,8 @@ def _pkill_arglists() -> list[list[str]]:
     order: whipper FIRST (the orchestrator — kill it so it can't respawn the
     reader), then the reader processes by name."""
     return [
-        ["-KILL", "-f", _WHIPPER_CLI],   # whipper CLI, anchored (never the GUI)
-        ["-KILL", _READER_NAMES],        # cdrdao / cd-paranoia, by process name
+        ["-KILL", "-f", _WHIPPER_CLI],  # whipper CLI, anchored (never the GUI)
+        ["-KILL", _READER_NAMES],  # cdrdao / cd-paranoia, by process name
     ]
 
 

@@ -7,7 +7,6 @@ replaced with a fake; we never touch the real MB API.
 
 from __future__ import annotations
 
-import pytest
 from PySide6.QtWidgets import QApplication
 
 from whipper_gui.adapters.musicbrainz_client import (
@@ -19,7 +18,6 @@ from whipper_gui.adapters.musicbrainz_client import (
     TrackSummary,
 )
 from whipper_gui.workers.mb_worker import MusicBrainzWorker
-
 
 # `qapp` fixture comes from tests/conftest.py — see test_rip_worker.py
 # for the reason worker tests adopt the wider QApplication fixture.
@@ -171,8 +169,10 @@ def test_lookup_toc_passes_signature_through(
     sigs.attach(worker)
 
     toc = TocSignature(
-        first_track=1, last_track=2,
-        lead_out_sector=12345, track_offsets=(150, 4567),
+        first_track=1,
+        last_track=2,
+        lead_out_sector=12345,
+        track_offsets=(150, 4567),
     )
     worker.lookup_toc(toc)
 

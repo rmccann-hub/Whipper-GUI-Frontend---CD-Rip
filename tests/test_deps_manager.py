@@ -6,7 +6,7 @@ so each test isolates one orchestration path.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from whipper_gui.deps.checks import ProbeResult
 from whipper_gui.deps.manager import DependencyManager, DependencyReport
@@ -18,7 +18,6 @@ from whipper_gui.deps.resolvers import (
     MissingItem,
     QueuedInstaller,
 )
-
 
 # --- Spec/probe factories -------------------------------------------------
 
@@ -84,9 +83,7 @@ def test_check_all_treats_too_old_as_missing() -> None:
     specs = [
         _spec(
             "old",
-            probe=lambda: ProbeResult(
-                present=True, version=(0, 9, 0), location="/x"
-            ),
+            probe=lambda: ProbeResult(present=True, version=(0, 9, 0), location="/x"),
             min_version=(1, 0, 0),
         ),
     ]
@@ -107,9 +104,7 @@ def test_check_all_is_idempotent() -> None:
     r2 = mgr.check_all()
 
     assert [s.dep_id for s in r1.ok] == [s.dep_id for s in r2.ok]
-    assert [m.spec.dep_id for m in r1.missing] == [
-        m.spec.dep_id for m in r2.missing
-    ]
+    assert [m.spec.dep_id for m in r1.missing] == [m.spec.dep_id for m in r2.missing]
 
 
 # --- resolve_missing ------------------------------------------------------
@@ -160,9 +155,7 @@ def test_resolve_missing_dispatches_to_manual_for_manual_tier() -> None:
     def record(item: MissingItem) -> None:
         seen.append(item.spec.dep_id)
 
-    mgr = DependencyManager(
-        manual=ManualPrompt(dialog_callback=record), specs=[spec]
-    )
+    mgr = DependencyManager(manual=ManualPrompt(dialog_callback=record), specs=[spec])
 
     report = mgr.check_all()
     mgr.resolve_missing(report)
@@ -185,9 +178,7 @@ def test_resolve_missing_cascades_to_fallback_on_failure() -> None:
     class FailingAuto:
         def resolve(self, items: list[MissingItem]) -> list[InstallResult]:
             return [
-                InstallResult(
-                    spec=item.spec, success=False, message="boom"
-                )
+                InstallResult(spec=item.spec, success=False, message="boom")
                 for item in items
             ]
 
