@@ -14,6 +14,36 @@ Status marker in each test's heading (same convention as `TASKS.md`): `[ ]` = no
 
 ---
 
+## Walkthrough — a recognized CD end-to-end
+
+A **recognized CD** (in MusicBrainz, and ideally in AccurateRip + CTDB — a popular
+album works best) exercises almost the whole plan in one sitting. Do these in
+order; each links to the detailed test for what to capture.
+
+1. **Calibrate the drive** with the disc inserted (it's in AccurateRip, so
+   offset-find works) — **Tests 3 & 4** below. Capture the `drive analyze` and
+   `offset find` output.
+2. **Rip it** from the GUI: MusicBrainz identifies the disc → **Start** → confirm
+   every track's **Test CRC == Copy CRC** and the AccurateRip confidence. Take a
+   screenshot — **Test 5**.
+3. **CTDB-verify the rip** — **Test 1**, the highest-value step:
+   ```bash
+   source .venv/bin/activate
+   python3 scripts/ctdb_verify.py "$HOME/Music/rips/<Artist>/<Album>/"
+   ```
+   Paste the full output (TOC, lookup URL, verdict). This is what validates — or
+   corrects — the `toc=` wire format and the CRC.
+4. If you have a second recognized disc, repeat step 3 on it: a standard studio
+   album is the cleanest CTDB data point, so two discs disambiguate "wrong wire
+   format" (both fail) from "this pressing isn't in CTDB" (one fails).
+
+> CTDB's CRC needs host `flac`. If `flac --version` fails, export it from the
+> container once: `distrobox enter ripping -- distrobox-export --bin /usr/bin/flac`.
+> Even without it, the **lookup half** of Test 1 still validates the wire format —
+> run it and paste the result anyway.
+
+---
+
 ## Test 1 — [ ] CTDB verify: wire format + CRC (KDD-16)
 
 **Goal:** confirm (or correct) the CTDB lookup wire format and the audio-CRC

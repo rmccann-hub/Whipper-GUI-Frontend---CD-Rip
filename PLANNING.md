@@ -599,3 +599,22 @@ Decided 2026-06-02, ahead of implementing KDD-14 Phase 1. **The question:** can 
 - **Rejected alternative:** ask the upstream author to relicense as GPLv2-or-later. Slower, depends on a third party, and only buys the right to copy code we don't need — clean-room is faster and removes the dependency entirely.
 
 - **Net effect:** the license gate that blocked KDD-14 Phase 1 is **closed**. The concrete protocol/CRC spec (grounded in the LGPL `CUEToolsDB.cs` + `CUETools.AccurateRip`/`CUETools.Parity`) lives in [docs/upstream-modification-investigation.md](docs/upstream-modification-investigation.md). The only remaining blocker is **hardware validation** — the locally-computed CRC must be confirmed against a real CD that is in CTDB (a T32-style test the cloud env can't run).
+
+### KDD-17 — Zero-CLI distribution: self-integrating + self-updating AppImage + GUI first-run host wizard
+
+Decided 2026-06-04 (user-approved; this is a sanctioned evolution of the distribution model per Critical Rule #2 / the deviation policy). **The goal:** a non-technical user touches no terminal — download one file, double-click, done. **The constraint that shapes everything:** the app is *not* self-contained — it routes through a host Distrobox container with whipper inside (Critical Rule #3), so the genuinely hard part is host setup, not GUI delivery.
+
+**Decisions:**
+
+- **The AppImage stays the single downloadable file.** It is the only Linux "one file you download and run" that works without a package manager. The remaining friction — the executable bit / file-manager "Allow executing" tick — is irreducible for a downloaded binary and is accepted.
+- **Self-integrate on first run.** The app offers "Add me to the application menu?" and installs its own `.desktop` + icon, superseding the *user-facing* need for `install-appimage.sh`. (The script stays for scripted/CI installs.)
+- **Self-update via the standard AppImage mechanism.** Embed AppImage update-information (zsync) and verify against the `.sha256` we already publish — this *is* the "check a manifest, skip if current, else download only the delta" pattern the user described, so we do **not** hand-roll a bespoke download stub (more code + supply-chain surface, reinvents a solved thing).
+- **Move host setup into a GUI first-run wizard**, owned by the dependency self-management subsystem (Critical Rule #6 — one subsystem, no scattered checks). It does what `setup-host.sh` does (create the `ripping` container, install whipper + flac + metaflac in it, `distrobox-export`) but as buttons + progress, driving **rootless** podman/distrobox directly. On the primary target (Bazzite/Silverblue) the runtime is preinstalled, so this is fully click-driven with no elevation. On distros lacking the runtime, a **single polkit-elevated step** installs it (the one unavoidable privilege prompt; atomic distros may also need a reboot). `setup-host.sh` remains the CLI equivalent.
+
+**Rejected alternatives:**
+
+- **Flatpak / Flathub** — the only *true* one-click, auto-updating, store-installed Linux path, **but the sandbox cannot reach host `~/.local/bin/whipper` / Distrobox** without `flatpak-spawn --host` holes that gut the sandbox and contradict Critical Rule #3. Not adopted; revisit only as a deliberate architecture change.
+- **A bespoke "stub that reads a remote config and downloads from source"** — superseded by AppImage update-information, which already does skip-if-current + delta fetch + verification.
+- **A downloaded `.desktop` or shell-script "installer"** — blocked by the Linux desktop trust model (untrusted `.desktop` won't run; double-clicked scripts open in an editor).
+
+**Sequencing note:** the self-integrate + self-update pieces are independent of the host wizard and can ship first; the host wizard is the larger lift and the bigger UX win.
