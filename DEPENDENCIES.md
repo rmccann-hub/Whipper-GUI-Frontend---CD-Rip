@@ -24,7 +24,7 @@ All dependencies, with last upstream release date and replacement plan. Reviewed
 
 | Name | Where it comes from | Version constraint | Status | Replacement plan |
 |---|---|---|---|---|
-| whipper | Distrobox container `ripping`, host-exported to `~/.local/bin/whipper` | `>=0.10.0` | Unmaintained (>12mo) — see retirement review log | `cyanrip` via `WhipperBackend.CyanripImpl` (ABC contract documented in PLANNING.md §5) |
+| whipper | Distrobox container `ripping`, host-exported to `~/.local/bin/whipper` | `>=0.10.0` | **Stalled — last release v0.10.0, 2021-05-17 (~5 yr).** Imports `pkg_resources` (gone in setuptools ≥81 / Python 3.14) → monitored compatibility risk; rips fine today on Fedora's 0.10.0. See [docs/ecosystem-audit-2026-06.md](docs/ecosystem-audit-2026-06.md) + KDD-18. | `cyanrip` via `WhipperBackend.CyanripImpl` (active: v0.9.3.1 2024-06-05, C/FFmpeg, LGPL-2.1). Strategic successor — KDD-18. Never fork whipper. |
 | metaflac | Distrobox container `ripping` (same export route) | (whatever ships with the container's `flac` package) | Active (FLAC project) | — |
 | flac (decoder) | Host, **optional** — used by CTDB verify to decode FLAC→PCM if present; the feature degrades with a clear message if absent (decision 2026-06-03). No required dependency added. | any | Active (FLAC project) | — |
 | libdiscid | (not installed) | n/a | **Not needed on host** — whipper-in-container computes the disc ID; the GUI never calls libdiscid (KDD-06, confirmed T32 2026-05-29) | — |

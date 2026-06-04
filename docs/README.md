@@ -23,6 +23,7 @@ These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS
 | [`appimage-testing.md`](appimage-testing.md) | How the AppImage is built (on every push to `main`, on demand for any branch, and at release) and how to test it in each case — including branches with no published release yet. |
 | [`upstream-modification-investigation.md`](upstream-modification-investigation.md) | EAC-parity investigation (2026-06-02): what modifying the open-source programs underneath us would buy, what's feasible (→ task items), and a "do not revisit" non-feasible list. |
 | [`test-plan.md`](test-plan.md) | Step-by-step **manual / hardware** test plan for the work that can't be validated in CI — CTDB verify (wire format + CRC), CTDB repair direction, `drive analyze`/`offset find` success strings, a GUI screenshot, the Picard UX, and the PyPI go-live. Run one test at a time and record results. |
+| [`ecosystem-audit-2026-06.md`](ecosystem-audit-2026-06.md) | Researched audit of the ripper ecosystem (whipper stalled since 2021; cyanrip the active successor) and the contribute-vs-integrate-vs-fork decision + a phased `CyanripImpl` migration plan. Backs PLANNING.md KDD-18. |
 
 ## Where the rest of the project context lives
 
@@ -31,7 +32,7 @@ Outside this directory:
 | File | What it covers |
 |---|---|
 | [`../CLAUDE.md`](../CLAUDE.md) | Persistent rules and conventions; locked rules section; project operations |
-| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, keyed design decisions (KDD-01 … KDD-17) |
+| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, keyed design decisions (KDD-01 … KDD-18) |
 | [`../TASKS.md`](../TASKS.md) | Active task checklist — P0 (T01-T32), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope |
 | [`../DEPENDENCIES.md`](../DEPENDENCIES.md) | Pinned versions, last upstream release dates, retirement-review log |
 | [`../README.md`](../README.md) | User-facing install instructions, troubleshooting, EAC comparison |

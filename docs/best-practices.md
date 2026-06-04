@@ -12,7 +12,7 @@ contributors — not a rulebook.
   explains and expands on those rules — the *how* and *why* — and collects the
   patterns and gotchas discovered while building the project.
 - **[`../PLANNING.md`](../PLANNING.md)** holds the architecture and the keyed
-  design decisions (KDD-01 … KDD-17) referenced throughout.
+  design decisions (KDD-01 … KDD-18) referenced throughout.
 - The **"Notes for future sessions"** log in CLAUDE.md is the running record of
   specific bugs and fixes; this doc distils the *general* lessons from it.
 

@@ -618,3 +618,14 @@ Decided 2026-06-04 (user-approved; this is a sanctioned evolution of the distrib
 - **A downloaded `.desktop` or shell-script "installer"** — blocked by the Linux desktop trust model (untrusted `.desktop` won't run; double-clicked scripts open in an editor).
 
 **Sequencing note:** the self-integrate + self-update pieces are independent of the host wizard and can ship first; the host wizard is the larger lift and the bigger UX win.
+
+### KDD-18 — cyanrip is the strategic successor backend; never fork whipper
+
+Decided 2026-06-04 after a researched ecosystem audit ([docs/ecosystem-audit-2026-06.md](docs/ecosystem-audit-2026-06.md)), prompted by whipper's `offset find` failing on real hardware (Pioneer BDR-209D) and the question of long-term foundation.
+
+- **whipper is effectively stalled.** Last release **v0.10.0, 2021-05-17 (~5 years)**; it imports `pkg_resources`, which is gone from setuptools ≥81 and Python 3.14 — a known compatibility cliff we currently paper over by installing `python3-setuptools` in the container. It still rips correctly today (Fedora packages 0.10.0), so this is a monitored risk, not an emergency.
+- **cyanrip is the successor** (active: v0.9.3.1, 2024-06-05; C + FFmpeg; LGPL-2.1; AccurateRip v1/v2 + EAC CRC32 + MusicBrainz + ReplayGain; no Python cliff). We invoke rippers as subprocesses, so LGPL-2.1 is fine against GPL-3.0-only.
+- **Decision:** keep whipper now; build **`CyanripImpl`** behind the existing `WhipperBackend` ABC as a config-selectable second backend (the ABC was designed for exactly this). **Never fork whipper** — forking inherits its maintenance burden + the `pkg_resources` cliff; if ripper-level changes are ever needed, contribute to *cyanrip* (active) instead. Writing our own ripper and upstreaming our GUI into whipper are both rejected (see the audit's options table).
+- **CTDB is backend-independent** — neither ripper does it; our clean-room `ctdb/` library (KDD-16) rides above whichever backend is selected, so this decision doesn't touch it.
+- **Backend-independent near-term win:** auto-look-up the drive's read offset from the AccurateRip offset list by drive model, so users never type an offset — this is what would have prevented the BDR-209D friction, and it's independent of the whipper-vs-cyanrip choice.
+- **Open feasibility unknown:** cyanrip's packaging for the Fedora-toolbox `ripping` container (AUR has it; Fedora is unconfirmed — COPR/build/Arch-base TBD). Resolved in the migration plan's step 1 (TASKS).
