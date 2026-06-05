@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from whipper_gui import drive_control
+from whipper_gui.adapters.accuraterip_offsets import OffsetDatabase
 from whipper_gui.adapters.metaflac import MetaflacAdapter
 from whipper_gui.adapters.musicbrainz_client import (
     MusicBrainzClient,
@@ -139,6 +140,10 @@ class MainWindow(QMainWindow):
         self._mb_client: MusicBrainzClient = mb_client
         self._metaflac: MetaflacAdapter = metaflac
         self._dependency_manager: DependencyManager = dependency_manager
+        # Read-offset lookup by drive model (the disc-free primary path that
+        # replaces relying on whipper's flaky `offset find`). Cheap to build
+        # — a curated in-code table overlaid with an optional user CSV.
+        self._offset_db: OffsetDatabase = OffsetDatabase.load_default()
         # save_config is injectable so tests don't need to monkeypatch
         # whipper_gui.config.save. Defaults to the real save() function.
         if save_config is None:
@@ -622,8 +627,28 @@ class MainWindow(QMainWindow):
         if not device:
             QMessageBox.warning(self, "Set up drive", "Select a drive first.")
             return
+        # Primary path: resolve the offset by drive model from the AccurateRip
+        # list, so the wizard can pre-fill the right value with no disc and no
+        # dependence on whipper's unreliable `offset find`.
+        drive = self._drive_picker.current_drive()
+        known_offset: int | None = None
+        drive_label = ""
+        if drive is not None:
+            known_offset = self._offset_db.lookup(drive.vendor, drive.model)
+            drive_label = f"{drive.vendor.strip()} {drive.model.strip()}".strip()
+            if known_offset is not None:
+                log.info(
+                    "known AccurateRip offset for %s: %+d",
+                    drive_label,
+                    known_offset,
+                )
         dialog = DriveSetupDialog(
-            self._backend, device, self, current_offset=self._config.read_offset
+            self._backend,
+            device,
+            self,
+            current_offset=self._config.read_offset,
+            known_offset=known_offset,
+            drive_label=drive_label,
         )
         dialog.manual_offset_saved.connect(self._on_manual_offset_saved)
         dialog.exec()

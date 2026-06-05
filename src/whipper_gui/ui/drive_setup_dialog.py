@@ -53,10 +53,19 @@ class DriveSetupDialog(QDialog):
         device: str,
         parent: QWidget | None = None,
         current_offset: int = 0,
+        known_offset: int | None = None,
+        drive_label: str = "",
     ) -> None:
+        """`known_offset`, when provided, is the AccurateRip read offset
+        looked up by drive model (the primary, disc-free path). We prefill
+        the manual field with it and call it out so the user can save it in
+        one click — no disc or whipper probe required. `drive_label` is the
+        human drive name shown in that callout.
+        """
         super().__init__(parent)
         self._backend: WhipperBackend = backend
         self._device: str = device
+        self._known_offset: int | None = known_offset
         self._thread: QThread | None = None
         self._worker: DriveSetupWorker | None = None
         # Set true once the dialog is closing, so a late worker result
@@ -86,6 +95,22 @@ class DriveSetupDialog(QDialog):
             f"Drive: {device or '(auto-detected)'}", self
         )
         root.addWidget(self._device_label)
+
+        # Primary path: if we already know this drive's offset from the
+        # AccurateRip drive list (looked up by model), say so prominently —
+        # the user can save it in one click below without inserting a disc.
+        # This sidesteps whipper's unreliable `offset find` entirely.
+        if known_offset is not None:
+            name = drive_label or "this drive"
+            suggestion = QLabel(
+                f"✓ Known read offset for {name}: <b>{known_offset:+d}</b> "
+                "(from the AccurateRip drive list). It's pre-filled below — "
+                'click "Save offset" to use it. No disc needed. '
+                "Auto-detect (Detect) is optional verification.",
+                self,
+            )
+            suggestion.setWordWrap(True)
+            root.addWidget(suggestion)
 
         self._detect_button: QPushButton = QPushButton("Detect", self)
         self._detect_button.clicked.connect(self._on_detect_clicked)
@@ -129,7 +154,12 @@ class DriveSetupDialog(QDialog):
         self._offset_spin: QSpinBox = QSpinBox(self)
         # AccurateRip offsets sit well within ±2000 samples in practice.
         self._offset_spin.setRange(-2000, 2000)
-        self._offset_spin.setValue(current_offset)
+        # Prefill with the model-looked-up offset when we have one (the
+        # primary path); otherwise fall back to the currently-configured
+        # value passed in.
+        self._offset_spin.setValue(
+            known_offset if known_offset is not None else current_offset
+        )
         manual_row.addWidget(self._offset_spin)
         self._save_offset_button: QPushButton = QPushButton("Save offset", self)
         self._save_offset_button.clicked.connect(self._on_save_offset_clicked)

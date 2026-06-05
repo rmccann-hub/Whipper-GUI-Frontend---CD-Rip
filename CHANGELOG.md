@@ -44,6 +44,16 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   documented in the workflow header. It's a separate workflow from
   `release.yml`, so a PyPI misconfiguration can't block the AppImage release.
 
+### Added
+- **Read offset is now looked up by drive model (AccurateRip list).** whipper's
+  `offset find` is unreliable (it failed on a Pioneer BDR-209D even with a disc
+  that's in AccurateRip). The drive-setup wizard now resolves the offset the way
+  EAC/dBpoweramp do — by the drive's vendor+model — and pre-fills it for one-click
+  save, **with no disc and no whipper probe**. New `adapters/accuraterip_offsets.py`
+  (`OffsetDatabase`), extensible via `~/.config/whipper-gui/drive_offsets.csv`;
+  whipper's `offset find` is kept as optional verification. The tested Pioneer
+  BDR-209D resolves to +667 instantly. See `docs/offset-investigation-2026-06.md`.
+
 ### Fixed
 - **The app no longer vanishes silently on a startup error.** Drive listing
   (and the rest of startup) ran after the window was shown but outside any

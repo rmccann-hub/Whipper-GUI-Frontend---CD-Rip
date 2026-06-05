@@ -25,6 +25,7 @@ These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS
 | [`testing.md`](testing.md) | **Testing strategy & standards** — the trophy + a real-hardware gate, the five-tier case taxonomy (easy/medium/hard/edge/unexpected), when to use property-based / golden / fault-injection / mutation testing, the institutional rules (every bug gets a regression test; parsers never raise; coverage gate ratchets up), and a Definition of Done. Portable to sibling projects. |
 | [`test-plan.md`](test-plan.md) | Step-by-step **manual / hardware** test plan for the work that can't be validated in CI — CTDB verify (wire format + CRC), CTDB repair direction, `drive analyze`/`offset find` success strings, a GUI screenshot, the Picard UX, and the PyPI go-live. Run one test at a time and record results. |
 | [`ecosystem-audit-2026-06.md`](ecosystem-audit-2026-06.md) | Researched audit of the ripper ecosystem (whipper stalled since 2021; cyanrip the active successor) and the contribute-vs-integrate-vs-fork decision + a phased `CyanripImpl` migration plan. Backs PLANNING.md KDD-18. |
+| [`offset-investigation-2026-06.md`](offset-investigation-2026-06.md) | Investigation + refactor of the read-offset subsystem: why whipper's `offset find` is unreliable, and the AccurateRip offset-by-drive-model lookup that replaces it (`adapters/accuraterip_offsets.py`). Lists what's hardware/data-gated (full DriveOffsets.bin import). |
 
 ## Where the rest of the project context lives
 

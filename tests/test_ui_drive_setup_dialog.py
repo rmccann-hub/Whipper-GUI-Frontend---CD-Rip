@@ -59,6 +59,30 @@ def test_manual_offset_prefilled_from_current(qapp: QApplication) -> None:
     assert dialog._offset_spin.value() == -12
 
 
+def test_known_offset_prefills_spinbox(qapp: QApplication) -> None:
+    # The model-looked-up offset is the primary path: it must pre-fill the
+    # spinbox (and take precedence over current_offset) so the user can save
+    # it in one click without a disc.
+    dialog = DriveSetupDialog(
+        _StubBackend(),
+        "/dev/sr0",
+        current_offset=0,
+        known_offset=667,
+        drive_label="PIONEER BD-RW BDR-209D",
+    )
+    assert dialog._offset_spin.value() == 667
+
+
+def test_known_offset_save_emits_that_value(qapp: QApplication) -> None:
+    dialog = DriveSetupDialog(
+        _StubBackend(), "/dev/sr0", known_offset=667, drive_label="PIONEER BDR-209D"
+    )
+    captured: list[int] = []
+    dialog.manual_offset_saved.connect(captured.append)
+    dialog._save_offset_button.click()
+    assert captured == [667]
+
+
 def test_on_finished_renders_success(qapp: QApplication) -> None:
     dialog = _dialog(qapp)
     dialog._on_finished(

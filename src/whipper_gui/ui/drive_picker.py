@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from whipper_gui.adapters.whipper_backend import WhipperBackend, WhipperError
+from whipper_gui.parsers.drive_list import DriveDescriptor
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +56,10 @@ class DrivePicker(QWidget):
     ) -> None:
         super().__init__(parent)
         self._backend: WhipperBackend = backend
+        # Device path -> full descriptor, so callers can recover the
+        # selected drive's vendor/model (e.g. for the offset lookup), not
+        # just its /dev node.
+        self._by_device: dict[str, DriveDescriptor] = {}
 
         layout = QHBoxLayout(self)
         # Zero margins so the row sits flush inside the parent's
@@ -88,6 +93,7 @@ class DrivePicker(QWidget):
         user can fix the path in Settings and refresh again.
         """
         previous_device: str | None = self.current_device()
+        self._by_device = {}
 
         try:
             drives = self._backend.list_drives()
@@ -121,6 +127,7 @@ class DrivePicker(QWidget):
         for i, drive in enumerate(drives):
             label = f"{drive.vendor.strip()} {drive.model.strip()} ({drive.device})"
             self._combo.addItem(label, drive.device)
+            self._by_device[drive.device] = drive
             if drive.device == previous_device:
                 restore_index = i
 
@@ -142,6 +149,18 @@ class DrivePicker(QWidget):
         self._combo.clear()
         self._combo.addItem(f"(error: {message})", None)
         self._combo.blockSignals(False)
+
+    def current_drive(self) -> DriveDescriptor | None:
+        """The full descriptor (vendor/model/offset) of the selected drive.
+
+        None when nothing is selected or the dropdown is showing an error /
+        no-drives placeholder. Lets callers look the drive's offset up by
+        model without re-running `drive list`.
+        """
+        device = self.current_device()
+        if device is None:
+            return None
+        return self._by_device.get(device)
 
     def current_device(self) -> str | None:
         """The device path of the currently selected drive, or None."""

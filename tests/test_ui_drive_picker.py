@@ -312,3 +312,35 @@ def test_refresh_button_click_re_invokes_backend(
     assert backend.list_calls == 1
     picker._refresh_button.click()
     assert backend.list_calls == 2
+
+
+# --- current_drive() (used for the offset-by-model lookup) ----------------
+
+
+def test_current_drive_returns_selected_descriptor(qapp: QApplication) -> None:
+    backend = _FakeBackend()
+    backend.set_drives([_drive("/dev/sr0", vendor="PIONEER", model="BD-RW  BDR-209D")])
+    picker = DrivePicker(backend)
+    picker.refresh()
+
+    drive = picker.current_drive()
+    assert drive is not None
+    assert drive.vendor == "PIONEER"
+    assert drive.model == "BD-RW  BDR-209D"
+    assert drive.device == "/dev/sr0"
+
+
+def test_current_drive_none_when_no_drives(qapp: QApplication) -> None:
+    backend = _FakeBackend()
+    backend.set_drives([])
+    picker = DrivePicker(backend)
+    picker.refresh()
+    assert picker.current_drive() is None
+
+
+def test_current_drive_none_on_backend_error(qapp: QApplication) -> None:
+    backend = _FakeBackend()
+    backend.raise_on_list(WhipperError("boom"))
+    picker = DrivePicker(backend)
+    picker.refresh()
+    assert picker.current_drive() is None
