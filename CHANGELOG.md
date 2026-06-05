@@ -1,11 +1,21 @@
 # Changelog
 
-All notable changes to Whipper GUI are recorded here. This project adheres to
-[Semantic Versioning](https://semver.org/). Dates are ISO-8601 (YYYY-MM-DD).
+**This is the single, authoritative record of all notable changes to Whipper
+GUI** — add an entry to `[Unreleased]` in the *same commit* as any change.
+Format follows [Keep a Changelog](https://keepachangelog.com/); the project
+adheres to [Semantic Versioning](https://semver.org/); dates are ISO-8601
+(YYYY-MM-DD). The version itself is single-sourced from
+`src/whipper_gui/__init__.py` (`__version__`); at release time the `[Unreleased]`
+entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
+`PLANNING.md` KDDs and the CLAUDE.md session log — not here.)
 
 ## [Unreleased]
 
 ### Added
+- **Ruff linter + formatter.** Adopted `ruff` (config in `pyproject.toml`:
+  rules `E,F,W,I,B,UP`, `E501` off; `ruff>=0.15` in the `dev` extra) with a
+  parallel `lint` job in CI running `ruff check` + `ruff format --check`. Fixed
+  all findings and raised coverage; the suite is now 525 tests.
 - **CTDB verify (Phase 1 — library + validation script).** Clean-room (KDD-16)
   CUETools Database lookup client (`adapters/ctdb_client.py`) and verify logic
   (`whipper_gui/ctdb/`), plus a standalone `scripts/ctdb_verify.py` to validate
@@ -23,6 +33,12 @@ All notable changes to Whipper GUI are recorded here. This project adheres to
   Trusted Publishing (OIDC) — no stored token. One-time PyPI-side setup is
   documented in the workflow header. It's a separate workflow from
   `release.yml`, so a PyPI misconfiguration can't block the AppImage release.
+
+### Fixed
+- **Drive-setup wizard:** the manual read-offset spinbox (and its up/down
+  arrows) and the **Save offset** button are now locked while detection is
+  running, so a value can't be edited/saved mid-detection and race what whipper
+  writes. They re-enable when detection finishes.
 
 ## [0.1.0] — 2026-06-01
 
