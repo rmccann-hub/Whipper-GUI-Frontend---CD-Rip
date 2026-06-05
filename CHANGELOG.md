@@ -45,14 +45,19 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   `release.yml`, so a PyPI misconfiguration can't block the AppImage release.
 
 ### Added
-- **Read offset is now looked up by drive model (AccurateRip list).** whipper's
-  `offset find` is unreliable (it failed on a Pioneer BDR-209D even with a disc
-  that's in AccurateRip). The drive-setup wizard now resolves the offset the way
-  EAC/dBpoweramp do — by the drive's vendor+model — and pre-fills it for one-click
-  save, **with no disc and no whipper probe**. New `adapters/accuraterip_offsets.py`
-  (`OffsetDatabase`), extensible via `~/.config/whipper-gui/drive_offsets.csv`;
-  whipper's `offset find` is kept as optional verification. The tested Pioneer
-  BDR-209D resolves to +667 instantly. See `docs/offset-investigation-2026-06.md`.
+- **Read offset is now looked up by drive model (full AccurateRip list, bundled).**
+  whipper's `offset find` is unreliable (it failed on a Pioneer BDR-209D even with
+  a disc that's in AccurateRip). The drive-setup wizard now resolves the offset the
+  way EAC/dBpoweramp do — by the drive's vendor+model — and pre-fills it for
+  one-click save, **with no disc and no whipper probe**. The **entire AccurateRip
+  drive-offset list (~4,800 drives)** is imported and bundled in-code
+  (`adapters/accuraterip_offsets_data.py`, a ~21 KB gzip blob), so it works offline
+  for any drive — refreshable via `scripts/update_drive_offsets.py` (which validates
+  the parse against the known BDR-209D = +667 before writing). Layered: user CSV
+  (`~/.config/whipper-gui/drive_offsets.csv`) > curated overrides > bundled list.
+  whipper's `offset find` is kept as optional verification. New
+  `adapters/accuraterip_offsets.py` (`OffsetDatabase`). See
+  `docs/offset-investigation-2026-06.md`.
 
 ### Fixed
 - **The app no longer vanishes silently on a startup error.** Drive listing

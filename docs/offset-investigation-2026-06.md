@@ -59,38 +59,45 @@ A wrong offset silently corrupts a rip, so the lookup only ever **suggests**:
 it pre-fills the field and the user clicks Save (and can cross-check the value
 against the accuraterip.com link already in the dialog). Nothing auto-applies.
 
-## Data: curated now, full list is the gated part
+## Data: the full AccurateRip list is now bundled (works for any drive)
 
-`_CURATED_OFFSETS` is a small, **high-confidence** table kept in code (not as
-packaged data — same AppImage pitfall that put `help_content` in code). It is
-led by the Pioneer BD family (`BDR-209D = +667`, confirmed on real hardware).
-It is intentionally small because shipping a wrong value is harmful.
+The canonical AccurateRip list — `DriveOffsets.bin` from
+`accuraterip.com/accuraterip/DriveOffsets.bin` — is **imported and bundled**, so
+lookup works for ~4,800 drives **offline**, not just the tested one.
 
-**Extension without code changes:** a user can drop the full AccurateRip list
-as `~/.config/whipper-gui/drive_offsets.csv` (`name,offset` rows); it overlays
-and overrides the curated seed.
+- **Format (reverse-engineered + validated):** a flat array of 69-byte records,
+  each `<int16 LE signed offset><67-byte null-padded ASCII name>`. The big risk
+  with a binary format is a silent misparse, so the importer has a **validation
+  gate**: it refuses to write the data module unless the Pioneer BDR-209D
+  resolves to the known-correct **+667**. (That sentinel passed; spot-checks
+  across LG/ASUS/Plextor/Optiarc are sane too.)
+- **How it's stored:** `scripts/update_drive_offsets.py` parses the `.bin`,
+  normalizes names with the *same* `normalize_drive_name` the lookup uses (so
+  keys match whipper's vendor+model), drops names that normalize to conflicting
+  offsets (never guess), and writes `adapters/accuraterip_offsets_data.py` — a
+  gzip+base64 blob (~21 KB compressed). It's a **Python module, not packaged
+  data**, so it ships reliably in the AppImage (dodging the `help_content`
+  pitfall) and needs no network at runtime.
+- **Refresh:** re-run `python3 scripts/update_drive_offsets.py` to pull a fresh
+  list. (This is why a live runtime query is unnecessary: the list changes
+  slowly, the bundled copy is offline + instant, and refreshing is one command.)
+- **Layering:** user CSV (`~/.config/whipper-gui/drive_offsets.csv`) > a tiny
+  in-code `_CURATED_OFFSETS` (hand-verified overrides) > the bundled full list.
 
-## What's needed to do better in the future (hardware/data-gated)
+## What's needed to do better in the future
 
-1. **Import the full AccurateRip offset list (~tens of thousands of drives).**
-   The canonical source is the binary `DriveOffsets.bin` at
-   `accuraterip.com/accuraterip/DriveOffsets.bin`. A parser for it could either
-   ship a generated CSV at build time or read the `.bin` at runtime. *Gated*
-   because the binary format must be confirmed bit-exactly against a known drive
-   before we trust it to write offsets — and that needs real hardware + a couple
-   of known-good drives to validate against. Until then the curated table +
-   user CSV cover the tested hardware.
-2. **Confirm offsets for drives other than the Pioneer family** on real
-   hardware before adding them to the curated table. Each unverified entry is a
-   silent-corruption risk; the bar for the in-code table is "verified or
-   universally published," everything else goes through the user CSV.
-3. **Auto-offer on drive detection.** Once a drive is selected and its offset is
-   known, the GUI could pre-stage the value even before the wizard is opened
-   (still behind a confirm). Deferred to keep a human in the loop while the data
-   set is small.
-4. **A model→offset confidence/source field.** When the full list lands,
-   recording where each offset came from (AccurateRip submission count) would let
-   the UI flag low-confidence drives. Nice-to-have, not required.
+1. **Periodically refresh the bundled list** (`scripts/update_drive_offsets.py`).
+   The validation gate guards against a format change silently corrupting it.
+2. **Confirm exotic offsets on real hardware.** The bundled values are
+   AccurateRip's community data; the tested Pioneer is hardware-confirmed. Any
+   drive a user finds wrong can be corrected via the user CSV, and genuinely
+   verified values can graduate into `_CURATED_OFFSETS`.
+3. **A confidence/source field.** AccurateRip's per-drive submission count isn't
+   in `DriveOffsets.bin`; if a future source exposes it, the UI could flag
+   low-confidence drives. Nice-to-have.
+4. **Real from-scratch wizard run** remains the final proof of the end-to-end
+   UX (the lookup + parse are unit-tested and the +667 sentinel is validated,
+   but a live run on hardware confirms the wiring).
 
 ## Tests added
 

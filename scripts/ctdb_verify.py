@@ -73,8 +73,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Matched CRC:{result.matched_crc:08x}")
     print(f"Detail:     {result.message}")
     if result.verdict is Verdict.MATCH and not result.trustworthy:
-        print("\nNOTE: a MATCH here is EXPERIMENTAL until the CRC algorithm is "
-              "confirmed bit-exact on hardware (KDD-16).")
+        print(
+            "\nNOTE: a MATCH here is EXPERIMENTAL until the CRC algorithm is "
+            "confirmed bit-exact on hardware (KDD-16)."
+        )
     # Exit 0 for a clean run regardless of verdict — the verdict is the data.
     return 0
 

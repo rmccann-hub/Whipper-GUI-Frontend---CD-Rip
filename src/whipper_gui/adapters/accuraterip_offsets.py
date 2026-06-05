@@ -52,13 +52,23 @@ def normalize_drive_name(vendor: str, model: str) -> str:
     output is ``BD-RW  BDR-209D``), so collapsing whitespace is essential.
 
     Steps: join vendor+model, drop a leading ``ATAPI`` tag some drives
-    prepend, uppercase, collapse any whitespace run to one space, strip.
+    prepend, uppercase, collapse AccurateRip's ``" - "`` vendor/model
+    separator (whipper reports the two as separate fields with no dash),
+    drop a leading ``"- "`` (vendorless entries), and collapse whitespace.
+    AccurateRip stores e.g. ``"PIONEER  - BD-RW   BDR-209D"`` while whipper
+    reports vendor ``"PIONEER"`` + model ``"BD-RW  BDR-209D"`` — after this
+    both become ``"PIONEER BD-RW BDR-209D"``.
     """
-    combined = f"{vendor} {model}".strip()
+    combined = f"{vendor} {model}"
     # Some drives report "ATAPI   iHAS124   B" etc.; the ATAPI tag isn't
     # part of AccurateRip's name.
     combined = re.sub(r"^\s*ATAPI\b", " ", combined, flags=re.IGNORECASE)
     combined = combined.upper()
+    # AccurateRip's "<vendor>  - <model>" separator (spaces around a hyphen).
+    # In-token hyphens like BD-RW / BDR-209D have no surrounding spaces, so
+    # they're untouched.
+    combined = re.sub(r"\s+-\s+", " ", combined)
+    combined = re.sub(r"^\s*-\s+", "", combined)  # vendorless: leading "- "
     combined = re.sub(r"\s+", " ", combined).strip()
     return combined
 
@@ -102,12 +112,16 @@ class OffsetDatabase:
 
     @classmethod
     def load_default(cls, user_path: Path = USER_OFFSETS_PATH) -> OffsetDatabase:
-        """Curated table, overlaid with the user CSV if present.
+        """The full bundled AccurateRip list, overlaid with curated fixes and
+        the user CSV (in that precedence: user > curated > bundled).
 
-        The user file wins on conflicts, so dropping the full official list
-        in place both extends and corrects the curated seed.
+        The bundled list (`accuraterip_offsets_data`, ~4.8k drives) covers
+        essentially every drive offline. `_CURATED_OFFSETS` is a tiny set of
+        hand-verified values that can override a bundled entry; the user CSV
+        overrides everything.
         """
-        entries = dict(_CURATED_OFFSETS)
+        entries = _load_bundled()
+        entries.update(_CURATED_OFFSETS)
         entries.update(_load_user_csv(user_path))
         return cls(entries)
 
@@ -132,6 +146,39 @@ class OffsetDatabase:
             if len(matches) == 1:
                 return next(iter(matches))
         return None
+
+
+# --- Bundled full list ------------------------------------------------------
+
+
+def _load_bundled() -> dict[str, int]:
+    """Decode the bundled AccurateRip list (gzip+base64 in-code blob).
+
+    Keys are already normalized at generation time (same `normalize_drive_name`
+    the lookup uses), so loading is just decompress + split. Returns an empty
+    dict if the data module is somehow unavailable — the curated table then
+    still covers the tested hardware.
+    """
+    try:
+        import base64
+        import gzip
+
+        from whipper_gui.adapters import accuraterip_offsets_data as _data
+
+        csv = gzip.decompress(base64.b64decode(_data._BLOB)).decode("utf-8")
+    except Exception:  # noqa: BLE001 — never let a bad blob break drive setup
+        log.exception("could not load bundled drive-offset list")
+        return {}
+
+    entries: dict[str, int] = {}
+    for line in csv.splitlines():
+        key, _, value = line.partition(",")
+        if key and value:
+            try:
+                entries[key] = int(value)
+            except ValueError:
+                continue
+    return entries
 
 
 # --- CSV loading ------------------------------------------------------------

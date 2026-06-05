@@ -54,6 +54,23 @@ def test_normalize_strips_atapi_prefix() -> None:  # hard
     assert normalize_drive_name("ATAPI", "iHAS124   B") == "IHAS124 B"
 
 
+def test_normalize_collapses_vendor_model_separator() -> None:  # hard
+    # AccurateRip stores "PIONEER  - BD-RW   BDR-209D"; whipper reports vendor
+    # "PIONEER" + model "BD-RW  BDR-209D". They must normalize identically.
+    accuraterip = normalize_drive_name("", "PIONEER  - BD-RW   BDR-209D")
+    whipper = normalize_drive_name("PIONEER", "BD-RW  BDR-209D")
+    assert accuraterip == whipper == "PIONEER BD-RW BDR-209D"
+
+
+def test_normalize_strips_leading_dash() -> None:  # edge — vendorless entries
+    assert normalize_drive_name("", "- 16X12 DVD DUAL") == "16X12 DVD DUAL"
+
+
+def test_normalize_keeps_in_token_hyphens() -> None:  # edge — not a separator
+    # The hyphens in BD-RW / BDR-209D have no surrounding spaces; keep them.
+    assert normalize_drive_name("PIONEER", "BDR-209D") == "PIONEER BDR-209D"
+
+
 def test_normalize_handles_empty() -> None:  # edge
     assert normalize_drive_name("", "") == ""
 
@@ -147,6 +164,24 @@ def test_default_db_knows_user_pioneer_bdr209d() -> None:
     table, with no user CSV."""
     db = OffsetDatabase.load_default(user_path=Path("/nonexistent.csv"))
     assert db.lookup("PIONEER", "BD-RW  BDR-209D") == 667
+
+
+# --- Bundled full list ----------------------------------------------------
+
+
+def test_bundled_db_is_loaded_and_large() -> None:
+    """The full AccurateRip list (~4.8k drives) is bundled in-code, so lookup
+    works offline for drives other than the tested one."""
+    db = OffsetDatabase.load_default(user_path=Path("/nonexistent.csv"))
+    assert db.size > 4000
+
+
+def test_bundled_resolves_a_spread_of_drives() -> None:
+    db = OffsetDatabase.load_default(user_path=Path("/nonexistent.csv"))
+    # Stable, widely-published values across vendors (golden checks).
+    assert db.lookup("PIONEER", "BD-RW  BDR-209D") == 667
+    assert db.lookup("PLEXTOR", "CD-R   PREMIUM") == 30
+    assert db.lookup("HL-DT-ST", "BD-RE  WH16NS40") == 6
 
 
 # --- Property: lookup never raises ----------------------------------------
