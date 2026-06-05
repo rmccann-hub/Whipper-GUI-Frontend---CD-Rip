@@ -1068,6 +1068,60 @@ def test_maybe_offer_host_setup_skips_when_already_prompted(
     assert opened == []
 
 
+# --- First-run AppImage integration offer --------------------------------
+
+
+def test_no_integration_offer_when_not_appimage(teardown_threads, monkeypatch) -> None:
+    import whipper_gui.appimage_integration as ai
+
+    monkeypatch.setattr(ai, "appimage_path", lambda: None)
+    window = teardown_threads()
+    integrated: list[bool] = []
+    monkeypatch.setattr(ai, "integrate", lambda *a, **k: integrated.append(True))
+    window._maybe_offer_appimage_integration()  # must be a no-op
+    assert integrated == []
+
+
+def test_integration_offer_runs_on_yes(teardown_threads, monkeypatch, tmp_path) -> None:
+    import whipper_gui.appimage_integration as ai
+
+    appimage = tmp_path / "whipper-gui-x86_64.AppImage"
+    appimage.write_bytes(b"x")
+    monkeypatch.setattr(ai, "appimage_path", lambda: appimage)
+    monkeypatch.setattr(ai, "is_integrated", lambda *_a, **_k: False)
+    saved: list[Config] = []
+    window = teardown_threads(
+        config=Config(appimage_integration_prompted=False), save_cfg=saved.append
+    )
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    integrated: list[Path] = []
+    monkeypatch.setattr(ai, "integrate", lambda p: integrated.append(p))
+
+    window._maybe_offer_appimage_integration()
+
+    assert window._config.appimage_integration_prompted is True
+    assert saved and saved[-1].appimage_integration_prompted is True
+    assert integrated == [appimage]
+
+
+def test_integration_offer_skips_when_already_prompted(
+    teardown_threads, monkeypatch, tmp_path
+) -> None:
+    import whipper_gui.appimage_integration as ai
+
+    appimage = tmp_path / "whipper-gui-x86_64.AppImage"
+    appimage.write_bytes(b"x")
+    monkeypatch.setattr(ai, "appimage_path", lambda: appimage)
+    window = teardown_threads(config=Config(appimage_integration_prompted=True))
+    integrated: list[bool] = []
+    monkeypatch.setattr(ai, "integrate", lambda *a, **k: integrated.append(True))
+    window._maybe_offer_appimage_integration()
+    assert integrated == []
+
+
 def _patch_force_stop(monkeypatch) -> list[dict]:
     """Record force-stop calls instead of touching a real drive/container.
 

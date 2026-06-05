@@ -114,6 +114,10 @@ class Config:
     # lives on Tools → Set up Whipper GUI….
     host_setup_prompted: bool = False
 
+    # Set once we've offered (on first AppImage run) to add Whipper GUI to the
+    # applications menu. One-time + dismissible; no-op on source/pipx installs.
+    appimage_integration_prompted: bool = False
+
     # Continue ripping a CD-R (burned disc). Whipper refuses by default
     # ("inserted disc seems to be a CD-R, --cdr not passed") because in an
     # archival workflow a burned disc is usually an accident. Off by

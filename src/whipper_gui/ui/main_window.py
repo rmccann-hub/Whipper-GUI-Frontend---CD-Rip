@@ -704,10 +704,51 @@ class MainWindow(QMainWindow):
         drive-calibration offer make sense. Deferred to the event loop, so in
         tests (no exec loop) neither fires — both are unit-tested directly.
         """
+        # AppImage menu integration is independent of the host/drive state —
+        # offer it first (it's a no-op on source/pipx installs and when already
+        # integrated), so a double-clicked AppImage becomes a real menu app.
+        self._maybe_offer_appimage_integration()
         if not self._host_stack_ready():
             self._maybe_offer_host_setup()
             return
         self._maybe_offer_drive_setup()
+
+    def _maybe_offer_appimage_integration(self) -> None:
+        """One-time offer (first AppImage run) to add a menu entry + icon."""
+        from whipper_gui import appimage_integration as ai
+
+        appimage = ai.appimage_path()
+        if appimage is None:  # not running from an AppImage — nothing to do
+            return
+        if self._config.appimage_integration_prompted or ai.is_integrated(appimage):
+            return
+        self._config.appimage_integration_prompted = True
+        self._save_config(self._config)
+        choice = QMessageBox.question(
+            self,
+            "Add to your applications menu?",
+            "Add Whipper GUI to your applications menu so you can launch it "
+            "like any installed app (instead of finding this file each time)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            ai.integrate(appimage)
+            QMessageBox.information(
+                self,
+                "Added to menu",
+                "Whipper GUI is now in your applications menu.",
+            )
+        except Exception:  # noqa: BLE001 — integration is a convenience
+            log.exception("AppImage integration failed")
+            QMessageBox.warning(
+                self,
+                "Couldn't add to menu",
+                "Adding the menu entry didn't work, but the app still runs "
+                "normally from this file.",
+            )
 
     def _host_stack_ready(self) -> bool:
         """True if the whipper binary is present (the container stack is set up)."""

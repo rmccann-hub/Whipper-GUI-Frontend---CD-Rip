@@ -45,6 +45,14 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   `release.yml`, so a PyPI misconfiguration can't block the AppImage release.
 
 ### Added
+- **AppImage self-integration on first run — no terminal (KDD-17, step 2).** The
+  first time the AppImage runs, it offers to add Whipper GUI to your
+  applications menu (writes a `.desktop` entry pointing at the AppImage, drops
+  the icon, refreshes the menu caches) and makes the AppImage executable — so
+  after the first double-click it launches from the menu like any installed
+  app. Supersedes the manual `install-appimage.sh` for the common case; no-op
+  on source/pipx installs. New `appimage_integration.py`; one-time/dismissible
+  (`Config.appimage_integration_prompted`).
 - **First-run host setup from the GUI — no terminal (KDD-17, step 1).** A new
   **Tools → Set up Whipper GUI…** wizard (also offered automatically on first
   launch when whipper isn't installed yet) does what `setup-host.sh` did by
