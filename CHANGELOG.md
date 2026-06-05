@@ -60,6 +60,12 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   `docs/offset-investigation-2026-06.md`.
 
 ### Fixed
+- **Ripping without a configured read offset now stops with a clear popup**
+  instead of failing cryptically inside whipper. If no offset is set (neither
+  whipper.conf nor the GUI's `--offset` override), Start shows a warning that
+  explains an accurate offset is required and offers to open the drive-setup
+  wizard — which fills the offset in automatically when the drive model is
+  known, or detects it from a CD that's in the AccurateRip database.
 - **The app no longer vanishes silently on a startup error.** Drive listing
   (and the rest of startup) ran after the window was shown but outside any
   guard, so an unexpected error — e.g. the drive-list parser choking on

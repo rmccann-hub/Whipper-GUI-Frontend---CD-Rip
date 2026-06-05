@@ -322,6 +322,11 @@ def test_rip_requested_blocked_when_track_table_invalid(
     """Empty track table fails validation; a warning is shown and no
     rip worker is spun up."""
     window = teardown_threads()
+    import whipper_gui.ui.main_window as mw
+
+    # Offset IS configured here so we exercise the track-table guard, not the
+    # read-offset guard that now precedes it.
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
 
     warnings: list[tuple[str, str]] = []
 
@@ -370,6 +375,9 @@ def test_rip_requested_in_unknown_mode_skips_validation(
 
     backend.rip = fake_rip  # type: ignore[assignment]
     window = teardown_threads(backend=backend)
+    import whipper_gui.ui.main_window as mw
+
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
 
     from whipper_gui.workers.rip_worker import RipParameters
 
@@ -389,6 +397,45 @@ def test_rip_requested_in_unknown_mode_skips_validation(
     if window._rip_thread is not None and window._rip_thread.isRunning():
         window._rip_thread.quit()
         window._rip_thread.wait(2000)
+
+
+def test_rip_requested_blocked_when_no_read_offset(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No read offset configured → the rip is blocked with a warning that
+    points at the drive-setup wizard, no worker is started, and answering
+    Yes opens the wizard."""
+    import whipper_gui.ui.main_window as mw
+
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: False)
+    window = teardown_threads()
+
+    warnings: list[tuple[str, str]] = []
+
+    def fake_warning(parent: Any, title: str, text: str, *args: Any) -> Any:
+        warnings.append((title, text))
+        return QMessageBox.StandardButton.Yes  # "open the wizard"
+
+    monkeypatch.setattr("whipper_gui.ui.main_window.QMessageBox.warning", fake_warning)
+    opened: list[bool] = []
+    monkeypatch.setattr(window, "_on_drive_setup", lambda: opened.append(True))
+
+    from whipper_gui.workers.rip_worker import RipParameters
+
+    window._on_rip_requested(
+        RipParameters(
+            drive="/dev/sr0",
+            release_id="x",
+            output_dir=Path("/tmp"),
+            track_template="t",
+            disc_template="d",
+        )
+    )
+
+    assert warnings, "a warning should be shown when no offset is configured"
+    assert "offset" in (warnings[0][0] + warnings[0][1]).lower()
+    assert window._rip_worker is None  # the rip did not start
+    assert opened == [True]  # answering Yes opened the wizard
 
 
 # --- closeEvent ----------------------------------------------------------
@@ -792,6 +839,9 @@ def test_unknown_rip_folder_uses_album_fields(
 
     backend.rip = lambda **kw: _StubHandle()  # type: ignore[assignment]
     window = teardown_threads(backend=backend)
+    import whipper_gui.ui.main_window as mw
+
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
     window._track_table._album_artist_edit.setText("jimmy2")
     window._track_table._album_title_edit.setText("for")
 
@@ -816,7 +866,7 @@ def test_unknown_rip_folder_uses_album_fields(
 
 
 def test_unknown_rip_folder_falls_back_when_album_blank(
-    teardown_threads,
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     backend = _FakeBackend()
 
@@ -832,6 +882,9 @@ def test_unknown_rip_folder_falls_back_when_album_blank(
 
     backend.rip = lambda **kw: _StubHandle()  # type: ignore[assignment]
     window = teardown_threads(backend=backend)
+    import whipper_gui.ui.main_window as mw
+
+    monkeypatch.setattr(mw, "is_offset_configured", lambda _override: True)
     # album fields left blank
     from whipper_gui.workers.rip_worker import RipParameters
 

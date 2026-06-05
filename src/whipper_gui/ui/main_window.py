@@ -397,6 +397,32 @@ class MainWindow(QMainWindow):
 
     def _on_rip_requested(self, params: RipParameters) -> None:
         """User clicked Start. Validate, then start the worker thread."""
+        # A read offset is mandatory: whipper refuses to rip without one (and
+        # fails with a cryptic error), and an accurate offset is what makes the
+        # rip bit-perfect. If neither whipper.conf nor our --offset override has
+        # one, stop here and point the user at the drive-setup wizard rather
+        # than letting the rip start and fail. The wizard pre-fills the offset
+        # when the drive model is known; otherwise it's found from a CD that's
+        # in the AccurateRip database.
+        if not is_offset_configured(self._config.override_read_offset):
+            answer = QMessageBox.warning(
+                self,
+                "Set up your drive first",
+                "No read offset is configured for your drive, so ripping can't "
+                "start — an accurate read offset is what makes the rip "
+                "bit-perfect.\n\n"
+                "Open Tools → Set up drive… — it fills in your drive's "
+                "offset automatically if the model is known. If it isn't, insert "
+                "a CD that's in the AccurateRip database and click Detect to find "
+                "the offset, then Save.\n\n"
+                "Open the drive-setup wizard now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self._on_drive_setup()
+            return
+
         # Only validate the track table for non-unknown rips — placeholder
         # tags will be applied after the fact in unknown mode.
         if not params.unknown:
