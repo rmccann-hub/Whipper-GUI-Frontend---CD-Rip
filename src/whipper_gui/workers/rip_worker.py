@@ -96,6 +96,11 @@ _NO_METADATA_MARKERS: tuple[str, ...] = (
     "unable to retrieve disc metadata",
 )
 
+# whipper exhausts its retries on a track it can't read consistently (a
+# scratched/dirty disc, or the cd-paranoia >587-offset upstream bug). We turn
+# this into an actionable message instead of a bare "Rip failed".
+_TRACK_GIVEUP_RE = re.compile(r"giving up on track (?P<track>\d+)")
+
 
 class RipWorker(QObject):
     """QObject worker that owns a rip subprocess for its lifetime.
@@ -154,12 +159,21 @@ class RipWorker(QObject):
         # can heal by retrying as an unknown-album rip. Only meaningful when
         # this rip wasn't already unknown.
         self._needs_unknown_retry: bool = False
+        # A user-facing explanation set when a known fatal pattern is seen
+        # (e.g. whipper giving up on an unreadable track). "" if none.
+        self._failure_hint: str = ""
 
     @property
     def needs_unknown_retry(self) -> bool:
         """True if the rip failed because whipper couldn't fetch online
         metadata (and this wasn't already an unknown-album rip)."""
         return self._needs_unknown_retry
+
+    @property
+    def failure_hint(self) -> str:
+        """An actionable failure explanation, or "" if the failure was generic.
+        Set when whipper gives up on an unreadable track."""
+        return self._failure_hint
 
     # --- Slots ---
 
@@ -206,6 +220,17 @@ class RipWorker(QObject):
                     m in line for m in _NO_METADATA_MARKERS
                 ):
                     self._needs_unknown_retry = True
+                giveup = _TRACK_GIVEUP_RE.search(line)
+                if giveup:
+                    track = giveup.group("track")
+                    self._failure_hint = (
+                        f"Track {track} couldn't be read after repeated tries. "
+                        "The disc may be scratched or dirty — clean it and try "
+                        "again. (Your drive's read offset of 667 is above the "
+                        "value where whipper's cd-paranoia has a known bug, "
+                        "which can cause this too.) To rip the readable tracks "
+                        "anyway, turn on “Keep going” in Settings."
+                    )
                 # Status text first (covers the pre-track disc scan and
                 # the encode/tag sub-phases), then the numeric progress
                 # that drives the bar.

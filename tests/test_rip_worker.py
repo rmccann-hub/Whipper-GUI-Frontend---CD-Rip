@@ -245,6 +245,25 @@ def test_no_unknown_retry_on_clean_rip(qapp: QApplication, tmp_path: Path) -> No
     assert worker.needs_unknown_retry is False
 
 
+def test_failure_hint_set_on_track_giveup(qapp: QApplication, tmp_path: Path) -> None:
+    """An unreadable track yields an actionable hint, not a bare failure."""
+    handle = _FakeHandle(
+        lines=["CRITICAL:whipper.command.cd:giving up on track 3 after 5 times"],
+        exit_code=1,
+    )
+    worker = RipWorker(_FakeBackend(handle=handle), _params(tmp_path))
+    worker.start_rip()
+    assert "Track 3" in worker.failure_hint
+    assert "Keep going" in worker.failure_hint
+
+
+def test_no_failure_hint_on_clean_rip(qapp: QApplication, tmp_path: Path) -> None:
+    handle = _FakeHandle(lines=["Reading TOC 100 %"], exit_code=0)
+    worker = RipWorker(_FakeBackend(handle=handle), _params(tmp_path))
+    worker.start_rip()
+    assert worker.failure_hint == ""
+
+
 # --- Progress parsing -----------------------------------------------------
 
 

@@ -582,6 +582,27 @@ def test_auto_heal_retries_as_unknown_on_no_metadata_failure(
     assert retried[0].release_id == ""  # no release-id → no network needed
 
 
+def test_rip_finished_shows_actionable_failure_hint(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    window = teardown_threads()
+    window._rip_worker = SimpleNamespace(  # type: ignore[assignment]
+        needs_unknown_retry=False,
+        failure_hint="Track 3 couldn't be read — clean the disc.",
+    )
+    window._active_rip_params = None
+    window._rip_cancelled = False
+    window._auto_retry_done = True
+    statuses: list[str] = []
+    monkeypatch.setattr(window._rip_progress, "set_status", statuses.append)
+
+    window._on_rip_finished(False, "")
+
+    assert any("Track 3" in s for s in statuses)
+
+
 def test_no_auto_heal_when_not_flagged(
     teardown_threads, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -590,7 +611,9 @@ def test_no_auto_heal_when_not_flagged(
     from whipper_gui.workers.rip_worker import RipParameters
 
     window = teardown_threads()
-    window._rip_worker = SimpleNamespace(needs_unknown_retry=False)  # type: ignore[assignment]
+    window._rip_worker = SimpleNamespace(  # type: ignore[assignment]
+        needs_unknown_retry=False, failure_hint=""
+    )
     window._active_rip_params = RipParameters(
         drive="/dev/sr0",
         release_id="mbid",

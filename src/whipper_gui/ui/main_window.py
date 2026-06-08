@@ -635,7 +635,10 @@ class MainWindow(QMainWindow):
         elif self._rip_cancelled:
             status = "Rip cancelled by user. Partial files may remain."
         else:
-            status = "Rip failed."
+            # Prefer an actionable hint (e.g. an unreadable track) over the
+            # bare "Rip failed", so the user knows what to do next.
+            hint = self._rip_worker.failure_hint if self._rip_worker else ""
+            status = hint or "Rip failed."
         self._rip_progress.set_status(status)
 
         if log_path:

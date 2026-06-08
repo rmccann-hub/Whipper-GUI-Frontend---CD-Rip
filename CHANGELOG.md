@@ -52,6 +52,13 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   CLI paths remain below for testers and developers; Method A notes that
   `install-appimage.sh` is no longer required (self-integration replaces it).
 
+### Changed
+- **Clear, actionable message when a track can't be read.** When whipper gives up
+  on a track after its retries (scratched/dirty disc, or the cd-paranoia
+  >587-offset upstream bug), the status now says which track failed and what to
+  do — clean the disc, or turn on "Keep going" in Settings to rip the readable
+  tracks — instead of a bare "Rip failed".
+
 ### Added
 - **Autonomous heal when the ripper can't reach MusicBrainz.** whipper inside the
   container aborts (`unable to retrieve disc metadata, --unknown argument not
