@@ -138,11 +138,20 @@ def main(argv: list[str] | None = None) -> int:
         backend: WhipperBackend
         if cfg.ripper_backend == "cyanrip":
             from whipper_gui.adapters.cyanrip_backend import CyanripImpl
+            from whipper_gui.paths import CYANRIP_BINARY_DEFAULT
 
+            # Prefer the host-exported absolute path: a desktop-launched GUI
+            # has a minimal PATH that may not include ~/.local/bin (same
+            # lesson as drive_control's absolute-path resolution). Fall back
+            # to a PATH lookup for users with a native cyanrip install.
+            cyanrip_binary: Path | str = (
+                CYANRIP_BINARY_DEFAULT if CYANRIP_BINARY_DEFAULT.exists() else "cyanrip"
+            )
             backend = CyanripImpl(
+                binary_path=cyanrip_binary,
                 working_dir=Path(cfg.working_dir) if cfg.working_dir else None,
             )
-            log.info("using cyanrip backend")
+            log.info("using cyanrip backend (%s)", cyanrip_binary)
         else:
             backend = WhipperHostExportedImpl(
                 binary_path=Path(cfg.whipper_path),

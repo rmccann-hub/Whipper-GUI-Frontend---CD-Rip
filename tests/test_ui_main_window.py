@@ -1260,6 +1260,63 @@ def test_maybe_offer_host_setup_skips_when_already_prompted(
     assert opened == []
 
 
+# --- cyanrip in the host-setup wizard (KDD-18) ----------------------------
+
+
+def test_build_host_setup_includes_cyanrip_per_config(teardown_threads) -> None:
+    """The wizard installs cyanrip only when the cyanrip backend is selected."""
+    window = teardown_threads(config=Config(ripper_backend="cyanrip"))
+    assert window._build_host_setup().include_cyanrip is True
+
+    window = teardown_threads()  # default config → whipper backend
+    assert window._build_host_setup().include_cyanrip is False
+
+
+def test_switch_to_cyanrip_offers_install_when_missing(
+    teardown_threads, monkeypatch
+) -> None:
+    import whipper_gui.deps.host_setup as host_setup
+
+    window = teardown_threads(config=Config(ripper_backend="cyanrip"))
+    monkeypatch.setattr(host_setup, "cyanrip_on_host", lambda: False)
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+    opened: list[bool] = []
+    monkeypatch.setattr(window, "open_host_setup_dialog", lambda: opened.append(True))
+
+    window._maybe_offer_cyanrip_install(old_backend="whipper")
+
+    assert opened == [True]
+
+
+def test_no_cyanrip_offer_when_already_installed(teardown_threads, monkeypatch) -> None:
+    import whipper_gui.deps.host_setup as host_setup
+
+    window = teardown_threads(config=Config(ripper_backend="cyanrip"))
+    monkeypatch.setattr(host_setup, "cyanrip_on_host", lambda: True)
+    opened: list[bool] = []
+    monkeypatch.setattr(window, "open_host_setup_dialog", lambda: opened.append(True))
+
+    window._maybe_offer_cyanrip_install(old_backend="whipper")
+
+    assert opened == []
+
+
+def test_no_cyanrip_offer_when_backend_unchanged(teardown_threads, monkeypatch) -> None:
+    """Re-saving Settings while already on cyanrip must not re-nag."""
+    import whipper_gui.deps.host_setup as host_setup
+
+    window = teardown_threads(config=Config(ripper_backend="cyanrip"))
+    monkeypatch.setattr(host_setup, "cyanrip_on_host", lambda: False)
+    opened: list[bool] = []
+    monkeypatch.setattr(window, "open_host_setup_dialog", lambda: opened.append(True))
+
+    window._maybe_offer_cyanrip_install(old_backend="cyanrip")
+
+    assert opened == []
+
+
 # --- First-run AppImage integration offer --------------------------------
 
 

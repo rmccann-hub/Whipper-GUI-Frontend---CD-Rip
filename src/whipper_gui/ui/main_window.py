@@ -870,11 +870,26 @@ class MainWindow(QMainWindow):
         if choice == QMessageBox.StandardButton.Yes:
             self.open_host_setup_dialog()
 
+    def _build_host_setup(self):
+        """The HostSetup the wizard runs, configured from the current config.
+
+        When the cyanrip backend is selected (KDD-18), the wizard also
+        installs cyanrip into the container (from its COPR — Fedora doesn't
+        package it) and exports it, so switching backends never needs a
+        terminal.
+        """
+        from whipper_gui.deps.host_setup import HostSetup, SubprocessRunner
+
+        return HostSetup(
+            runner=SubprocessRunner(),
+            include_cyanrip=self._config.ripper_backend == "cyanrip",
+        )
+
     def open_host_setup_dialog(self) -> None:
         """Open the host-setup wizard (Tools → Set up Whipper GUI…)."""
         from whipper_gui.ui.host_setup_dialog import HostSetupDialog
 
-        dialog = HostSetupDialog(self)
+        dialog = HostSetupDialog(self, host_setup=self._build_host_setup())
         dialog.setup_finished.connect(self._on_host_setup_finished)
         dialog.exec()
 
@@ -994,6 +1009,7 @@ class MainWindow(QMainWindow):
         # "Re-detect…" next to the read-offset field opens the same wizard.
         dialog.detect_offset_requested.connect(self._on_drive_setup)
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            old_backend = self._config.ripper_backend
             self._config = dialog.to_config()
             # Push the new config into the rip controls so the next rip
             # reflects the edits (output dir, templates, Continue-on-CD-R).
@@ -1002,6 +1018,30 @@ class MainWindow(QMainWindow):
                 self._save_config(self._config)
             except OSError as exc:
                 QMessageBox.warning(self, "Couldn't save settings", f"{exc}")
+            self._maybe_offer_cyanrip_install(old_backend)
+
+    def _maybe_offer_cyanrip_install(self, old_backend: str) -> None:
+        """Offer the setup wizard when the user just switched to cyanrip
+        but cyanrip isn't installed yet — otherwise the new backend would
+        silently fail on the next launch with 'binary not found'."""
+        from whipper_gui.deps import host_setup
+
+        if self._config.ripper_backend != "cyanrip" or old_backend == "cyanrip":
+            return
+        if host_setup.cyanrip_on_host():
+            return
+        choice = QMessageBox.question(
+            self,
+            "Install cyanrip?",
+            "You selected the cyanrip backend, but cyanrip isn't installed "
+            "yet.\n\nRun setup now to install it into the ripping container "
+            "and make it available to this app? (Restart the app afterwards "
+            "for the backend change to take effect.)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice == QMessageBox.StandardButton.Yes:
+            self.open_host_setup_dialog()
 
     def _on_check_dependencies(self) -> None:
         """Run the dependency subsystem with GUI-backed resolvers.

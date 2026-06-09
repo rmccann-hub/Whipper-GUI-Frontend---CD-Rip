@@ -11,8 +11,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from whipper_gui.deps.host_setup import (
+    CYANRIP_COPR_REPO_CONTENT,
+    CYANRIP_COPR_REPO_PATH,
     HostSetup,
     StepStatus,
+    cyanrip_on_host,
     install_argv,
 )
 
@@ -251,6 +254,149 @@ def test_is_ready_reflects_exported_whipper(tmp_path: Path) -> None:
     assert setup.is_ready() is False
     runner.paths = {tmp_path / "whipper"}
     assert setup.is_ready() is True
+
+
+# --- cyanrip step (KDD-18: optional backend install via COPR) -------------
+
+
+def _setup_cyanrip(tmp_path: Path, runner: _FakeRunner) -> HostSetup:
+    return HostSetup(
+        runner=runner,
+        os_release=_fedora(tmp_path),
+        whipper_path=tmp_path / "whipper",
+        cyanrip_path=tmp_path / "cyanrip",
+        include_cyanrip=True,
+    )
+
+
+def _container_ready(runner: _FakeRunner) -> None:
+    """Mark distrobox/podman/container/whipper-in-container as present."""
+    runner.present = {"distrobox", "podman"}
+    runner.results[("distrobox", "list")] = (0, "ripping\n")
+    runner.results[
+        ("distrobox", "enter", "ripping", "--", "command", "-v", "whipper")
+    ] = (0, "/usr/bin/whipper")
+
+
+def test_cyanrip_step_absent_by_default(tmp_path: Path) -> None:
+    """Backwards compatible: without the flag, the plan is the original five
+    steps and no cyanrip command is ever issued."""
+    runner = _FakeRunner()
+    setup = _setup(tmp_path, runner)
+    assert "cyanrip" not in setup.STEP_IDS
+    setup.run()
+    flat = [" ".join(c) for c in runner.calls]
+    assert not any("cyanrip" in c for c in flat)
+
+
+def test_cyanrip_step_ordered_between_tools_and_export(tmp_path: Path) -> None:
+    setup = _setup_cyanrip(tmp_path, _FakeRunner())
+    assert setup.STEP_IDS == (
+        "distrobox",
+        "backend",
+        "container",
+        "tools",
+        "cyanrip",
+        "export",
+    )
+
+
+def test_fresh_system_with_cyanrip_installs_and_exports(tmp_path: Path) -> None:
+    runner = _FakeRunner()
+    # The cyanrip-in-container probe must fail until installed; everything
+    # else defaults to success in the fake.
+    runner.results[
+        ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
+    ] = (1, "")
+    results = _setup_cyanrip(tmp_path, runner).run()
+
+    status = dict(_ids(results))
+    assert status["cyanrip"] == "ran"
+    assert status["export"] == "ran"
+    flat = [" ".join(c) for c in runner.calls]
+    assert any("sudo dnf install -y cyanrip" in c for c in flat)
+    assert any("distrobox-export --bin /usr/bin/cyanrip" in c for c in flat)
+
+
+def test_copr_repo_content_passed_as_data_not_spliced_into_script(
+    tmp_path: Path,
+) -> None:
+    """The repo stanza must reach `sh` as a positional argument ("$1"), not
+    be embedded in the -c script — otherwise $releasever would be expanded
+    (to nothing) and the repo would break on every Fedora version."""
+    runner = _FakeRunner()
+    runner.results[
+        ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
+    ] = (1, "")
+    _setup_cyanrip(tmp_path, runner).run()
+
+    write = next(c for c in runner.calls if CYANRIP_COPR_REPO_CONTENT in c)
+    script = write[write.index("-c") + 1]
+    assert CYANRIP_COPR_REPO_PATH in script
+    assert "$releasever" not in script  # stays in the data argument only
+    assert write[-1] == CYANRIP_COPR_REPO_CONTENT
+
+
+def test_copr_repo_stanza_is_generic_and_gpg_checked() -> None:
+    """Guards against accidentally pinning a Fedora version into the baseurl
+    or disabling signature verification."""
+    assert "fedora-$releasever-$basearch" in CYANRIP_COPR_REPO_CONTENT
+    assert "gpgcheck=1" in CYANRIP_COPR_REPO_CONTENT
+    assert "gpgkey=https://" in CYANRIP_COPR_REPO_CONTENT
+
+
+def test_cyanrip_already_installed_and_exported_is_all_done(tmp_path: Path) -> None:
+    runner = _FakeRunner()
+    _container_ready(runner)
+    runner.results[
+        ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
+    ] = (0, "/usr/bin/cyanrip")
+    runner.paths = {tmp_path / "whipper", tmp_path / "cyanrip"}
+
+    results = _setup_cyanrip(tmp_path, runner).run()
+
+    assert all(r.status is StepStatus.DONE for r in results)
+    flat = [" ".join(c) for c in runner.calls]
+    assert not any("install" in c or "export" in c for c in flat)
+
+
+def test_export_reruns_when_cyanrip_not_yet_exported(tmp_path: Path) -> None:
+    """whipper already exported but cyanrip not → the export step is not
+    'done' and exports cyanrip too."""
+    runner = _FakeRunner()
+    _container_ready(runner)
+    runner.results[
+        ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
+    ] = (0, "/usr/bin/cyanrip")
+    runner.paths = {tmp_path / "whipper"}  # cyanrip missing on host
+
+    results = _setup_cyanrip(tmp_path, runner).run()
+
+    status = dict(_ids(results))
+    assert status["cyanrip"] == "done"
+    assert status["export"] == "ran"
+    flat = [" ".join(c) for c in runner.calls]
+    assert any("distrobox-export --bin /usr/bin/cyanrip" in c for c in flat)
+
+
+def test_is_ready_requires_cyanrip_only_when_included(tmp_path: Path) -> None:
+    runner = _FakeRunner()
+    runner.paths = {tmp_path / "whipper"}
+    assert _setup(tmp_path, runner).is_ready() is True
+    assert _setup_cyanrip(tmp_path, runner).is_ready() is False
+    runner.paths.add(tmp_path / "cyanrip")
+    assert _setup_cyanrip(tmp_path, runner).is_ready() is True
+
+
+def test_cyanrip_on_host_checks_export_then_path(tmp_path: Path, monkeypatch) -> None:
+    exported = tmp_path / "cyanrip"
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    assert cyanrip_on_host(exported) is False
+    exported.write_text("#!/bin/sh\n", encoding="utf-8")
+    assert cyanrip_on_host(exported) is True
+    # Native install (on PATH) also counts.
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/cyanrip")
+    assert cyanrip_on_host(tmp_path / "missing") is True
 
 
 # --- install_argv distro matrix ------------------------------------------

@@ -16,8 +16,9 @@ from whipper_gui.ui.host_setup_dialog import HostSetupDialog
 class _FakeHost:
     """Minimal stand-in for HostSetup (duck-typed)."""
 
-    def __init__(self, ready: bool) -> None:
+    def __init__(self, ready: bool, include_cyanrip: bool = False) -> None:
         self._ready = ready
+        self.include_cyanrip = include_cyanrip
 
     def is_ready(self) -> bool:
         return self._ready
@@ -26,8 +27,18 @@ class _FakeHost:
         return []
 
 
-def _dialog(qapp: QApplication, ready: bool = True) -> HostSetupDialog:
-    return HostSetupDialog(host_setup=_FakeHost(ready))
+def _dialog(
+    qapp: QApplication, ready: bool = True, include_cyanrip: bool = False
+) -> HostSetupDialog:
+    return HostSetupDialog(host_setup=_FakeHost(ready, include_cyanrip))
+
+
+def test_intro_omits_cyanrip_by_default(qapp: QApplication) -> None:
+    assert "cyanrip" not in _dialog(qapp)._intro.text()
+
+
+def test_intro_mentions_cyanrip_when_included(qapp: QApplication) -> None:
+    assert "cyanrip" in _dialog(qapp, include_cyanrip=True)._intro.text()
 
 
 def test_on_step_appends_formatted_line(qapp: QApplication) -> None:

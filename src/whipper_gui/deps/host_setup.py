@@ -30,13 +30,43 @@ from enum import Enum
 from pathlib import Path
 from typing import Protocol
 
-from whipper_gui.paths import WHIPPER_BINARY_DEFAULT
+from whipper_gui.paths import CYANRIP_BINARY_DEFAULT, WHIPPER_BINARY_DEFAULT
 
 log = logging.getLogger(__name__)
 
 DEFAULT_CONTAINER: str = "ripping"
 DEFAULT_IMAGE: str = "registry.fedoraproject.org/fedora-toolbox:latest"
 _OS_RELEASE: Path = Path("/etc/os-release")
+
+# --- cyanrip packaging (KDD-18) ---------------------------------------------
+# Fedora does NOT package cyanrip (verified 2026-06-09: no result in the
+# official repos or RPM Fusion; cyanrip's own README lists Debian/openSUSE/
+# Alpine/Void/Nix but not Fedora). The one prebuilt source for our
+# fedora-toolbox container is the COPR `barsnick/non-fed` (a Fedora
+# contributor's "not-in-Fedora" repo), which has succeeded cyanrip builds
+# for Fedora 42/43/44 + rawhide on x86_64, GPG-signed. The fallback, if that
+# COPR ever disappears, is a meson source build (all build deps ARE in
+# Fedora: ffmpeg-free-devel, libcdio-paranoia-devel, libmusicbrainz5-devel,
+# libcurl-devel) — see docs/ecosystem-audit-2026-06.md.
+#
+# We write the standard COPR repo stanza ourselves instead of running
+# `dnf copr enable` because the copr plugin isn't guaranteed to be in the
+# container image (dnf4 vs dnf5 ship it differently), while a .repo file
+# works everywhere. The content below is exactly what `dnf copr enable`
+# would write: $releasever/$basearch keep it valid across Fedora versions,
+# and gpgcheck=1 + the COPR-published key keep the packages verified.
+CYANRIP_COPR_REPO_PATH: str = "/etc/yum.repos.d/copr-barsnick-non-fed.repo"
+CYANRIP_COPR_REPO_CONTENT: str = """\
+[copr:copr.fedorainfracloud.org:barsnick:non-fed]
+name=Copr repo for non-fed owned by barsnick (provides cyanrip)
+baseurl=https://download.copr.fedorainfracloud.org/results/barsnick/non-fed/fedora-$releasever-$basearch/
+type=rpm-md
+gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/barsnick/non-fed/pubkey.gpg
+repo_gpgcheck=0
+skip_if_unavailable=True
+enabled=1
+"""
 
 # Generous timeout: a `dnf install` inside a fresh container or an image pull
 # can legitimately take minutes.
@@ -174,16 +204,26 @@ class HostSetup:
     image: str = DEFAULT_IMAGE
     os_release: Path = _OS_RELEASE
     whipper_path: Path = WHIPPER_BINARY_DEFAULT
+    cyanrip_path: Path = CYANRIP_BINARY_DEFAULT
     # Privilege escalation for host-root installs. "pkexec" (the default)
     # shows a graphical polkit prompt — correct for a GUI with no TTY. On
     # Bazzite/Silverblue distrobox+podman are preinstalled, so these steps
     # are skipped and no prompt appears at all.
     elevate: str = "pkexec"
-    # Ordered step ids, exposed for the dialog/tests.
-    STEP_IDS: tuple[str, ...] = field(
-        default=("distrobox", "backend", "container", "tools", "export"),
-        init=False,
-    )
+    # Also install + export the cyanrip backend (KDD-18). Off by default —
+    # whipper is the default backend; the main window turns this on when
+    # `Config.ripper_backend == "cyanrip"`.
+    include_cyanrip: bool = False
+    # Ordered step ids, exposed for the dialog/tests. Computed in
+    # __post_init__ because the cyanrip step is optional.
+    STEP_IDS: tuple[str, ...] = field(default=(), init=False)
+
+    def __post_init__(self) -> None:
+        steps = ["distrobox", "backend", "container", "tools"]
+        if self.include_cyanrip:
+            steps.append("cyanrip")
+        steps.append("export")
+        self.STEP_IDS = tuple(steps)
 
     # --- State probes (each "is this step already done?") ---
 
@@ -213,9 +253,26 @@ class HostSetup:
     def whipper_exported(self) -> bool:
         return self.runner.exists(self.whipper_path)
 
+    def cyanrip_in_container(self) -> bool:
+        if not self.container_exists():
+            return False
+        rc, _ = self.runner.run(
+            ["distrobox", "enter", self.container, "--", "command", "-v", "cyanrip"]
+        )
+        return rc == 0
+
+    def cyanrip_exported(self) -> bool:
+        return self.runner.exists(self.cyanrip_path)
+
+    def _export_done(self) -> bool:
+        """The export step is satisfied when every requested binary is on host."""
+        if not self.whipper_exported():
+            return False
+        return (not self.include_cyanrip) or self.cyanrip_exported()
+
     def is_ready(self) -> bool:
-        """True when the whole stack is in place (whipper reachable on host)."""
-        return self.whipper_exported()
+        """True when the whole stack is in place (ripper reachable on host)."""
+        return self._export_done()
 
     # --- The plan ---
 
@@ -253,7 +310,41 @@ class HostSetup:
                     "python3-setuptools",
                 ]
             ]
+        if step_id == "cyanrip":
+            return [
+                # Drop the COPR repo file. The stanza is passed as its own
+                # argv element ("$1"), NOT spliced into the script string, so
+                # nothing in it (e.g. $releasever) is shell-expanded.
+                [
+                    "distrobox",
+                    "enter",
+                    self.container,
+                    "--",
+                    "sudo",
+                    "sh",
+                    "-c",
+                    f'printf %s "$1" > {CYANRIP_COPR_REPO_PATH}',
+                    "write-copr-repo",
+                    CYANRIP_COPR_REPO_CONTENT,
+                ],
+                [
+                    "distrobox",
+                    "enter",
+                    self.container,
+                    "--",
+                    "sudo",
+                    "dnf",
+                    "install",
+                    "-y",
+                    "cyanrip",
+                ],
+            ]
         if step_id == "export":
+            # distrobox-export is idempotent (re-exporting overwrites the
+            # wrapper), so re-running already-exported binaries is harmless.
+            binaries = ["/usr/bin/whipper", "/usr/bin/metaflac"]
+            if self.include_cyanrip:
+                binaries.append("/usr/bin/cyanrip")
             return [
                 [
                     "distrobox",
@@ -264,7 +355,7 @@ class HostSetup:
                     "--bin",
                     b,
                 ]
-                for b in ("/usr/bin/whipper", "/usr/bin/metaflac")
+                for b in binaries
             ]
         raise ValueError(f"unknown step: {step_id}")  # pragma: no cover
 
@@ -274,7 +365,8 @@ class HostSetup:
             "backend": self.backend_present,
             "container": self.container_exists,
             "tools": self.whipper_in_container,
-            "export": self.whipper_exported,
+            "cyanrip": self.cyanrip_in_container,
+            "export": self._export_done,
         }[step_id]()
 
     _TITLES: dict[str, str] = field(
@@ -283,7 +375,8 @@ class HostSetup:
             "backend": "Container backend (podman)",
             "container": f"'{DEFAULT_CONTAINER}' container",
             "tools": "whipper + flac (in container)",
-            "export": "Export whipper to ~/.local/bin",
+            "cyanrip": "cyanrip backend (in container)",
+            "export": "Export tools to ~/.local/bin",
         },
         init=False,
     )
@@ -362,7 +455,7 @@ class HostSetup:
     @staticmethod
     def _running_hint(step_id: str) -> str:
         """Reassuring sub-text for a step that's actively running."""
-        if step_id in ("container", "tools"):
+        if step_id in ("container", "tools", "cyanrip"):
             return "working… this can take a few minutes (downloading + installing)"
         return "working…"
 
@@ -373,6 +466,19 @@ class HostSetup:
             if rc != 0:
                 return False, _last_meaningful_line(out) or f"exit {rc}"
         return True, "installed"
+
+
+def cyanrip_on_host(cyanrip_path: Path = CYANRIP_BINARY_DEFAULT) -> bool:
+    """True if cyanrip is reachable from the host.
+
+    Either host-exported by the wizard (the canonical route, mirroring
+    whipper) or installed natively and on PATH. Lives here — not in the UI —
+    so dependency-presence logic stays inside the self-management subsystem
+    (Critical Rule #6).
+    """
+    import shutil
+
+    return cyanrip_path.exists() or shutil.which("cyanrip") is not None
 
 
 def _last_meaningful_line(output: str) -> str:

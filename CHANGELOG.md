@@ -12,6 +12,17 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Added
+- **Host-setup wizard can install the cyanrip backend (KDD-18).** When
+  Settings → Ripping backend is set to cyanrip, the setup wizard (and the
+  Tools → Set up Whipper GUI… flow) gains a step that installs cyanrip into
+  the `ripping` container and host-exports it to `~/.local/bin/cyanrip`.
+  Research finding (2026-06-09): Fedora does **not** package cyanrip (nor
+  does RPM Fusion); the install uses the GPG-checked COPR
+  `barsnick/non-fed` (cyanrip 0.9.3.1 built for Fedora 42–44 + rawhide) via
+  a version-generic `.repo` file — no `dnf copr` plugin needed. Switching
+  the backend in Settings now offers to run the wizard if cyanrip is
+  missing, and the app prefers the host-exported absolute path when
+  constructing the cyanrip backend (desktop launches have a minimal PATH).
 - **Institutionalized testing strategy + stronger test infrastructure.** New
   [`docs/testing.md`](docs/testing.md) codifies the approach (testing trophy +
   an explicit real-hardware gate, a five-tier case taxonomy, property/golden/

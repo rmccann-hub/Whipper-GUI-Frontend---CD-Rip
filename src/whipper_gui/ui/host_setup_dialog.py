@@ -75,20 +75,28 @@ class HostSetupDialog(QDialog):
 
         root = QVBoxLayout(self)
 
-        intro = QLabel(
+        # Mention the optional cyanrip step only when this run includes it
+        # (getattr: test fakes are duck-typed and may not carry the flag).
+        cyanrip_line = (
+            "• installs the cyanrip backend into the container\n"
+            if getattr(host_setup, "include_cyanrip", False)
+            else ""
+        )
+        self._intro: QLabel = QLabel(
             "Whipper GUI rips through the <b>whipper</b> tool, which runs in a "
             "small Linux container so it never touches your system. This sets "
             "that up for you — no terminal needed:\n\n"
             "• installs Distrobox + a container runtime (if missing)\n"
             "• creates the 'ripping' container and installs whipper into it\n"
+            f"{cyanrip_line}"
             "• makes whipper available to this app\n\n"
             "Installing system packages may pop up your system password prompt "
             "once. On Bazzite/Silverblue everything's already there, so this is "
             "usually instant. It's safe to re-run.",
             self,
         )
-        intro.setWordWrap(True)
-        root.addWidget(intro)
+        self._intro.setWordWrap(True)
+        root.addWidget(self._intro)
 
         self._setup_button: QPushButton = QPushButton("Set up", self)
         self._setup_button.clicked.connect(self._on_setup_clicked)

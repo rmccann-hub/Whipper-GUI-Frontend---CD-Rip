@@ -47,3 +47,9 @@ WHIPPER_CONFIG_PATH: Path = _XDG_CONFIG_HOME / "whipper" / "whipper.conf"
 # dialog lets the user override this at runtime, but this is the value
 # we assume on first launch (matches the brief's documented setup).
 WHIPPER_BINARY_DEFAULT: Path = Path.home() / ".local" / "bin" / "whipper"
+
+# Default location of the host-exported cyanrip binary (the optional
+# KDD-18 backend). Same export route as whipper: the host-setup wizard
+# runs `distrobox-export` inside the `ripping` container, which drops a
+# wrapper here.
+CYANRIP_BINARY_DEFAULT: Path = Path.home() / ".local" / "bin" / "cyanrip"

@@ -153,13 +153,44 @@ sysfs vendor/model/rev — cyanrip has no list-drives command).
 3. **Metadata model** — whipper takes `--release-id`; cyanrip does its own
    MusicBrainz lookup (or `-N` + manual `-a`/`-t`). Decide whether to let
    cyanrip self-lookup or feed it the GUI's metadata via `-a`/`-t`.
-4. **Settings UI toggle** for `ripper_backend` (config field exists; not yet
-   surfaced in the dialog).
-5. **Container packaging** of cyanrip (AUR has it; Fedora-toolbox via COPR or
-   build — the host-setup wizard would need a cyanrip path).
+4. ~~**Settings UI toggle**~~ — **DONE 2026-06-09** (whipper | cyanrip combo in
+   Settings; `Config.ripper_backend`).
+5. ~~**Container packaging** of cyanrip~~ — **DONE 2026-06-09**, see
+   "Packaging research" below. The host-setup wizard now installs + exports
+   cyanrip when the cyanrip backend is selected.
 6. **Hardware parity run** — same disc through both backends; compare CRCs, and
    confirm cyanrip rips the BDR-209D's offset-667 tracks that whipper's >587 bug
    fails.
+
+## Packaging research — RESOLVED (2026-06-09)
+
+The step-1 open unknown ("cyanrip Fedora packaging: COPR? build? Arch base?")
+is now answered, verified against the live indexes:
+
+- **Fedora official repos: NO cyanrip.** packages.fedoraproject.org returns
+  zero results across F43/F44/rawhide/EPEL. cyanrip's own README install
+  matrix (Debian, openSUSE, Alpine, Void, NixOS, FreeBSD, AUR) pointedly
+  omits Fedora.
+- **RPM Fusion: NO cyanrip** (checked the free repo package listing).
+- **Terra (Fyra Labs): no evidence of cyanrip** (and not a repo we'd want the
+  wizard to add wholesale anyway).
+- **COPR `barsnick/non-fed`: YES.** cyanrip **0.9.3.1** with *succeeded*
+  builds for fedora-42/43/44 + rawhide x86_64 (also aarch64), GPG-signed
+  (`gpgcheck=1`, key published by COPR). It's a Fedora contributor's
+  "packages not in Fedora" repo — a third-party personal repo, which is why
+  it is **only enabled inside the disposable `ripping` container**, never on
+  the host.
+- **Chosen mechanism:** the wizard writes the standard COPR `.repo` stanza
+  itself (exactly what `dnf copr enable` would write, with
+  `$releasever/$basearch` so it tracks the container's Fedora version) and
+  then `dnf install -y cyanrip`. Writing the file directly avoids depending
+  on the `dnf copr` plugin, which dnf4/dnf5 ship differently.
+- **Fallback if the COPR ever vanishes:** meson source build *inside the
+  container* — every build dep IS in Fedora proper (`meson`, `gcc`,
+  `ffmpeg-free-devel`, `libcdio-paranoia-devel`, `libmusicbrainz5-devel`,
+  `libcurl-devel`). Switching the container base to Arch/Debian (both
+  package cyanrip) was rejected: it would churn the whipper install path and
+  every existing user's container for one optional backend.
 
 ---
 
