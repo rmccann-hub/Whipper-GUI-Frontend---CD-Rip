@@ -130,6 +130,24 @@ class SettingsDialog(QDialog):
         )
         form.addRow("metaflac path:", metaflac_row)
 
+        # --- Ripping backend (KDD-18) ---
+        # Store the raw backend id as item data ("whipper" | "cyanrip").
+        self._backend_combo: QComboBox = QComboBox(self)
+        for label, value in (
+            ("whipper (default)", "whipper"),
+            ("cyanrip (experimental)", "cyanrip"),
+        ):
+            self._backend_combo.addItem(label, value)
+        backend_index = self._backend_combo.findData(config.ripper_backend)
+        self._backend_combo.setCurrentIndex(backend_index if backend_index >= 0 else 0)
+        self._backend_combo.setToolTip(
+            "Which ripping tool to drive. cyanrip applies the read offset with "
+            "its own paranoia, avoiding whipper's known bug at offsets over 587 "
+            "(e.g. the Pioneer BDR-209D's +667). cyanrip must be installed in "
+            "the container and is experimental — restart the app after changing."
+        )
+        form.addRow("Ripping backend:", self._backend_combo)
+
         # --- Toggles ---
         self._auto_picard_check: QCheckBox = QCheckBox(
             "Launch MusicBrainz Picard on unknown discs", self
@@ -259,6 +277,13 @@ class SettingsDialog(QDialog):
             force_overread=self._force_overread_check.isChecked(),
             max_retries=self._max_retries_spin.value(),
             keep_going=self._keep_going_check.isChecked(),
+            ripper_backend=self._backend_combo.currentData(),
+            # Preserve fields the dialog doesn't model, so saving Settings
+            # never silently resets them (these one-time "already offered"
+            # flags being reset is what re-triggered the first-run prompts).
+            drive_setup_prompted=self._config.drive_setup_prompted,
+            host_setup_prompted=self._config.host_setup_prompted,
+            appimage_integration_prompted=self._config.appimage_integration_prompted,
             schema_version=self._config.schema_version,
         )
 

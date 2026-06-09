@@ -117,6 +117,29 @@ def test_to_config_preserves_schema_version(qapp: QApplication) -> None:
     assert dialog.to_config().schema_version == 99
 
 
+def test_backend_combo_reflects_config_and_round_trips(qapp: QApplication) -> None:
+    # Default is whipper.
+    assert SettingsDialog(Config()).to_config().ripper_backend == "whipper"
+    # An existing cyanrip config is shown and survives to_config().
+    dialog = SettingsDialog(Config(ripper_backend="cyanrip"))
+    assert dialog._backend_combo.currentData() == "cyanrip"
+    assert dialog.to_config().ripper_backend == "cyanrip"
+
+
+def test_to_config_preserves_one_time_prompt_flags(qapp: QApplication) -> None:
+    """Saving Settings must NOT reset the 'already offered' flags (doing so
+    re-triggered the first-run prompts)."""
+    config = Config(
+        drive_setup_prompted=True,
+        host_setup_prompted=True,
+        appimage_integration_prompted=True,
+    )
+    out = SettingsDialog(config).to_config()
+    assert out.drive_setup_prompted is True
+    assert out.host_setup_prompted is True
+    assert out.appimage_integration_prompted is True
+
+
 def test_to_config_uses_current_default_for_fresh_config(
     qapp: QApplication,
 ) -> None:

@@ -60,6 +60,11 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   tracks — instead of a bare "Rip failed".
 
 ### Added
+- **Settings → Ripping backend toggle (cyanrip, Phase 2 start).** You can now
+  pick the backend (whipper | cyanrip) in Settings; it's wired to
+  `Config.ripper_backend` and applied on next launch. cyanrip is marked
+  experimental and still needs to be installed in the container (provisioning is
+  the next phase). Completes the user-facing half of making cyanrip selectable.
 - **cyanrip backend — Phase 1 (KDD-18).** A second ripping backend
   (`adapters/cyanrip_backend.py`, `CyanripImpl`) behind the existing
   `WhipperBackend` ABC, selectable via `Config.ripper_backend = "cyanrip"`
@@ -139,6 +144,10 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   `docs/offset-investigation-2026-06.md`.
 
 ### Fixed
+- **Saving Settings no longer resets the one-time first-run flags.** `to_config`
+  rebuilt `Config` from scratch and dropped `drive_setup_prompted` /
+  `host_setup_prompted` / `appimage_integration_prompted`, so after saving
+  Settings the first-run offers could re-appear on the next launch. Preserved now.
 - **Ripping without a configured read offset now stops with a clear popup**
   instead of failing cryptically inside whipper. If no offset is set (neither
   whipper.conf nor the GUI's `--offset` override), Start shows a warning that
