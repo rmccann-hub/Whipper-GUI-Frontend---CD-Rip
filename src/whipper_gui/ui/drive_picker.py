@@ -75,6 +75,19 @@ class DrivePicker(QWidget):
         self._refresh_button.clicked.connect(self.refresh)
         layout.addWidget(self._refresh_button)
 
+        # Re-run the disc scan for the CURRENT drive. Refresh only reloads
+        # the drive LIST (and keeps the selection, so it never re-triggers
+        # the scan) — real-user feedback: when the first scan hits a
+        # transient error (disc still spinning up → whipper's cdrdao
+        # read-toc flake), there was no way to retry short of restarting.
+        self._rescan_button: QPushButton = QPushButton("Rescan disc", self)
+        self._rescan_button.setToolTip(
+            "Read the disc in the selected drive again — use this after "
+            "inserting a disc, or when the first scan failed."
+        )
+        self._rescan_button.clicked.connect(self._on_rescan_clicked)
+        layout.addWidget(self._rescan_button)
+
         # Eject the selected disc. Re-emits as eject_requested so the main
         # window can run the (potentially blocking) eject off the GUI thread.
         self._eject_button: QPushButton = QPushButton("Eject", self)
@@ -180,3 +193,12 @@ class DrivePicker(QWidget):
         # current_device() is None when only a placeholder is shown; eject
         # the system default ("") in that case rather than blocking the button.
         self.eject_requested.emit(self.current_device() or "")
+
+    def _on_rescan_clicked(self) -> None:
+        """Re-emit drive_changed for the current drive so the main window
+        re-runs the whole disc pipeline (disc info → MusicBrainz lookup).
+        No-op when nothing is selected — there's nothing to rescan."""
+        device = self.current_device()
+        if device:
+            log.info("rescan requested for %s", device)
+            self.drive_changed.emit(device)

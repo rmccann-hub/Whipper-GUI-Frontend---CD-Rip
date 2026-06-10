@@ -1859,3 +1859,23 @@ def test_dialog_queued_resolver_empty_items_is_noop(qapp) -> None:
 
     resolver = _DialogQueuedResolver(parent=None, install_one=lambda i: None)
     assert resolver.resolve([]) == []
+
+
+def test_friendly_disc_scan_error_for_cdrdao_toc_flake() -> None:
+    """The cdrdao read-toc temp-file FileNotFoundError (drive not ready)
+    becomes plain language pointing at the Rescan disc button."""
+    from whipper_gui.ui.main_window import _friendly_disc_scan_error
+
+    raw = (
+        "whipper failed: FileNotFoundError: [Errno 2] No such file or "
+        "directory: '/tmp/tmp55rw20ax.cdrdao.read-toc.whipper.task'"
+    )
+    friendly = _friendly_disc_scan_error(raw)
+    assert "Rescan disc" in friendly
+    assert "table of contents" in friendly
+    assert "FileNotFoundError" not in friendly  # no raw traceback text
+
+    # Unrecognized errors pass through untouched — never hide information.
+    assert _friendly_disc_scan_error("whipper failed: exit 1") == (
+        "whipper failed: exit 1"
+    )

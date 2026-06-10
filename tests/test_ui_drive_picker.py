@@ -345,3 +345,33 @@ def test_current_drive_none_on_backend_error(qapp: QApplication) -> None:
     picker = DrivePicker(backend)
     picker.refresh()
     assert picker.current_drive() is None
+
+
+def test_rescan_button_reemits_drive_changed(qapp: QApplication) -> None:
+    """Rescan re-runs the disc pipeline for the CURRENT drive — the retry
+    affordance for transient scan failures (e.g. whipper's cdrdao read-toc
+    flake when the disc is still spinning up). Refresh can't do this: it
+    preserves the selection, so it never re-triggers the scan."""
+    backend = _FakeBackend()
+    backend.set_drives([_drive("/dev/sr0")])
+    picker = DrivePicker(backend)
+    picker.refresh()
+    seen: list[str] = []
+    picker.drive_changed.connect(seen.append)  # connected AFTER refresh
+
+    picker._rescan_button.click()
+
+    assert seen == ["/dev/sr0"]
+
+
+def test_rescan_button_noop_without_a_drive(qapp: QApplication) -> None:
+    backend = _FakeBackend()
+    backend.set_drives([])
+    picker = DrivePicker(backend)
+    picker.refresh()  # placeholder only
+    seen: list[str] = []
+    picker.drive_changed.connect(seen.append)
+
+    picker._rescan_button.click()
+
+    assert seen == []  # nothing selected → nothing to rescan

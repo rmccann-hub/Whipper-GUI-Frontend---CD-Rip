@@ -11,7 +11,21 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
-*(nothing yet)*
+### Added
+- **"Rescan disc" button** next to Refresh/Eject (real-user request,
+  2026-06-10). Re-runs the disc scan + MusicBrainz lookup for the selected
+  drive — the retry for transient scan failures and for discs inserted
+  after launch. (Refresh only reloads the drive *list* and keeps the
+  selection, so it never re-triggered the scan; previously the only retry
+  was restarting the app.)
+
+### Changed
+- **Plain-language message for the disc-scan flake.** whipper's known
+  cdrdao read-toc failure ("FileNotFoundError: …cdrdao.read-toc.whipper.task",
+  typically the disc still spinning up) now reads "The drive couldn't read
+  the disc's table of contents — … Click 'Rescan disc' to try again"
+  instead of a raw traceback line. Unrecognized errors still pass through
+  verbatim.
 
 ## [0.2.1] — 2026-06-10
 

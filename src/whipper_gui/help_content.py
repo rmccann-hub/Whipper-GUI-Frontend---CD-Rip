@@ -100,6 +100,9 @@ rips. Your existing `whipper.conf` is backed up first.
 
 ## Troubleshooting
 
+- **Disc not detected, or the first scan failed** → click **Rescan disc**
+  (next to Refresh). The first read sometimes happens while the disc is
+  still spinning up; a rescan almost always works.
 - **No drive found** → *Tools → Diagnose drive access*. If it's a permissions
   problem it will tell you the exact `usermod` command to run (then log out and
   back in).

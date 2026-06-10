@@ -346,7 +346,9 @@ class MainWindow(QMainWindow):
             info = self._backend.disc_info(device)
         except WhipperError as exc:
             log.warning("disc_info failed: %s", exc)
-            self._disc_info_panel.set_disc_info_error(str(exc))
+            self._disc_info_panel.set_disc_info_error(
+                _friendly_disc_scan_error(str(exc))
+            )
             return
 
         self._disc_info_panel.set_disc_info(info)
@@ -1405,6 +1407,28 @@ def _safe_path_segment(value: str) -> str:
     input so callers can fall back to an "Unknown …" placeholder.
     """
     return (value or "").strip().replace("/", "-").replace("%", "")
+
+
+def _friendly_disc_scan_error(error_text: str) -> str:
+    """Turn known disc-scan failures into plain language with a next step.
+
+    The headline case (real-user report, 2026-06-10): whipper has cdrdao
+    read the disc's table of contents into a temp file; when the drive
+    isn't ready yet (disc still spinning up, or scanned the instant it was
+    inserted) cdrdao produces nothing and whipper trips over the missing
+    file — "FileNotFoundError: ... .cdrdao.read-toc.whipper.task". A retry
+    almost always succeeds, so point at the Rescan disc button instead of
+    showing a raw traceback line.
+    """
+    if "read-toc" in error_text and (
+        "FileNotFoundError" in error_text or "No such file" in error_text
+    ):
+        return (
+            "The drive couldn't read the disc's table of contents — this "
+            "usually means the disc wasn't ready yet (still spinning up). "
+            "Click “Rescan disc” to try again."
+        )
+    return error_text
 
 
 def _fidelity_summary(rip_log: object) -> str:
