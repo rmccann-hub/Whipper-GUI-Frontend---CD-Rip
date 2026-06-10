@@ -80,6 +80,33 @@ def test_integrate_writes_desktop_entry_and_copies_icon(tmp_path: Path) -> None:
     assert refreshed == [True]
 
 
+def test_integrate_writes_uninstaller_menu_entry(tmp_path: Path) -> None:
+    """Integration also installs an 'Uninstall Whipper GUI' menu entry that
+    launches the app's --uninstall mode — menu only, never on the Desktop,
+    and under System rather than Multimedia."""
+    appimage = _appimage(tmp_path)
+    desktop_dir = tmp_path / "applications"
+    desktop_folder = tmp_path / "Desktop"
+    desktop_folder.mkdir()
+
+    ai.integrate(
+        appimage,
+        app_dir=None,
+        desktop_dir=desktop_dir,
+        icon_dir=tmp_path / "icons",
+        desktop_folder=desktop_folder,
+        refresh=lambda: None,
+    )
+
+    entry = desktop_dir / f"{ai.DESKTOP_ID}-uninstall.desktop"
+    text = entry.read_text()
+    assert f'Exec="{appimage}" --uninstall' in text
+    assert "Name=Uninstall Whipper GUI" in text
+    assert "Categories=System;" in text
+    # The Desktop folder gets the app shortcut only — no uninstaller there.
+    assert not (desktop_folder / f"{ai.DESKTOP_ID}-uninstall.desktop").exists()
+
+
 def test_integrate_writes_desktop_folder_shortcut(tmp_path: Path) -> None:
     appimage = _appimage(tmp_path)
     desktop_folder = tmp_path / "Desktop"

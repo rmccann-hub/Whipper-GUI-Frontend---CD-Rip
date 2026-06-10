@@ -12,6 +12,13 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Added
+- **"Uninstall Whipper GUI" menu entry + `--uninstall` mode.** AppImage
+  self-integration now also installs an uninstaller launcher in the
+  application menu (under System, not next to the app in Multimedia) that
+  opens just the uninstaller via the new `whipper-gui --uninstall` flag — so
+  removal needs neither a terminal nor the main app. Verified all our
+  `.desktop` entries already file the app itself under Multimedia
+  (`Categories=AudioVideo;Audio;`).
 - **In-app Uninstaller (Tools → Uninstall Whipper GUI…).** Removes everything
   the app installed — menu/desktop shortcuts, host-exported
   whipper/metaflac/cyanrip, the `ripping` container, optionally `whipper.conf`

@@ -174,6 +174,25 @@ def integrate(
     target.write_text(contents, encoding="utf-8")
     log.info("integrated AppImage: wrote %s", target)
 
+    # A separate "Uninstall Whipper GUI" menu entry (menu only — deliberately
+    # NOT on the Desktop) that opens the in-app uninstaller directly via the
+    # app's --uninstall mode. Filed under System so it doesn't sit beside the
+    # app in the Multimedia menu. The uninstaller removes this entry too.
+    uninstall_entry = desktop_dir / f"{DESKTOP_ID}-uninstall.desktop"
+    uninstall_entry.write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Uninstall Whipper GUI\n"
+        "Comment=Remove Whipper GUI and everything it installed "
+        "(your music is kept)\n"
+        f'Exec="{appimage}" --uninstall\n'
+        f"Icon={icon_value}\n"
+        "Terminal=false\n"
+        "Categories=System;\n",
+        encoding="utf-8",
+    )
+    log.info("wrote uninstaller menu entry %s", uninstall_entry)
+
     # Also drop a clickable icon on the Desktop (only if the user has a Desktop
     # folder — don't create one). Mark it executable; GNOME may still need a
     # one-time right-click "Allow Launching", KDE shows it directly.

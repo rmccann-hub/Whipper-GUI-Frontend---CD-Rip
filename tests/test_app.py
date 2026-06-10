@@ -117,3 +117,35 @@ def test_install_excepthook_sets_and_routes(monkeypatch: pytest.MonkeyPatch) -> 
         assert shown == []  # KeyboardInterrupt is not routed to the dialog
     finally:
         sys.excepthook = original
+
+
+def test_main_uninstall_flag_opens_uninstaller_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`whipper-gui --uninstall` (the Uninstall menu entry) opens just the
+    uninstaller dialog — no adapters, no main window."""
+    import whipper_gui.ui.uninstall_dialog as ud
+    from whipper_gui import app as app_module
+
+    opened: list[bool] = []
+
+    class _FakeDialog:
+        def __init__(self, *a, **k):
+            pass
+
+        def exec(self):
+            opened.append(True)
+            return 0
+
+    monkeypatch.setattr(ud, "UninstallDialog", _FakeDialog)
+    # A MainWindow being constructed would mean the flag was ignored.
+    import whipper_gui.ui.main_window as mw
+
+    monkeypatch.setattr(
+        mw,
+        "MainWindow",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("main window built")),
+    )
+
+    assert app_module.main(["--uninstall"]) == 0
+    assert opened == [True]

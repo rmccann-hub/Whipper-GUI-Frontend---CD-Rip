@@ -89,7 +89,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--version", action="version", version=f"whipper-gui {__version__}"
     )
-    parser.parse_args(argv if argv is not None else sys.argv[1:])
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="open only the uninstaller (used by the Uninstall menu entry)",
+    )
+    args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     # Logging is the first thing — any failure below this line shows up
     # in ~/.local/share/whipper-gui/log.txt.
@@ -117,6 +122,17 @@ def main(argv: list[str] | None = None) -> int:
     # Qt slot during the event loop) goes to the log + an on-screen dialog
     # rather than silently aborting the process.
     _install_excepthook()
+
+    # Uninstaller-only mode: the "Uninstall Whipper GUI" menu entry launches
+    # `<app> --uninstall`, so removal works without opening (or needing) the
+    # main window — none of the adapters below are required for it.
+    if args.uninstall:
+        from whipper_gui.ui.uninstall_dialog import UninstallDialog
+
+        log.info("uninstall mode requested")
+        dialog = UninstallDialog()
+        dialog.exec()
+        return 0
 
     # Bringing up the adapters + window can fail (bad config path, an
     # unexpected whipper output that trips a parser, a Qt error). Guard the
