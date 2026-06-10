@@ -50,6 +50,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash build/build_appimage.sh
 
+      # Fail HERE, with a clear message, if the self-update artifacts are
+      # missing — not later inside `gh release upload` (the v0.2.0 lesson:
+      # a skipped embed surfaced only as a cryptic upload error, and the
+      # release ended up with no assets at all).
+      - name: Verify update artifacts
+        run: |
+          if [ ! -f whipper-gui-x86_64.AppImage.zsync ]; then
+            echo "::error::.zsync missing — the update-information embed was skipped."
+            echo "Check the build step's '[4/4] Embedding zsync update-information' output."
+            exit 1
+          fi
+
       - name: Generate checksum
         run: sha256sum whipper-gui-x86_64.AppImage > whipper-gui-x86_64.AppImage.sha256
 

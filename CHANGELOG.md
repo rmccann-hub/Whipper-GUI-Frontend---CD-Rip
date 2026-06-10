@@ -13,6 +13,19 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 *(nothing yet)*
 
+## [0.2.1] — 2026-06-10
+
+### Fixed
+- **v0.2.0's release build uploaded no files.** Two packaging bugs: the
+  build script looked for python-appimage's cached `appimagetool` with a
+  glob that skipped its dot-prefixed cache directory, so the zsync
+  update-information embed was silently skipped; the release upload then
+  failed on the missing `.zsync` and aborted before attaching anything.
+  The glob now matches the dot-form, and a dedicated "Verify update
+  artifacts" workflow step fails early with a clear message if the
+  `.zsync` is ever missing again. *(v0.2.0 was superseded without
+  artifacts; v0.2.1 is identical plus this fix.)*
+
 ## [0.2.0] — 2026-06-09
 
 ### Added
@@ -358,6 +371,7 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.2.1]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/tag/v0.1.0
 [0.0.1]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/releases/tag/v0.0.1

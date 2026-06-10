@@ -142,7 +142,11 @@ def test_build_script_embeds_zsync_update_information() -> None:
     assert ".AppImage.zsync" in script
     assert '-u "$UPDATE_INFO"' in script
     # Falls back to python-appimage's cached appimagetool (no new host dep).
+    # REGRESSION (v0.2.0): the cache dir is DOT-prefixed
+    # (.appimagetool-<ver>.appdir/AppRun); a plain * glob missed it and the
+    # embed silently skipped. The script must glob the dot-form explicitly.
     assert ".cache/python-appimage/bin" in script
+    assert "/.appimagetool*/AppRun" in script
 
 
 def test_release_workflow_ships_the_zsync_file() -> None:
@@ -154,5 +158,10 @@ def test_release_workflow_ships_the_zsync_file() -> None:
     )
     assert "apt-get install -y -q zsync" in workflow
     assert workflow.count("whipper-gui-x86_64.AppImage.zsync") >= 2
+    # REGRESSION (v0.2.0): a missing .zsync must fail at a dedicated verify
+    # step with a clear message, not as a cryptic `gh release upload` error
+    # after which the release ends up with no assets at all.
+    assert "Verify update artifacts" in workflow
+    assert workflow.index("Verify update artifacts") < workflow.index("sha256sum")
     # Build (which embeds update info) must precede the checksum generation.
     assert workflow.index("build_appimage.sh") < workflow.index("sha256sum")

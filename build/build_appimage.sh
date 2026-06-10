@@ -153,7 +153,11 @@ find_appimagetool() {
     # just cached for its own build (~/.cache/python-appimage/bin).
     command -v appimagetool 2>/dev/null && return 0
     local candidate
-    for candidate in "$HOME/.cache/python-appimage/bin"/*appimagetool*/AppRun \
+    # NOTE: python-appimage caches the tool in a DOT-prefixed directory
+    # (.appimagetool-<ver>.appdir/AppRun), which a plain * glob skips —
+    # that exact miss broke the v0.2.0 release upload. Match both forms.
+    for candidate in "$HOME/.cache/python-appimage/bin"/.appimagetool*/AppRun \
+                     "$HOME/.cache/python-appimage/bin"/*appimagetool*/AppRun \
                      "$HOME/.cache/python-appimage/bin"/*appimagetool*; do
         if [ -x "$candidate" ]; then
             echo "$candidate"
