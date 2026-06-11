@@ -8,4 +8,4 @@
 #     the `--version` flag, the Help → About dialog, and the MusicBrainz
 #     user-agent.
 # To cut a release: bump this, add a CHANGELOG entry, then tag `vX.Y.Z`.
-__version__: str = "0.2.1"
+__version__: str = "0.2.2"
