@@ -10,6 +10,21 @@ import pytest
 
 from whipper_gui import appimage_integration as ai
 
+
+@pytest.fixture(autouse=True)
+def _no_real_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never spawn real `gio`/`kbuildsycoca` processes during these tests.
+
+    `integrate()` calls `_mark_trusted` (gio) and the default menu refresh,
+    both now fire-and-forget `Popen`. On a box where those tools exist (CI
+    often has `gio`), the real tests would launch detached background
+    processes — noisy and racy. Stub Popen to a no-op recorder by default;
+    the dedicated _mark_trusted / _default_refresh tests install their own
+    Popen stub on top, so this doesn't mask them.
+    """
+    monkeypatch.setattr(ai.subprocess, "Popen", lambda *a, **k: object())
+
+
 # --- env detection --------------------------------------------------------
 
 
