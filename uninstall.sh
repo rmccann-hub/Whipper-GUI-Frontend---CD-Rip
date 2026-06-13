@@ -264,17 +264,20 @@ else
     skipped "Distrobox 'ripping' container"
 fi
 
-# whipper.conf
-WHIPPER_CONF="$HOME/.config/whipper/whipper.conf"
-if [ "$REMOVE_WHIPPER_CONFIG" -eq 1 ] || prompt "Remove whipper.conf at $WHIPPER_CONF?"; then
-    if [ -f "$WHIPPER_CONF" ]; then
-        run rm -f "$WHIPPER_CONF"
-        removed "$WHIPPER_CONF"
+# whipper config — remove the whole ~/.config/whipper/ directory, not just
+# whipper.conf, so the drive-setup wizard's whipper.conf.bak backup doesn't
+# survive a "full" uninstall. Matches what the in-app uninstaller
+# (deps/host_teardown.py) already does (it removes the config dir).
+WHIPPER_CONF_DIR="$HOME/.config/whipper"
+if [ "$REMOVE_WHIPPER_CONFIG" -eq 1 ] || prompt "Remove whipper config (drive calibration, incl. .bak) at $WHIPPER_CONF_DIR?"; then
+    if [ -d "$WHIPPER_CONF_DIR" ]; then
+        run rm -rf "$WHIPPER_CONF_DIR"
+        removed "$WHIPPER_CONF_DIR"
     else
-        missing "$WHIPPER_CONF"
+        missing "$WHIPPER_CONF_DIR"
     fi
 else
-    skipped "$WHIPPER_CONF"
+    skipped "$WHIPPER_CONF_DIR"
 fi
 
 # Host-exported binaries from Distrobox

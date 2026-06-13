@@ -15,13 +15,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 UNINSTALL = REPO_ROOT / "uninstall.sh"
 
 
-def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run uninstall.sh with args; return the completed process."""
+def _run(
+    args: list[str], env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run uninstall.sh with args; return the completed process.
+
+    `env` overrides are merged onto the current environment — used to
+    point $HOME at a tmp dir so $HOME-based removals can be exercised
+    without touching the real home directory.
+    """
+    full_env = {**os.environ, **(env or {})}
     return subprocess.run(
         ["bash", str(UNINSTALL), *args],
         capture_output=True,
         text=True,
         check=False,
+        env=full_env,
     )
 
 
@@ -72,10 +81,37 @@ def test_dry_run_full_shows_what_would_be_removed() -> None:
     for category in [
         "Picard",
         "Distrobox",
-        "whipper.conf",
+        ".config/whipper",  # the whipper config dir (calibration + .bak)
         "whipper",  # also in the host-exported wrapper section
     ]:
         assert category in out, f"category {category!r} missing from output"
+
+
+def test_full_removes_whipper_config_dir_including_bak(tmp_path: Path) -> None:
+    """Regression (2026-06-13): a `--full` uninstall must remove the whole
+    ~/.config/whipper/ directory, not just whipper.conf — otherwise the
+    drive-setup wizard's whipper.conf.bak survives and a "fresh" reinstall
+    isn't actually fresh. A real user hit exactly this leftover.
+    """
+    home = tmp_path / "home"
+    whipper_dir = home / ".config" / "whipper"
+    whipper_dir.mkdir(parents=True)
+    (whipper_dir / "whipper.conf").write_text("offset = 667\n")
+    (whipper_dir / "whipper.conf.bak").write_text("offset = 0\n")
+
+    result = _run(["--yes", "--dry-run", "--full"], env={"HOME": str(home)})
+
+    assert result.returncode == 0
+    # The planned action must be an `rm -rf` of the directory itself (which
+    # inherently covers whipper.conf.bak), not a file-only `rm -f`.
+    planned = [
+        line
+        for line in result.stdout.splitlines()
+        if line.strip().startswith("DRY-RUN:")
+    ]
+    assert any("rm -rf" in line and str(whipper_dir) in line for line in planned), (
+        f"whipper config dir not planned for recursive removal; planned={planned}"
+    )
 
 
 def test_dry_run_does_not_touch_rips_without_explicit_flag() -> None:

@@ -11,7 +11,12 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
-*(nothing yet)*
+### Fixed
+- **`uninstall.sh --full` now removes the whole `~/.config/whipper/` directory**
+  instead of just `whipper.conf`, so the drive-setup wizard's
+  `whipper.conf.bak` backup no longer survives a full uninstall (a real user
+  found this leftover after a "fresh" reset). Matches what the in-app
+  uninstaller already does.
 
 ## [0.2.5] — 2026-06-13
 
