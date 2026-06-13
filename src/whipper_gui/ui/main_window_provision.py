@@ -29,8 +29,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMessageBox
+
+if TYPE_CHECKING:  # import only for type hints — runtime import stays lazy
+    from whipper_gui.deps.host_setup import HostSetup
 
 log = logging.getLogger(__name__)
 
@@ -189,7 +193,7 @@ class ProvisioningMixin:
         if choice == QMessageBox.StandardButton.Yes:
             self.open_host_setup_dialog()
 
-    def _build_host_setup(self):
+    def _build_host_setup(self) -> HostSetup:
         """The HostSetup the wizard runs, configured from the current config.
 
         When the cyanrip backend is selected (KDD-18), the wizard also

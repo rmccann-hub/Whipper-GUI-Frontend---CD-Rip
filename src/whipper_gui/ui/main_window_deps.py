@@ -182,7 +182,7 @@ class DependencyMixin:
         dialog.exec()
 
     def _show_dep_summary(
-        self, report: object, optional_missing: list | None = None
+        self, report: object, optional_missing: list[MissingItem] | None = None
     ) -> None:
         """Post-check summary popup with install-failure detail when present.
 

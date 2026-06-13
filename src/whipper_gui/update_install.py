@@ -24,6 +24,7 @@ via AppImageUpdate remain possible for users who have that tool.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import logging
 import urllib.request
 from collections.abc import Callable
@@ -53,7 +54,7 @@ def asset_url(version: str) -> str:
     )
 
 
-def _default_open(url: str):
+def _default_open(url: str) -> http.client.HTTPResponse:
     """Open a streaming HTTP response (callers read() it in chunks)."""
     request = urllib.request.Request(url, headers={"User-Agent": "whipper-gui"})
     return urllib.request.urlopen(request, timeout=_TIMEOUT_S)

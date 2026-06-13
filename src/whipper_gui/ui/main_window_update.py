@@ -24,9 +24,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QMessageBox
+
+if TYPE_CHECKING:  # import only for type hints
+    from PySide6.QtWidgets import QProgressDialog
 
 log = logging.getLogger(__name__)
 
@@ -168,13 +172,13 @@ class UpdateMixin:
         dialog.show()
 
     def _on_update_install_finished(
-        self, ok: bool, payload: str, dialog: object
+        self, ok: bool, payload: str, dialog: QProgressDialog
     ) -> None:
         """Close the progress dialog; restart into the new version on success."""
         from whipper_gui import appimage_integration as ai
 
         try:
-            dialog.close()  # type: ignore[attr-defined]
+            dialog.close()
         except Exception:  # noqa: BLE001 — closing UI must never block the flow
             pass
         self._install_worker = None
