@@ -2,6 +2,27 @@
 
 This directory contains the canonical source material the project was built from, plus reference documents the rest of the codebase points to.
 
+## Single source of truth — where each kind of content lives
+
+To keep the docs efficient and stop the same rule from sprawling across files (and going stale in some), every kind of content has **one canonical home**. State it there; everywhere else, *link* — don't re-explain.
+
+| Content | Canonical home |
+|---|---|
+| Locked coding conventions & critical rules | `CLAUDE.md` → *Code conventions* / *Critical rules* |
+| How the maintainer works / project values | `CLAUDE.md` → *Working with the maintainer* |
+| Architectural decisions + rationale | `PLANNING.md` (KDD-NN) |
+| Module map & per-module responsibility | `PLANNING.md` |
+| Layered design, patterns, extension recipes | `docs/architecture.md` |
+| Engineering patterns & hard-won lessons | `docs/best-practices.md` |
+| Testing strategy, taxonomy, institutional rules | `docs/testing.md` |
+| Hardware / manual test steps | `docs/test-plan.md` |
+| User-facing changes | `CHANGELOG.md` |
+| Active task queue | `TASKS.md` |
+| What happened each session (chronology) | `docs/session-log.md` |
+| Install / usage docs | `README.md` |
+
+A lesson legitimately appears in **two** places: a one-line *rule* in its canonical home, and a dated *entry* in `docs/session-log.md` recording how it arose (the **graduation rule** — distillation up, chronology down). Anything beyond that is duplication to delete.
+
 ## Source documents (anchor for "rebuild from scratch")
 
 These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS.md`, `DEPENDENCIES.md`, and `README.md` are the full context needed to reproduce the project from a clean slate.
@@ -27,6 +48,7 @@ These three files together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS
 | [`test-plan.md`](test-plan.md) | Step-by-step **manual / hardware** test plan for the work that can't be validated in CI — CTDB verify (wire format + CRC), CTDB repair direction, `drive analyze`/`offset find` success strings, a GUI screenshot, the Picard UX, and the PyPI go-live. Run one test at a time and record results. |
 | [`ecosystem-audit-2026-06.md`](ecosystem-audit-2026-06.md) | Researched audit of the ripper ecosystem (whipper stalled since 2021; cyanrip the active successor) and the contribute-vs-integrate-vs-fork decision + a phased `CyanripImpl` migration plan. Backs PLANNING.md KDD-18. |
 | [`offset-investigation-2026-06.md`](offset-investigation-2026-06.md) | Investigation + refactor of the read-offset subsystem: why whipper's `offset find` is unreliable, and the AccurateRip offset-by-drive-model lookup that replaces it (`adapters/accuraterip_offsets.py`). Lists what's hardware/data-gated (full DriveOffsets.bin import). |
+| [`session-log.md`](session-log.md) | **Chronological session history** — what each Claude Code session built, decided, and learned (newest first). The project's institutional memory; durable lessons graduate from here into the docs above. |
 
 ## Where the rest of the project context lives
 
@@ -35,7 +57,7 @@ Outside this directory:
 | File | What it covers |
 |---|---|
 | [`../CLAUDE.md`](../CLAUDE.md) | Persistent rules and conventions; locked rules section; project operations |
-| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, keyed design decisions (KDD-01 … KDD-18) |
+| [`../PLANNING.md`](../PLANNING.md) | Architecture, directory tree, per-module responsibilities, adapter designs, dependency-manager design, keyed design decisions (KDD-01 … KDD-19) |
 | [`../TASKS.md`](../TASKS.md) | Active task checklist — P0 (T01-T32), P1.1 (install/uninstall ease), P1 (broader backlog), P2 (future), Out of scope |
 | [`../DEPENDENCIES.md`](../DEPENDENCIES.md) | Pinned versions, last upstream release dates, retirement-review log |
 | [`../README.md`](../README.md) | User-facing install instructions, troubleshooting, EAC comparison |
