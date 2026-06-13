@@ -76,6 +76,7 @@ Read these alongside this file when picking up a session:
 - **`TASKS.md`** — active task checklist; update status (`[ ]` → `[~]` → `[x]`) as work progresses. Sections: P0 (v1 release, T01-T32), P1.1 (install/uninstall ease — highest-priority P1 subset), P1 (broader backlog), P2 (future), Out of scope.
 - **`DEPENDENCIES.md`** — dep table with last release dates and replacement plans; review per the cadence stated in that file
 - **`README.md`** — outward-facing project description and install instructions
+- **`docs/architecture.md`** — architecture & contributor guide: the layered design, the core patterns (adapter layer, GUI-thread threading discipline, never-raise parsers, the MainWindow mixin decomposition), extension recipes, and future directions. Start here to extend the program.
 - **`docs/README.md`** — index of the docs/ directory and a rebuild-from-scratch checklist
 - **`docs/whipper-gui-research-brief-v2.1.md`** — the project brief; canonical for requirements and scope
 - **`docs/whipper-gui-session-start.md`** — bootstrap instructions a fresh Claude Code session uses to reproduce the initial planning artifacts
