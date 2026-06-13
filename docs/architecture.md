@@ -165,6 +165,15 @@ release, never the ripper's interactive prompt).
   `tests/test_*_worker.py`. **Stub anything that would touch the network or a
   real subprocess** (the update downloader, the cover-art fetcher, `gio`/
   `kbuildsycoca`) — an unstubbed one can hang the suite.
+- **When you move code between modules, move its monkeypatch targets too.**
+  `monkeypatch.setattr(some_module, "free_function", fake)` only affects
+  callers that resolve the name *through that module*. If a method moves to a
+  new module, patch it there (or patch the function's *source* module and
+  call it module-qualified, e.g. `offset_config.is_offset_configured(...)`,
+  so one patch point covers every caller). A patch that silently stops
+  intercepting is how the 2026-06-13 `RipMixin` extraction briefly let a test
+  start a real rip thread. Patching an attribute *on a shared module object*
+  (`drive_control.eject_drive`) is unaffected by where the caller lives.
 
 ## 6. Future improvements & directions
 
