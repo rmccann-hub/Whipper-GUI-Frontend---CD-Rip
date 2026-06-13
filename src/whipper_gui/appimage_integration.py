@@ -162,7 +162,15 @@ def _desktop_contents(appimage: Path, icon: str) -> str:
 
 
 def _default_refresh() -> None:
-    """Best-effort refresh of the freedesktop + KDE menu caches."""
+    """Best-effort refresh of the freedesktop + KDE menu caches.
+
+    Fire-and-forget: `kbuildsycoca6` in particular can take tens of seconds
+    to rebuild KDE's system cache, and this is sometimes called on the GUI
+    thread (e.g. right after an in-app update). Blocking on it froze the
+    window ("Not Responding") — a real-user report 2026-06-13. We don't
+    need the result (the menu entry appears once the cache catches up on its
+    own), so we launch each command detached and return immediately.
+    """
     cmds = [
         ["update-desktop-database", str(DESKTOP_DIR)],
         ["kbuildsycoca6"],
@@ -172,15 +180,16 @@ def _default_refresh() -> None:
         if shutil.which(argv[0]) is None:
             continue
         try:
-            subprocess.run(
+            # Popen (not run): start it and move on — never wait. start_new_session
+            # detaches it so it isn't tied to our process group.
+            subprocess.Popen(
                 argv,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                timeout=30,
-                check=False,
+                start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError):  # best-effort only
-            log.debug("menu refresh via %s failed", argv[0], exc_info=True)
+            log.debug("menu refresh via %s failed to launch", argv[0], exc_info=True)
 
 
 def integrate(

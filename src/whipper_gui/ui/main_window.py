@@ -912,7 +912,19 @@ class MainWindow(QMainWindow):
                 dialog.setRange(0, 100)
                 dialog.setValue(int(percent))
 
+        def on_status(message: str) -> None:
+            # Tell the user which phase we're in — the post-download steps
+            # (verify + install) are quick but used to look like a freeze.
+            dialog.setLabelText(message)
+            # Once we leave the download phase the operation can't be safely
+            # cancelled (the file swap is atomic), so retire the Cancel button
+            # rather than leave a button that "does nothing" (real-user report
+            # 2026-06-13). The Esc/close shortcut is disabled with it.
+            if not message.startswith(("Checking", "Downloading")):
+                dialog.setCancelButton(None)
+
         self._install_worker.progress.connect(on_progress)
+        self._install_worker.status.connect(on_status)
         self._install_worker.finished.connect(
             lambda ok, payload: self._on_update_install_finished(ok, payload, dialog)
         )

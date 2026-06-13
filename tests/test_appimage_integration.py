@@ -235,3 +235,35 @@ def test_is_settled_only_inside_applications_dir(tmp_path: Path) -> None:
     outside.write_bytes(b"x")
     assert ai.is_settled(inside, applications_dir=applications) is True
     assert ai.is_settled(outside, applications_dir=applications) is False
+
+
+# --- _default_refresh: must never block the caller (real-user report) ------
+
+
+def test_default_refresh_is_non_blocking(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The menu-cache refresh runs after an in-app update on the GUI thread;
+    `kbuildsycoca6` can take tens of seconds, and waiting on it froze the
+    window ("Not Responding", 2026-06-13). It must launch detached (Popen)
+    and never call the blocking subprocess.run."""
+    launched: list[list[str]] = []
+
+    # Pretend every refresh tool exists so we exercise the launch path.
+    monkeypatch.setattr(ai.shutil, "which", lambda _name: "/usr/bin/" + _name)
+
+    def fake_popen(argv, **kwargs):
+        launched.append(argv)
+        # Detached launch is the whole point — assert we didn't ask to wait.
+        assert kwargs.get("start_new_session") is True
+        return object()
+
+    # If the code ever reverts to a blocking run(), fail loudly.
+    def forbidden_run(*_a, **_k):
+        raise AssertionError("_default_refresh must not block on subprocess.run")
+
+    monkeypatch.setattr(ai.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(ai.subprocess, "run", forbidden_run)
+
+    ai._default_refresh()
+
+    # update-desktop-database + kbuildsycoca6 + kbuildsycoca5 all "found".
+    assert ["kbuildsycoca6"] in launched

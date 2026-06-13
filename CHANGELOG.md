@@ -12,6 +12,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Fixed
+- **In-app update no longer freezes the window ("Not Responding") after the
+  download (real-user report).** The post-download menu-cache refresh
+  (`kbuildsycoca6`, which can take tens of seconds) was run synchronously on
+  the GUI thread, blocking the event loop — so the progress dialog sat frozen
+  at 100%, the Cancel button "did nothing", and closing took a long time. The
+  refresh is now fire-and-forget, and the updater reports each phase
+  ("Verifying…", "Installing — almost done, please don't close…") instead of
+  sitting at "Downloading 100%". The Cancel button is retired once the
+  un-cancellable install phase begins rather than lingering as a dead button.
 - **`uninstall.sh --full` now removes the whole `~/.config/whipper/` directory**
   instead of just `whipper.conf`, so the drive-setup wizard's
   `whipper.conf.bak` backup no longer survives a full uninstall (a real user

@@ -74,6 +74,26 @@ def test_success_installs_atomically_and_is_executable(tmp_path: Path) -> None:
     assert seen and seen[-1] == pytest.approx(100.0)  # progress reached 100%
 
 
+def test_status_reports_each_phase(tmp_path: Path) -> None:
+    """The UI relies on phase labels so the quick post-download steps don't
+    look like a freeze (real-user report 2026-06-13). Verify + install must
+    each announce themselves, in order, after downloading."""
+    phases: list[str] = []
+    download_and_install(
+        "0.2.3", dest_dir=tmp_path, status=phases.append, opener=_opener()
+    )
+
+    joined = " | ".join(phases)
+    assert "Downloading" in joined
+    assert "Verifying" in joined
+    assert "Installing" in joined
+    # Order: download before verify before install.
+    download_i = next(i for i, p in enumerate(phases) if "Downloading" in p)
+    verify_i = next(i for i, p in enumerate(phases) if "Verifying" in p)
+    install_i = next(i for i, p in enumerate(phases) if "Installing" in p)
+    assert download_i < verify_i < install_i
+
+
 def test_checksum_mismatch_never_installs(tmp_path: Path) -> None:
     """The integrity gate: a corrupted/tampered download is discarded and
     the existing install is untouched."""

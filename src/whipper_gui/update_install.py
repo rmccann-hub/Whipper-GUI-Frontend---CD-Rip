@@ -65,20 +65,29 @@ def download_and_install(
     progress: Callable[[float], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
     opener: Callable[[str], object] | None = None,
+    status: Callable[[str], None] | None = None,
 ) -> Path:
     """Download release `version`, verify it, install it. Returns the path.
 
     `progress` gets a percentage (0–100), or -1.0 when the server didn't
-    say how big the file is. `cancelled` is polled between chunks.
-    Raises :class:`UpdateInstallError` on any failure — after cleaning up
-    the partial download, and never having touched the existing install.
+    say how big the file is. `cancelled` is polled between chunks. `status`
+    gets a short phase label ("Downloading…", "Verifying…", "Installing…")
+    so the UI can tell the user what's happening — the post-download phases
+    are quick but used to look like a freeze. Raises
+    :class:`UpdateInstallError` on any failure — after cleaning up the
+    partial download, and never having touched the existing install.
     """
     open_url = opener or _default_open
     url = asset_url(version)
     target = dest_dir / CANONICAL_APPIMAGE_NAME
     part = dest_dir / ".whipper-gui-update.part"
 
+    def _status(message: str) -> None:
+        if status is not None:
+            status(message)
+
     # 1. The published checksum is the integrity gate for the download.
+    _status("Checking for the update…")
     try:
         with open_url(url + ".sha256") as response:
             expected = response.read().decode("utf-8").split()[0].strip().lower()
@@ -89,6 +98,7 @@ def download_and_install(
 
     # 2. Stream the AppImage to a .part file next to the final location
     # (same filesystem → the final rename is atomic).
+    _status(f"Downloading Whipper GUI {version}…")
     digest = hashlib.sha256()
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -114,6 +124,7 @@ def download_and_install(
         raise UpdateInstallError(f"download failed: {exc}") from exc
 
     # 3. Verify BEFORE touching the existing install.
+    _status("Verifying the download…")
     actual = digest.hexdigest().lower()
     if actual != expected:
         part.unlink(missing_ok=True)
@@ -124,6 +135,7 @@ def download_and_install(
 
     # 4. Make it launchable and atomically swap it in. Replacing the file
     # the app is running from is safe — the old session keeps its inode.
+    _status("Installing — almost done, please don't close…")
     try:
         part.chmod(0o755)
         part.replace(target)

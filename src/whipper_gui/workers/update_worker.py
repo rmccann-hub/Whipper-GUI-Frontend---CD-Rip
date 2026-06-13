@@ -39,10 +39,12 @@ class UpdateInstallWorker(QObject):
 
     Signals:
       progress(float) — download percentage (0–100), or -1.0 if unknown
+      status(str) — short phase label (Downloading/Verifying/Installing…)
       finished(bool, str) — (True, installed path) or (False, error text)
     """
 
     progress = Signal(float)
+    status = Signal(str)
     finished = Signal(bool, str)
 
     def __init__(self, version: str, parent: QObject | None = None) -> None:
@@ -65,6 +67,7 @@ class UpdateInstallWorker(QObject):
                 self._version,
                 progress=self.progress.emit,
                 cancelled=lambda: self._cancelled,
+                status=self.status.emit,
             )
         except UpdateInstallError as exc:
             self.finished.emit(False, str(exc))
