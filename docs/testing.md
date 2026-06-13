@@ -109,6 +109,15 @@ tiers. "I added a happy-path test" is not done.
     with the "already prompted" config flags (`host_setup_prompted=True`, …) so
     those offers are no-ops. (This is the same `processEvents` hazard called out
     for widget tests in `conftest`.)
+- **Architectural fitness tests.** A small, fast test that protects a *design
+  property* rather than a single behaviour. We enforce the "never block the GUI
+  thread" rule this way: `test_gui_thread_discipline.py` AST-parses every
+  `ui/` module and fails if any makes a synchronous blocking call
+  (`subprocess.run`, `urlopen`, `time.sleep`) — so the freeze bug class can't
+  silently return. It ships with a meta-test proving the guard detects a
+  planted offender (a fitness test that can't fail is worthless). Reach for
+  this pattern whenever a rule is easy to violate and expensive to catch by
+  eye. Portable to any sibling project.
 - **Mutation testing** (periodic, not in CI). Run `mutmut` occasionally on the
   parsers/adapters to measure whether tests actually *catch* bugs rather than
   just execute lines — coverage says a line ran, mutation says a test fails when
