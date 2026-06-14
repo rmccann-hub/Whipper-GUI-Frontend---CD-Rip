@@ -149,6 +149,11 @@ class MainWindow(
         # in closeEvent so a half-downloaded update can't outlive the window.
         self._install_worker: object | None = None
         self._install_thread: QThread | None = None
+        # Launch-time dependency probe, run off-thread so a cold-container
+        # `whipper --version` can't freeze the just-shown window; joined in
+        # closeEvent. (DependencyMixin.run_dependency_check_async)
+        self._dep_check_worker: object | None = None
+        self._dep_check_thread: QThread | None = None
         # Params of the in-flight rip, captured at start so the finish
         # handler knows whether it was an unknown-mode rip (and where the
         # FLACs landed) without depending on the controls' current state.
@@ -254,6 +259,11 @@ class MainWindow(
                 self._install_worker.cancel()
             self._install_thread.quit()
             self._install_thread.wait(5000)
+        # Join a still-running launch dependency probe (bounded subprocess
+        # probes; short wait).
+        if self._dep_check_thread is not None and self._dep_check_thread.isRunning():
+            self._dep_check_thread.quit()
+            self._dep_check_thread.wait(2000)
         # Cancel any in-progress rip before the window goes away.
         if self._rip_worker is not None:
             self._rip_worker.cancel()

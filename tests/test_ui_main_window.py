@@ -7,6 +7,7 @@ We DON'T drive a real Qt event loop — tests poke slots directly.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -147,6 +148,16 @@ def teardown_threads(qapp: QApplication):
         if window._mb_thread.isRunning():
             window._mb_thread.quit()
             window._mb_thread.wait(2000)
+        # Join a launch dependency-check thread too — destroying a window with
+        # a running QThread aborts the process. quit() here is delivered to the
+        # thread's own loop directly (not via the queued finished→quit), so it
+        # works even when the test never pumped the GUI event loop.
+        if (
+            window._dep_check_thread is not None
+            and window._dep_check_thread.isRunning()
+        ):
+            window._dep_check_thread.quit()
+            window._dep_check_thread.wait(2000)
         window.deleteLater()
 
 
@@ -2193,3 +2204,54 @@ def test_cover_art_outcome_lands_in_the_log_view(teardown_threads) -> None:
     assert "Cover art: embedded in 14 track(s)." in (
         window._rip_progress._log_view.toPlainText()
     )
+
+
+# --- Launch dependency check runs off the GUI thread (TASKS #11a) ----------
+
+
+def test_run_dependency_check_async_probes_off_thread_and_applies(
+    teardown_threads, qapp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The launch-time dependency check probes on a worker thread, then
+    applies the report on the GUI thread (show_summary=False). Proves the
+    worker→GUI-thread-apply wiring + cleanup, without freezing the window."""
+    # First-run offers marked done so the processEvents poll below can't fire
+    # a deferred _maybe_offer_* singleShot into a modal dialog (blocks headless).
+    window = teardown_threads(
+        config=Config(
+            host_setup_prompted=True,
+            drive_setup_prompted=True,
+            appimage_integration_prompted=True,
+        )
+    )
+    applied: list[bool] = []
+    monkeypatch.setattr(
+        window,
+        "_apply_dependency_report",
+        lambda _mgr, _report, show_summary: applied.append(show_summary),
+    )
+
+    window.run_dependency_check_async()
+    assert window._dep_check_thread is not None  # a worker thread was started
+
+    deadline = time.monotonic() + 8.0
+    while not applied and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.005)
+
+    assert applied, "async dependency check never applied its report"
+    assert applied[0] is False  # launch path never forces the summary popup
+    assert window._dep_check_thread is None  # cleaned up after finishing
+
+
+def test_run_dependency_check_async_is_single_flight(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second async check while one is running is a no-op (one at a time)."""
+    window = teardown_threads(
+        config=Config(host_setup_prompted=True, drive_setup_prompted=True)
+    )
+    window.run_dependency_check_async()
+    first_thread = window._dep_check_thread
+    window.run_dependency_check_async()  # must not start a second
+    assert window._dep_check_thread is first_thread

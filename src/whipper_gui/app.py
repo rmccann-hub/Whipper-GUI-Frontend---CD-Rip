@@ -195,17 +195,18 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         window.show()
-        # Both the launch dependency check and the drive listing shell out
-        # to whipper, which enters the Distrobox container and can take a
-        # moment on a cold start. Do them AFTER show() so the user sees the
-        # window immediately rather than staring at nothing while a
-        # subprocess runs. Each is guarded so a failure still leaves a
-        # usable window. (Moving these probes fully off the GUI thread so
-        # they can't even briefly block is tracked in TASKS.)
+        # The launch dependency check shells out to whipper (which enters the
+        # Distrobox container — slow on a cold start), so run it OFF the GUI
+        # thread: the window is responsive immediately and the probe can't
+        # freeze it. Resolver dialogs for anything missing surface on the GUI
+        # thread when the probe finishes. Guarded so a failure still leaves a
+        # usable window.
         try:
-            window.run_dependency_check(show_summary=False)
+            window.run_dependency_check_async()
         except Exception:  # noqa: BLE001 — last-resort guard
             log.exception("initial dependency check failed; continuing anyway")
+        # Drive listing also shells to whipper; kept after show() so the window
+        # appears immediately. (Off-threading this probe too is tracked in TASKS.)
         try:
             window.refresh_drives()
         except Exception:  # noqa: BLE001 — last-resort guard

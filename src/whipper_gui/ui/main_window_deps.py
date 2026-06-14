@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from whipper_gui.deps.resolvers import (
@@ -107,28 +108,72 @@ class DependencyMixin:
         self.run_dependency_check(show_summary=True)
 
     def run_dependency_check(self, show_summary: bool = True) -> None:
-        """Run check_all + resolve_missing with GUI-backed resolvers.
+        """Run check_all + resolve_missing with GUI-backed resolvers, **synchronously**.
 
-        Public so app.py can call it at launch. `show_summary=False`
-        means the OK popup is suppressed when nothing's missing — but
-        dialogs still appear for items that need attention.
+        Used by the Tools → Check dependencies menu action (the user clicked,
+        so a brief block while probing is acceptable) and by tests. The
+        launch-time path uses `run_dependency_check_async` instead so a
+        cold-container probe can't freeze the just-shown window.
         """
-        auto = AutoInstaller(consent=self._gui_auto_consent)
-        queued = _DialogQueuedResolver(self, self._make_install_one())
-        manual = ManualPrompt(dialog_callback=self._gui_manual_dialog)
+        gui_manager = self._build_gui_dependency_manager()
+        self._apply_dependency_report(
+            gui_manager, gui_manager.check_all(), show_summary=show_summary
+        )
 
-        # Reuse the registry from the injected DependencyManager so the
-        # menu-driven check sees exactly the deps the app cares about.
+    def run_dependency_check_async(self) -> None:
+        """Launch-time dependency check that probes **off the GUI thread**.
+
+        `check_all()` shells out per dependency, and the whipper probe enters
+        the Distrobox container — slow on a cold start. Running it on the GUI
+        thread at launch froze the just-shown window; here the probing runs on
+        a worker and only the *result* is applied on the GUI thread (where the
+        resolver dialogs must live). One check at a time.
+        """
+        if self._dep_check_thread is not None:  # a check is already running
+            return
+        from whipper_gui.workers.dependency_worker import DependencyCheckWorker
+
+        gui_manager = self._build_gui_dependency_manager()
+        self._dep_check_worker = DependencyCheckWorker(gui_manager)
+        self._dep_check_thread = QThread(self)
+        self._dep_check_worker.moveToThread(self._dep_check_thread)
+        self._dep_check_worker.finished.connect(
+            lambda report: self._on_dependency_check_done(gui_manager, report)
+        )
+        self._dep_check_worker.finished.connect(self._dep_check_thread.quit)
+        self._dep_check_thread.finished.connect(self._dep_check_thread.deleteLater)
+        self._dep_check_thread.started.connect(self._dep_check_worker.run)
+        self._dep_check_thread.start()
+
+    def _on_dependency_check_done(self, gui_manager: object, report: object) -> None:
+        """Worker finished probing — apply the report on the GUI thread."""
+        self._dep_check_worker = None
+        self._dep_check_thread = None
+        # Launch path never forces the "all good" popup (silent unless action
+        # is needed); resolver dialogs still surface for genuinely-missing deps.
+        self._apply_dependency_report(gui_manager, report, show_summary=False)
+
+    def _build_gui_dependency_manager(self) -> object:
+        """A DependencyManager wired with GUI-backed resolvers (consent dialog,
+        queued-install dialog, manual-search dialog), reusing the injected
+        manager's registry so it sees exactly the deps the app cares about."""
         from whipper_gui.deps.manager import DependencyManager
 
-        gui_manager = DependencyManager(
-            auto=auto,
-            queued=queued,
-            manual=manual,
+        return DependencyManager(
+            auto=AutoInstaller(consent=self._gui_auto_consent),
+            queued=_DialogQueuedResolver(self, self._make_install_one()),
+            manual=ManualPrompt(dialog_callback=self._gui_manual_dialog),
             specs=self._dependency_manager._specs,  # type: ignore[attr-defined]
         )
 
-        report = gui_manager.check_all()
+    def _apply_dependency_report(
+        self, gui_manager: object, report: object, show_summary: bool
+    ) -> None:
+        """GUI-thread half: set optional deps aside, resolve the required
+        missing ones (dialogs), then show the summary. `report` is None only
+        if the off-thread probe crashed — then this is a no-op (already logged)."""
+        if report is None:
+            return
         # Optional deps (e.g. Picard) shouldn't nag at launch or count as a
         # problem — set them aside so only required deps drive resolution.
         optional_missing = [
