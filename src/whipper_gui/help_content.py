@@ -62,7 +62,9 @@ named from the album artist/title you type.
 - **Output folder** and **file-name templates** (separate templates for known
   and unknown discs).
 - **Continue on CD-R** — needed to rip home-burned discs.
-- **Cover art** — off, embedded, or saved as a file. Works with both backends: whipper fetches it itself; with cyanrip this app fetches the front cover from the Cover Art Archive after the rip.
+- **Cover art** — off, embedded, or saved as a file. Works with both
+  backends: whipper fetches it itself; with cyanrip this app fetches the
+  front cover from the Cover Art Archive after the rip.
 - **Force overread**, **max retries**, **keep going on errors** — EAC-parity
   read options.
 - **Read offset override** — set the drive read-offset by hand (the drive-setup
@@ -102,9 +104,13 @@ containers keep working). You'll confirm before anything is removed.
 
 ## Drive setup (Tools → Set up drive)
 
-Runs whipper's own **drive analyze** and **offset find** and writes them to
-`whipper.conf`. Do this once per drive for accurate, AccurateRip-comparable
-rips. Your existing `whipper.conf` is backed up first.
+Sets your drive's **read offset** — the one calibration that makes rips
+bit-perfect. For most drives the wizard already knows the right value (from
+the bundled AccurateRip drive list) and pre-fills it, so it's a single
+**Save offset** click — no disc needed. If your drive isn't in the list,
+insert a popular commercial CD and click **Detect**, or type the offset by
+hand. The value is saved as the app's offset override (and `whipper.conf` is
+backed up first if it's touched). Do this once per drive.
 
 ## Troubleshooting
 
