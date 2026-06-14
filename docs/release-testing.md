@@ -149,7 +149,12 @@ assuming a bug:
   every sample → every CRC differs.
 - **Gap/pregap handling** — EAC here used **"Appended to previous track."** If
   the ripper splits gaps differently, track *boundaries* move and per-track CRCs
-  differ even though the audio is correct. Match the gap mode.
+  differ even though the audio is correct. ⚠️ **We don't currently set a gap
+  mode** — the rip uses whipper's / cyanrip's default. So if a *clean* track's
+  CRC differs (especially one adjacent to a pregap) while the offset is right,
+  **gap handling is the prime suspect**, and the fix is to expose/force the
+  EAC-matching gap mode (tracked in TASKS — the "EAC gap-handling parity" item).
+  Tracks with no surrounding gap (most of a typical album) are unaffected.
 - **Lead-in/out overread** — EAC: **No** overread here. Keep "Force overread"
   off to match.
 - **Null samples in CRC** — EAC: **Yes**. (whipper/cyanrip CRC the decoded PCM,
