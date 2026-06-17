@@ -167,6 +167,16 @@ class Config:
     # silently skipped, in an archival workflow.
     keep_going: bool = False
 
+    # --- CTDB verification (KDD-14 Phase 1) ---
+    # After a successful rip, verify the result against the CUETools Database
+    # (a second, TOC-keyed verification path alongside AccurateRip). Off by
+    # default: it's a network call, and — until the audio-CRC algorithm is
+    # confirmed bit-exact on real hardware (KDD-16, crc.CRC_VALIDATED) — a
+    # match is only "experimental" and is labelled as such in the UI. The
+    # verify fails *safe*: a wrong CRC can only ever under-claim (NO_MATCH),
+    # never fabricate a "verified".
+    ctdb_verify_after_rip: bool = False
+
     # --- Schema bookkeeping ---
     schema_version: int = SCHEMA_VERSION
 

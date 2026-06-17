@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict
 from whipper_gui.parsers.rip_log import RipLog
 
 log = logging.getLogger(__name__)
@@ -115,6 +116,16 @@ class RipProgress(QWidget):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         root.addWidget(self._ar_table, stretch=1)
 
+        # --- CTDB verdict line (second, TOC-keyed verification path) ---
+        # Sits directly under the AccurateRip table — a one-liner that only
+        # appears when a CTDB verify ran (it's an opt-in, post-rip network
+        # check). Until the audio-CRC algorithm is hardware-validated a match
+        # is shown as "experimental" (KDD-16); see set_ctdb_result.
+        self._ctdb_label: QLabel = QLabel("", self)
+        self._ctdb_label.setWordWrap(True)
+        self._ctdb_label.setVisible(False)
+        root.addWidget(self._ctdb_label)
+
         # --- View log button ---
         button_row = QHBoxLayout()
         button_row.addStretch(1)
@@ -133,6 +144,8 @@ class RipProgress(QWidget):
         self._progress_bar.setValue(0)
         self._log_view.clear()
         self._ar_table.setRowCount(0)
+        self._ctdb_label.clear()
+        self._ctdb_label.setVisible(False)
         self._view_log_button.setEnabled(False)
         self._log_path = None
 
@@ -172,6 +185,21 @@ class RipProgress(QWidget):
             self._ar_table.setItem(row, _AR_COL_V1, v1_item)
             self._ar_table.setItem(row, _AR_COL_V2, v2_item)
 
+    def set_ctdb_status(self, text: str) -> None:
+        """Show an in-progress CTDB line (e.g. 'Verifying against CTDB…')."""
+        self._ctdb_label.setText(text)
+        self._ctdb_label.setVisible(True)
+
+    def set_ctdb_result(self, result: CtdbVerifyResult) -> None:
+        """Render the final CTDB verdict under the AccurateRip table.
+
+        A match that isn't yet trustworthy (the audio-CRC algorithm is not
+        hardware-validated, KDD-16) is labelled experimental — we never claim
+        a verification the algorithm can't yet stand behind.
+        """
+        self._ctdb_label.setText(ctdb_verdict_line(result))
+        self._ctdb_label.setVisible(True)
+
     def set_log_path(self, path: Path | None) -> None:
         """Enable the View Log button (when path is non-empty and exists)."""
         if path is None or str(path) == "":
@@ -190,6 +218,33 @@ class RipProgress(QWidget):
             return
         url = QUrl.fromLocalFile(str(self._log_path))
         self._open_url(url)
+
+
+def ctdb_verdict_line(result: CtdbVerifyResult) -> str:
+    """One-line, user-facing summary of a CTDB verify outcome.
+
+    Pure function (no widget) so it's unit-testable. The MATCH wording is the
+    important safety case: until ``result.trustworthy`` (the CRC algorithm is
+    hardware-validated, KDD-16) a match is spelled out as *experimental*, never
+    as a plain "verified" — mirroring the rip's own "never claim a check that
+    didn't run" rule.
+    """
+    verdict = result.verdict
+    if verdict is Verdict.MATCH:
+        if result.trustworthy:
+            return f"CTDB: verified ✓ (confidence {result.confidence})"
+        return (
+            f"CTDB: CRC matched (confidence {result.confidence}) — "
+            "EXPERIMENTAL, pending hardware validation of the CRC algorithm "
+            "(not yet a confirmed verification)"
+        )
+    if verdict is Verdict.NO_MATCH:
+        return "CTDB: no match — this rip differs from the database entries"
+    if verdict is Verdict.NOT_IN_DATABASE:
+        return "CTDB: this disc isn’t in the database"
+    if verdict is Verdict.DECODER_UNAVAILABLE:
+        return "CTDB: not verified — install the `flac` decoder to enable this"
+    return "CTDB: verification unavailable (lookup or decode error)"
 
 
 def _basename(path: str) -> str:

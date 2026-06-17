@@ -183,6 +183,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         metaflac = MetaflacAdapter(binary_name=cfg.metaflac_path)
 
+        # CTDB lookup transport (KDD-14 Phase 1). Constructed here in the
+        # composition root and injected; only used when the user enables
+        # "Verify with CTDB after a rip".
+        from whipper_gui.adapters.ctdb_client import CtdbHttpImpl
+
+        ctdb_client = CtdbHttpImpl()
+
         from whipper_gui.deps.manager import DependencyManager
 
         dependency_manager = DependencyManager()
@@ -195,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
             mb_client=mb_client,
             metaflac=metaflac,
             dependency_manager=dependency_manager,
+            ctdb_client=ctdb_client,
         )
 
         window.show()

@@ -80,6 +80,19 @@ def test_debug_logging_defaults_off_and_round_trips(
     assert config_module.load().debug_logging is True
 
 
+def test_ctdb_verify_defaults_off_and_round_trips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _redirect_config(tmp_path, monkeypatch)
+
+    cfg = config_module.load()
+    assert cfg.ctdb_verify_after_rip is False  # default off (network call)
+
+    cfg.ctdb_verify_after_rip = True
+    config_module.save(cfg)
+    assert config_module.load().ctdb_verify_after_rip is True
+
+
 def test_save_is_atomic_no_tmp_left_behind(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

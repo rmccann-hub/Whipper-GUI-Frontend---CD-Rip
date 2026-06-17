@@ -11,6 +11,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **CTDB verification after a rip (opt-in, experimental).** A new Settings
+  toggle, "Verify with CTDB after a rip", checks a finished rip against the
+  CUETools Database — a second, TOC-keyed verification path alongside
+  AccurateRip. The result appears as a one-line verdict beneath the
+  AccurateRip table. It runs entirely off the GUI thread (the network lookup
+  and the local FLAC decode), needs the `flac` decoder for the audio check,
+  and is **off by default** (it's a network call). Until the audio-CRC
+  algorithm is confirmed bit-exact on real hardware, a match is labelled
+  **EXPERIMENTAL** rather than "verified" — the check can only ever
+  under-claim (report "no match"), never fabricate a verification.
+
 ### Fixed
 - **The window no longer freezes while tagging an unknown-album rip.** Writing
   the FLAC tags after a rip (a `metaflac` subprocess per track) used to run on

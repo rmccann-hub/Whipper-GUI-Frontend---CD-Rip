@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from whipper_gui.adapters.ctdb_client import CTDBClient, CtdbLookupResult
 from whipper_gui.adapters.metaflac import MetaflacAdapter
 from whipper_gui.adapters.musicbrainz_client import (
     MusicBrainzClient,
@@ -30,6 +31,7 @@ from whipper_gui.adapters.whipper_backend import (
     WhipperBackend,
 )
 from whipper_gui.config import Config
+from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict
 from whipper_gui.deps.manager import DependencyManager
 from whipper_gui.drive_access import DriveAccessDiagnosis
 from whipper_gui.parsers.drive_list import DriveDescriptor
@@ -172,6 +174,10 @@ def teardown_threads(qapp: QApplication):
         ):
             window._drive_list_thread.quit()
             window._drive_list_thread.wait(2000)
+        # …and a post-rip CTDB verify thread.
+        if window._ctdb_thread is not None and window._ctdb_thread.isRunning():
+            window._ctdb_thread.quit()
+            window._ctdb_thread.wait(2000)
         window.deleteLater()
 
 
@@ -2272,6 +2278,78 @@ def test_cover_art_outcome_lands_in_the_log_view(teardown_threads) -> None:
     assert "Cover art: embedded in 14 track(s)." in (
         window._rip_progress._log_view.toPlainText()
     )
+
+
+# --- Post-rip CTDB verify (opt-in, KDD-14 Phase 1) -------------------------
+
+
+class _FakeCtdbClient(CTDBClient):
+    """Returns a canned lookup result without touching the network."""
+
+    def __init__(self, result: CtdbLookupResult) -> None:
+        self._result = result
+        self.calls = 0
+
+    def lookup(self, toc):  # type: ignore[no-untyped-def]
+        self.calls += 1
+        return self._result
+
+
+def test_ctdb_verify_skipped_when_disabled(teardown_threads, tmp_path: Path) -> None:
+    window = teardown_threads()  # default config: ctdb_verify_after_rip off
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, "")
+
+    assert window._ctdb_thread is None  # no verify when the toggle is off
+
+
+def test_ctdb_verify_skipped_on_failed_rip(teardown_threads, tmp_path: Path) -> None:
+    window = teardown_threads(config=Config(ctdb_verify_after_rip=True))
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(False, "")  # rip failed → nothing to verify
+
+    assert window._ctdb_thread is None
+
+
+def test_ctdb_verify_runs_off_thread_and_renders_verdict(
+    teardown_threads, qapp, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """With the toggle on, a successful rip kicks off a CTDB verify on a
+    worker thread; the verdict lands under the AccurateRip table on the GUI
+    thread. Fake client + stubbed sample probe → no network, no subprocess."""
+    window = teardown_threads(config=Config(ctdb_verify_after_rip=True))
+    # Not in CTDB → a deterministic verdict that needs no audio decode.
+    window._ctdb_client = _FakeCtdbClient(CtdbLookupResult())
+    # Stub the metaflac sample probe so building the TOC never shells out.
+    monkeypatch.setattr("whipper_gui.ctdb.decode.total_samples", lambda _p: 1000)
+
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Track.flac").write_bytes(b"flac")
+    log_file = album_dir / "Album.log"
+    log_file.write_text("", encoding="utf-8")
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, str(log_file))
+    assert window._ctdb_thread is not None  # verify started off-thread
+
+    # Pump the GUI loop until the queued finished→handler clears the thread.
+    deadline = time.monotonic() + 8.0
+    while window._ctdb_thread is not None and time.monotonic() < deadline:
+        qapp.processEvents()
+        time.sleep(0.005)
+
+    assert window._ctdb_thread is None  # finished + cleaned up
+    assert "database" in window._rip_progress._ctdb_label.text()
+
+
+def test_on_ctdb_verified_renders_verdict(teardown_threads) -> None:
+    window = teardown_threads()
+    window._on_ctdb_verified(CtdbVerifyResult(Verdict.NO_MATCH))
+    assert "no match" in window._rip_progress._ctdb_label.text()
+    assert window._ctdb_thread is None
 
 
 # --- Launch dependency check runs off the GUI thread (TASKS #11a) ----------

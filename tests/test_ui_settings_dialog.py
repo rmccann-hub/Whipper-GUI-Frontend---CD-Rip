@@ -111,6 +111,18 @@ def test_auto_eject_reflects_config_and_round_trips(qapp: QApplication) -> None:
     assert dialog2.to_config().auto_eject_after_rip is True
 
 
+def test_ctdb_verify_reflects_config_and_round_trips(qapp: QApplication) -> None:
+    # Reflects the incoming config…
+    dialog = SettingsDialog(Config(ctdb_verify_after_rip=True))
+    assert dialog._ctdb_verify_check.isChecked() is True
+
+    # …and defaults off, with a user toggle surviving to_config().
+    dialog2 = SettingsDialog(Config())
+    assert dialog2._ctdb_verify_check.isChecked() is False
+    dialog2._ctdb_verify_check.setChecked(True)
+    assert dialog2.to_config().ctdb_verify_after_rip is True
+
+
 def test_to_config_preserves_schema_version(qapp: QApplication) -> None:
     config = Config(schema_version=99)
     dialog = SettingsDialog(config)

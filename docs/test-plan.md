@@ -332,12 +332,22 @@ This unblocks wiring CTDB verify into the GUI.
 **If it fails:** record the URL, raw XML, and TOC; the fix lives in `ctdb/toc.py`
 (format) or `ctdb/crc.py` (CRC) — both are isolated for exactly this.
 
-### Test 1b — [ ] wire CTDB verify into the GUI
-Once Test 1 yields a trustworthy `match`: add `workers/ctdb_worker.py`
-(off-thread, emits `verified(result)`/`error`) + a CTDB verdict next to the
-AccurateRip result in `ui/rip_progress.py`; a Settings toggle "Verify with CTDB
-after a rip" (default off — it's a network call); tests for the worker signal
-flow and the UI render. (Backlog item in `TASKS.md`.)
+### Test 1b — [x] wire CTDB verify into the GUI — BUILT 2026-06-17 (experimental seam)
+The GUI wiring shipped ahead of the hardware validation, kept safe behind the
+`crc.CRC_VALIDATED=False` seam (a match shows as **EXPERIMENTAL**, never
+"verified"). As built: `workers/ctdb_worker.py::CtdbVerifyWorker` (off-thread
+lookup + decode, emits `finished(result)`; joins the post-rip metaflac thread
+first so it never decodes a file mid-rewrite); a CTDB verdict line under the
+AccurateRip table in `ui/rip_progress.py` (`set_ctdb_status`/`set_ctdb_result`
++ the pure `ctdb_verdict_line` renderer); a `Config.ctdb_verify_after_rip`
+Settings toggle (default off — it's a network call); tests for the worker
+signal flow, the UI render (incl. experimental labelling), and the off-thread
+MainWindow wiring.
+
+**Remaining (depends on Test 1):** once Test 1 confirms the `toc=` wire format
+and a trustworthy `match`, flip `crc.CRC_VALIDATED` → `True` (the single seam)
+so matches read "verified ✓", and export host `flac` in the wizard for the
+decoder.
 
 ## Test 2 — [ ] CTDB repair direction (Phase 2, KDD-14)
 

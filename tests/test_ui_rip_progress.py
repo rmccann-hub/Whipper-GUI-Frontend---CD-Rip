@@ -7,12 +7,18 @@ from pathlib import Path
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QApplication
 
+from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict
 from whipper_gui.parsers.rip_log import (
     AccurateRipResult,
     RipLog,
     TrackResult,
 )
-from whipper_gui.ui.rip_progress import RipProgress, _ar_cell, _basename
+from whipper_gui.ui.rip_progress import (
+    RipProgress,
+    _ar_cell,
+    _basename,
+    ctdb_verdict_line,
+)
 
 # --- Helpers --------------------------------------------------------------
 
@@ -230,3 +236,51 @@ def test_ar_cell_not_in_db() -> None:
         confidence=0,
     )
     assert _ar_cell(ar) == "not in DB"
+
+
+# --- CTDB verdict --------------------------------------------------------
+
+
+def test_ctdb_verdict_line_match_validated() -> None:
+    result = CtdbVerifyResult(Verdict.MATCH, confidence=8, crc_validated=True)
+    line = ctdb_verdict_line(result)
+    assert "verified" in line
+    assert "8" in line
+    assert "EXPERIMENTAL" not in line
+
+
+def test_ctdb_verdict_line_match_unvalidated_is_experimental() -> None:
+    # Default crc_validated mirrors crc.CRC_VALIDATED (False today) → a match
+    # must be labelled experimental, never a plain "verified".
+    result = CtdbVerifyResult(Verdict.MATCH, confidence=8)
+    line = ctdb_verdict_line(result)
+    assert "EXPERIMENTAL" in line
+    assert "verified ✓" not in line
+
+
+def test_ctdb_verdict_line_other_verdicts() -> None:
+    assert "no match" in ctdb_verdict_line(CtdbVerifyResult(Verdict.NO_MATCH))
+    assert "database" in ctdb_verdict_line(CtdbVerifyResult(Verdict.NOT_IN_DATABASE))
+    assert "flac" in ctdb_verdict_line(CtdbVerifyResult(Verdict.DECODER_UNAVAILABLE))
+    assert "unavailable" in ctdb_verdict_line(CtdbVerifyResult(Verdict.LOOKUP_ERROR))
+
+
+def test_set_ctdb_status_shows_label(qapp: QApplication) -> None:
+    widget = RipProgress()
+    assert widget._ctdb_label.isVisible() is False
+    widget.set_ctdb_status("Verifying against CTDB…")
+    assert widget._ctdb_label.text() == "Verifying against CTDB…"
+
+
+def test_set_ctdb_result_renders_verdict(qapp: QApplication) -> None:
+    widget = RipProgress()
+    widget.set_ctdb_result(CtdbVerifyResult(Verdict.NOT_IN_DATABASE))
+    assert "database" in widget._ctdb_label.text()
+
+
+def test_clear_hides_ctdb_label(qapp: QApplication) -> None:
+    widget = RipProgress()
+    widget.set_ctdb_result(CtdbVerifyResult(Verdict.NO_MATCH))
+    widget.clear()
+    assert widget._ctdb_label.text() == ""
+    assert widget._ctdb_label.isVisible() is False

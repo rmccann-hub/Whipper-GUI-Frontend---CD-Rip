@@ -249,6 +249,24 @@ class SettingsDialog(QDialog):
         )
         form.addRow("On track failure:", self._keep_going_check)
 
+        # --- CTDB verification (KDD-14 Phase 1) ---
+        # A second, TOC-keyed verification path alongside AccurateRip. Off by
+        # default: it's a post-rip network call, and a match is currently
+        # labelled "experimental" until the audio-CRC is hardware-validated.
+        self._ctdb_verify_check: QCheckBox = QCheckBox(
+            "Verify with CTDB after a rip (experimental)", self
+        )
+        self._ctdb_verify_check.setChecked(config.ctdb_verify_after_rip)
+        self._ctdb_verify_check.setToolTip(
+            "After a successful rip, also check it against the CUETools "
+            "Database (a second verification path alongside AccurateRip). This "
+            "is a network lookup and decodes the FLACs locally (needs `flac`). "
+            "A match is shown as EXPERIMENTAL until the CRC algorithm is "
+            "confirmed on real hardware — it can only ever under-claim, never "
+            "fabricate a 'verified'. Off by default."
+        )
+        form.addRow("CTDB:", self._ctdb_verify_check)
+
         root.addLayout(form)
 
         # --- Backend capability gating (one UI for both backends) ---
@@ -339,6 +357,7 @@ class SettingsDialog(QDialog):
             force_overread=self._force_overread_check.isChecked(),
             max_retries=self._max_retries_spin.value(),
             keep_going=self._keep_going_check.isChecked(),
+            ctdb_verify_after_rip=self._ctdb_verify_check.isChecked(),
             ripper_backend=self._backend_combo.currentData(),
             # Preserve fields the dialog doesn't model, so saving Settings
             # never silently resets them (these one-time "already offered"

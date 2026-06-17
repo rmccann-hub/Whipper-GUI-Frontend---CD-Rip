@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from whipper_gui.adapters import cover_art
 from whipper_gui.adapters.accuraterip_offsets import OffsetDatabase
+from whipper_gui.adapters.ctdb_client import CTDBClient, CtdbHttpImpl
 from whipper_gui.adapters.metaflac import MetaflacAdapter
 from whipper_gui.adapters.musicbrainz_client import (
     MusicBrainzClient,
@@ -107,6 +108,7 @@ class MainWindow(
         metaflac: MetaflacAdapter,
         dependency_manager: DependencyManager,
         save_config: Callable[[Config], None] | None = None,
+        ctdb_client: CTDBClient | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -119,6 +121,11 @@ class MainWindow(
         self._mb_client: MusicBrainzClient = mb_client
         self._metaflac: MetaflacAdapter = metaflac
         self._dependency_manager: DependencyManager = dependency_manager
+        # CTDB lookup adapter (KDD-14 Phase 1). Injected so tests pass a fake;
+        # defaults to the real HTTP client. Only reached when the user opts in
+        # to "Verify with CTDB after a rip" (off by default — it's a network
+        # call), so the default real client never touches the net in tests.
+        self._ctdb_client: CTDBClient = ctdb_client or CtdbHttpImpl()
         # Read-offset lookup by drive model (the disc-free primary path that
         # replaces relying on whipper's flaky `offset find`). Cheap to build
         # — a curated in-code table overlaid with an optional user CSV.
@@ -199,6 +206,11 @@ class MainWindow(
         self._post_rip_thread: threading.Thread | None = None
         # Whether the user asked to launch Picard after an unknown rip.
         self._pending_picard_launch: bool = False
+        # Post-rip CTDB verify (KDD-14 Phase 1, opt-in). Runs the lookup +
+        # local decode on a QThread so the network/subprocess never blocks the
+        # GUI; joined in closeEvent like the other probe threads.
+        self._ctdb_worker: object | None = None
+        self._ctdb_thread: QThread | None = None
         # Guard so the "no drive — here's the fix" nudge auto-shows at most
         # once per session (refreshing shouldn't re-pop the dialog).
         self._drive_access_nudged: bool = False
@@ -317,6 +329,11 @@ class MainWindow(
         if self._drive_list_thread is not None and self._drive_list_thread.isRunning():
             self._drive_list_thread.quit()
             self._drive_list_thread.wait(2000)
+        # Join a still-running CTDB verify (bounded — its network call and
+        # decode have their own timeouts).
+        if self._ctdb_thread is not None and self._ctdb_thread.isRunning():
+            self._ctdb_thread.quit()
+            self._ctdb_thread.wait(3000)
         # Cancel any in-progress rip before the window goes away.
         if self._rip_worker is not None:
             self._rip_worker.cancel()
