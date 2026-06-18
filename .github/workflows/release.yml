@@ -22,9 +22,11 @@ on:
         description: "Release tag to create (e.g. v0.2.4)"
         required: true
 
-# Needed for the `gh release` calls to create/update the release.
+# Needed for the `gh release` calls to create/update the release, and for
+# `gh workflow run` to dispatch the PyPI publish workflow.
 permissions:
-  contents: write
+  contents: write # create the GitHub Release + upload assets
+  actions: write # dispatch publish-pypi.yml (gh workflow run)
 
 jobs:
   build-and-release:
@@ -110,3 +112,18 @@ jobs:
               --generate-notes \
               $PRERELEASE
           fi
+
+      # Kick off the PyPI publish in its OWN run. We must DISPATCH it rather
+      # than rely on a `release: published` trigger: the release above is
+      # created with the default GITHUB_TOKEN, and GitHub suppresses the events
+      # a GITHUB_TOKEN generates — so that trigger never fires (this is why
+      # v0.2.4–v0.2.7 shipped with no PyPI publish). workflow_dispatch is the
+      # documented EXCEPTION — it always creates a run, even via GITHUB_TOKEN —
+      # so this is the reliable hand-off. Dispatched on the release TAG so the
+      # publish builds the released commit. A separate run keeps the rule that a
+      # PyPI problem can't block the AppImage release (already created above).
+      - name: Trigger the PyPI publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh workflow run publish-pypi.yml --ref "$TAG"

@@ -427,7 +427,11 @@ Update README Step 6 with the real behaviour.
 ## Test 7 — [ ] PyPI go-live (maintainer credential)
 
 **Goal:** make `pipx install whipper-gui` work from PyPI. The `publish-pypi.yml`
-workflow is already in place (Trusted Publishing).
+workflow is already in place (Trusted Publishing) and is dispatched automatically
+by `release.yml` after each release (it keeps `publish-pypi.yml` as the OIDC
+entry workflow, so the publisher config in step 1 is exactly right). Note: the
+publish only ever *failed* before because the publisher wasn't configured —
+step 1 is the missing piece.
 
 **Steps**
 1. On PyPI: **Publishing → add a pending publisher** with — project

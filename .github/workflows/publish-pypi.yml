@@ -1,9 +1,20 @@
 name: Publish to PyPI
 
-# Publishes the wheel + sdist to PyPI when a GitHub Release is published.
-# release.yml creates the release on a `v*` tag (which fires this), so a
-# normal `git tag vX.Y.Z && git push --tags` ships both the AppImage AND the
-# PyPI package with no extra step.
+# Builds the wheel + sdist and publishes them to PyPI.
+#
+# HOW IT'S TRIGGERED: release.yml dispatches this workflow (`gh workflow run`)
+# right after it creates the GitHub Release, on the release TAG — so the
+# checkout below builds the released commit. It is deliberately NOT triggered by
+# a `release: published` event: release.yml creates the release with the default
+# GITHUB_TOKEN, and GitHub suppresses the events a GITHUB_TOKEN generates, so
+# that trigger never fired (this is why v0.2.4–v0.2.7 shipped with no PyPI
+# publish). workflow_dispatch is the documented exception — it always creates a
+# run, even when dispatched via GITHUB_TOKEN — so it's the reliable hand-off.
+# You can also run it by hand to retry a publish.
+#
+# This stays the OIDC ENTRY workflow (the token's workflow_ref is
+# publish-pypi.yml), so the trusted-publisher config below is exactly what PyPI
+# must match — keep it as-is.
 #
 # Authentication uses PyPI **Trusted Publishing** (OIDC) — there is no API
 # token or secret stored in this repo. ONE-TIME SETUP on PyPI before the first
@@ -17,14 +28,13 @@ name: Publish to PyPI
 #     Workflow name:      publish-pypi.yml
 #     Environment name:   pypi
 #
-# Until that's configured the publish step fails LOUDLY — but this is a
-# SEPARATE workflow from release.yml, so a PyPI misconfiguration never blocks
-# the AppImage release.
+# Until that's configured the publish step fails LOUDLY (with `invalid-publisher`)
+# — but in its OWN run, so a PyPI misconfiguration never blocks the AppImage
+# release.
 
 on:
-  release:
-    types: [published]
-  # Manual re-run for an existing tag if a publish needs retrying.
+  # Dispatched by release.yml after a release (see above); also runnable by hand
+  # to retry a publish for an existing tag.
   workflow_dispatch:
 
 permissions:
@@ -55,3 +65,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Idempotent re-runs: if this version is already on PyPI (e.g. a
+          # release re-cut to re-upload AppImage assets), skip instead of
+          # failing — PyPI versions are immutable.
+          skip-existing: true

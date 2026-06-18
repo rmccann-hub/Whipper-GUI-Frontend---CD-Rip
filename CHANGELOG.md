@@ -11,6 +11,17 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Fixed
+- **PyPI publishing now actually triggers on a release (CI; contributor-facing).**
+  `release.yml` creates the GitHub Release with the default `GITHUB_TOKEN`, and
+  GitHub suppresses the events such a token generates — so `publish-pypi.yml`'s
+  `release: published` trigger never fired, and v0.2.4–v0.2.7 shipped with no
+  PyPI publish attempt. `release.yml` now explicitly dispatches `publish-pypi.yml`
+  (a `workflow_dispatch`, the documented exception that always runs) on the
+  release tag; the publish runs in its own job so a PyPI problem still can't
+  block the AppImage release. (Going live on PyPI still needs the one-time
+  Trusted Publisher setup — test-plan Test 7.)
+
 ## [0.2.7] — 2026-06-18
 
 ### Added
