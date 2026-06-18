@@ -37,6 +37,14 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   the two never touch the same file at once), keeping the window responsive.
 
 ### Changed
+- **Test hardening + coverage floor raised to 90% (contributor-facing only;
+  no app behaviour change).** Added regression tests for previously-untested
+  error/edge paths in the self-update installer (download + install-swap
+  failures clean up after themselves), the in-app uninstaller dialog and
+  engine (already-running guard, close-while-running teardown, tree-removal
+  failures, container-probe failure), and the setup workers (the host-setup
+  worker had no tests; drive-setup cancel/partial paths). CI's
+  `--cov-fail-under` ratchets 88 → 90.
 - **Documentation consolidation (contributor-facing only; no app behaviour
   change).** `docs/` reduced from 15 files to 9 + an `archive/`: `best-practices.md`
   merged into `architecture.md` (one canonical home per engineering pattern);

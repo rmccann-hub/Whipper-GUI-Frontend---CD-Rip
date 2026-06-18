@@ -137,6 +137,44 @@ def test_network_failure_raises_presentable_error(tmp_path: Path) -> None:
         download_and_install("0.2.3", dest_dir=tmp_path, opener=open_url)
 
 
+def test_download_stream_failure_cleans_up_and_raises(tmp_path: Path) -> None:
+    # The checksum fetch succeeds, but the AppImage stream dies mid-read. The
+    # generic failure path must wrap it as a presentable error and delete the
+    # partial file — never leaving a half-download or touching the install.
+    class _ExplodingResponse(_FakeResponse):
+        def read(self, n: int = -1) -> bytes:
+            raise OSError("stream reset")
+
+    def open_url(url: str):
+        if url.endswith(".sha256"):
+            digest = hashlib.sha256(_PAYLOAD).hexdigest()
+            return _FakeResponse(f"{digest}  x\n".encode())
+        return _ExplodingResponse(_PAYLOAD)
+
+    with pytest.raises(UpdateInstallError, match="download failed"):
+        download_and_install("0.2.3", dest_dir=tmp_path, opener=open_url)
+
+    assert not (tmp_path / ".whipper-gui-update.part").exists()
+    assert not (tmp_path / "whipper-gui-x86_64.AppImage").exists()
+
+
+def test_install_swap_failure_cleans_up_and_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A verified download that can't be swapped into place (e.g. permissions)
+    # must surface a presentable error and remove the .part, leaving no mess.
+    def boom(self: Path, target: Path) -> None:
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(Path, "replace", boom)
+
+    with pytest.raises(UpdateInstallError, match="couldn't install"):
+        download_and_install("0.2.3", dest_dir=tmp_path, opener=_opener())
+
+    assert not (tmp_path / ".whipper-gui-update.part").exists()
+    assert not (tmp_path / "whipper-gui-x86_64.AppImage").exists()
+
+
 def test_unknown_size_reports_indeterminate_progress(tmp_path: Path) -> None:
     def open_url(url: str):
         if url.endswith(".sha256"):

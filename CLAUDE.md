@@ -133,7 +133,7 @@ There is no `compass_artifact_*.md` in the repo; the original v1 research valida
 ### Test commands
 
 - `pytest` from repo root (no env vars needed — `pyproject.toml` sets `pythonpath = ["src"]`)
-- **What CI enforces:** branch coverage + a hard floor — `pytest --cov=whipper_gui --cov-report=term-missing --cov-fail-under=88` on a **Python 3.11–3.13 matrix**. The gate **ratchets up, never down**.
+- **What CI enforces:** branch coverage + a hard floor — `pytest --cov=whipper_gui --cov-report=term-missing --cov-fail-under=90` on a **Python 3.11–3.13 matrix**. The gate **ratchets up, never down**.
 - Property-based tests (parsers never crash on any input): `pytest tests/test_parsers_property.py` (needs `hypothesis`, in the `dev` extra).
 - Periodic test-quality audit (slow, not a CI gate): `pipx run mutmut run --paths-to-mutate src/whipper_gui/parsers/`.
 - **Testing strategy + the rules every change is held to live in [`docs/testing.md`](docs/testing.md)** (the trophy + hardware gate, the five-tier case taxonomy, and the Definition of Done). **Institutional rule: every shipped bug gets a regression test in the same PR as the fix; every new parser of external output gets a property-based "never raises" test.**

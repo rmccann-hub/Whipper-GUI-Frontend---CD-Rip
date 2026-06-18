@@ -97,6 +97,22 @@ def test_worker_records_offset_failure_but_keeps_cache(
     assert result.can_defeat_cache is True  # analyze still succeeded
 
 
+def test_worker_records_analyze_failure_but_keeps_offset(
+    qapp: QApplication,
+) -> None:
+    # analyze fails with a WhipperError, offset find still succeeds — the two
+    # steps are independent, so we keep the good half.
+    backend = _FakeBackend(
+        offset=667, analyze_exc=WhipperError("no disc for cache analysis")
+    )
+    result = _run(DriveSetupWorker(backend, "/dev/sr0"))
+
+    assert result.offset == 667
+    assert result.can_defeat_cache is None
+    assert "cache" in (result.analyze_error or "")
+    assert result.ok is True  # the read offset is the key value
+
+
 def test_worker_handles_unsupported_backend(qapp: QApplication) -> None:
     backend = _FakeBackend(
         offset_exc=NotImplementedError(), analyze_exc=NotImplementedError()
@@ -120,6 +136,22 @@ def test_cancel_sets_flag_and_calls_backend(qapp: QApplication) -> None:
     assert cancels == [True]
 
 
+def test_cancel_swallows_backend_error(qapp: QApplication) -> None:
+    # cancel() must never raise, even if the backend's cancel_setup() does —
+    # it's called from the GUI thread while closing the dialog.
+    backend = _FakeBackend()
+
+    def boom() -> None:
+        raise RuntimeError("cancel blew up")
+
+    backend.cancel_setup = boom  # type: ignore[method-assign]
+    worker = DriveSetupWorker(backend, "/dev/sr0")
+
+    worker.cancel()  # no exception escapes
+
+    assert worker._cancelled is True
+
+
 def test_run_short_circuits_when_cancelled_before_start(
     qapp: QApplication,
 ) -> None:
@@ -132,3 +164,33 @@ def test_run_short_circuits_when_cancelled_before_start(
     # No probing happened; an empty result is emitted so the thread ends.
     assert result.offset is None
     assert backend.devices == []
+
+
+def test_run_short_circuits_after_analyze_when_cancelled_mid_run(
+    qapp: QApplication,
+) -> None:
+    # If the user cancels while the cache analysis is running, the worker must
+    # NOT kick off the long offset search — it emits the partial result (cache
+    # verdict kept) and ends so the QThread can be torn down.
+    backend = _FakeBackend(offset=667, cache=True)
+    worker = DriveSetupWorker(backend, "/dev/sr0")
+
+    original_analyze = backend.analyze_drive
+
+    def analyze_then_cancel(device: str):  # type: ignore[no-untyped-def]
+        result = original_analyze(device)
+        worker._cancelled = True  # user closed the dialog during analysis
+        return result
+
+    backend.analyze_drive = analyze_then_cancel  # type: ignore[method-assign]
+
+    captured: list[DriveSetupResult] = []
+    worker.finished.connect(captured.append)
+    worker.run()
+
+    assert len(captured) == 1
+    result = captured[0]
+    assert result.can_defeat_cache is True  # analyze ran before the cancel
+    assert result.offset is None  # offset search was skipped
+    assert result.offset_error is None  # skipped, not failed
+    assert backend.devices == ["/dev/sr0"]  # only analyze touched the drive

@@ -77,4 +77,4 @@ jobs:
           pytest -q
           --cov=whipper_gui
           --cov-report=term-missing
-          --cov-fail-under=88
+          --cov-fail-under=90

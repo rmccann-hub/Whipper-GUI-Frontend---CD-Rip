@@ -7,6 +7,7 @@ monkeypatched confirm prompt.
 
 from __future__ import annotations
 
+from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from whipper_gui.deps.host_setup import StepResult, StepStatus
@@ -119,3 +120,96 @@ def test_on_step_appends_result_lines(qapp: QApplication) -> None:
     dialog._on_step(StepResult("container", "Container", StepStatus.RUNNING))
     assert "Container" in dialog._status_label.text()
     assert "Container" not in dialog._results.toPlainText()
+
+
+def test_on_step_without_detail_has_no_dash(qapp: QApplication) -> None:
+    dialog = _dialog(qapp)
+    dialog._on_step(StepResult("shortcuts", "Shortcuts", StepStatus.RAN))
+    line = dialog._results.toPlainText()
+    assert "Shortcuts" in line
+    assert "—" not in line  # no detail → no " — …" suffix
+
+
+def test_uninstall_click_ignored_while_already_running(
+    qapp: QApplication, monkeypatch
+) -> None:
+    built: list = []
+    dialog = _dialog(qapp, build=lambda *a: built.append(a))
+    # Pretend a run is already in flight.
+    dialog._thread = QThread(dialog)
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+
+    dialog._on_uninstall_clicked()  # must early-return, not start a second run
+
+    assert built == []  # no second teardown built
+    dialog._thread = None  # avoid touching the sentinel thread at teardown
+
+
+def test_step_and_finished_ignored_while_closing(qapp: QApplication) -> None:
+    dialog = _dialog(qapp)
+    dialog._closing = True
+    seen: list[bool] = []
+    dialog.uninstall_finished.connect(seen.append)
+
+    dialog._on_step(StepResult("exports", "Exports", StepStatus.RAN, "x"))
+    dialog._on_finished([StepResult("shortcuts", "Shortcuts", StepStatus.RAN)])
+
+    # A closing dialog updates nothing and emits nothing (the window is going
+    # away; touching destroyed widgets would crash).
+    assert dialog._results.toPlainText() == ""
+    assert seen == []
+
+
+def test_on_finished_incomplete_without_a_failed_step(qapp: QApplication) -> None:
+    # No FAILED step, but not all ok (a CANCELLED step) → the generic
+    # "did not complete" message, and the UI re-enables for a retry.
+    dialog = _dialog(qapp)
+    dialog._uninstall_button.setEnabled(False)
+    seen: list[bool] = []
+    dialog.uninstall_finished.connect(seen.append)
+
+    dialog._on_finished(
+        [
+            StepResult("shortcuts", "Shortcuts", StepStatus.RAN),
+            StepResult("app_data", "Settings + logs", StepStatus.CANCELLED),
+        ]
+    )
+
+    assert dialog._status_label.text() == "Uninstall did not complete."
+    assert dialog._uninstall_button.isEnabled() is True
+    assert seen == [False]
+
+
+def test_stop_is_a_no_op_when_nothing_is_running(qapp: QApplication) -> None:
+    dialog = _dialog(qapp)
+    dialog._stop()  # thread is None → returns without error
+    assert dialog._thread is None
+
+
+def test_stop_quits_a_started_threadless_worker(qapp: QApplication) -> None:
+    # thread present but no worker (e.g. teardown raced): _stop still quits and
+    # clears the thread without trying to cancel a missing worker.
+    dialog = _dialog(qapp)
+    dialog._thread = QThread(dialog)  # never started → wait() returns at once
+    dialog._worker = None
+
+    dialog._stop()
+
+    assert dialog._thread is None
+    assert dialog._worker is None
+
+
+def test_reject_marks_closing_and_stops(qapp: QApplication) -> None:
+    dialog = _dialog(qapp)
+    dialog.reject()
+    assert dialog._closing is True
+    assert dialog._thread is None
+
+
+def test_close_event_marks_closing_and_stops(qapp: QApplication) -> None:
+    dialog = _dialog(qapp)
+    dialog.close()  # delivers a real QCloseEvent → closeEvent
+    assert dialog._closing is True
+    assert dialog._thread is None

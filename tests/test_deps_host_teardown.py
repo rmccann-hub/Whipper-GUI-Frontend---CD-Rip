@@ -246,3 +246,54 @@ def test_canonical_applications_copy_removed_without_appimage_env(
     td.run()
 
     assert not canonical.exists()
+
+
+# --- Tree-removal edge cases, progress, and container-probe failure ----------
+
+
+def test_app_data_tree_failure_is_reported_and_skips_absent_tree(
+    tmp_path: Path,
+) -> None:
+    # Only the GUI config tree exists (the data/log tree is already gone). The
+    # app_data step removes the present tree and skips the absent one; if the
+    # removal raises, the step fails with a presentable message.
+    (tmp_path / "config" / "whipper-gui").mkdir(parents=True)
+    (tmp_path / "config" / "whipper-gui" / "config.toml").write_text("x")
+
+    def explode(path: Path) -> None:
+        raise OSError("directory not empty")
+
+    results = _teardown(tmp_path, _FakeRunner(), remove_tree=explode).run()
+
+    app_data = next(r for r in results if r.step_id == "app_data")
+    assert app_data.status is StepStatus.FAILED
+    assert "could not remove" in app_data.detail
+
+
+def test_run_reports_running_progress_per_step(tmp_path: Path) -> None:
+    _populate_everything(tmp_path)
+    runner = _FakeRunner()
+    runner.present = {"distrobox"}
+    runner.results[("distrobox", "list")] = (0, "ripping\n")
+
+    seen: list[tuple[str, StepStatus]] = []
+    _teardown(tmp_path, runner).run(
+        progress=lambda r: seen.append((r.step_id, r.status))
+    )
+
+    # Each actioned step emits a transient RUNNING before its terminal result.
+    assert ("shortcuts", StepStatus.RUNNING) in seen
+
+
+def test_container_probe_treats_list_failure_as_absent(tmp_path: Path) -> None:
+    # `distrobox list` failing (non-zero) must not crash or wrongly try to
+    # remove a container — it's treated as "no such container" (already done).
+    runner = _FakeRunner()
+    runner.present = {"distrobox"}
+    runner.results[("distrobox", "list")] = (1, "cannot connect to podman")
+
+    results = _teardown(tmp_path, runner).run()
+
+    container = next(r for r in results if r.step_id == "container")
+    assert container.status is StepStatus.DONE
+    assert all(c[:2] != ["distrobox", "rm"] for c in runner.calls)

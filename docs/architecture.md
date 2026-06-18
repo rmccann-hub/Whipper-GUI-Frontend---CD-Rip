@@ -277,7 +277,7 @@ release, never the ripper's interactive prompt).
 - `pytest` from the repo root (no env vars — `pyproject.toml` sets
   `pythonpath = ["src"]`); the suite touches no real hardware, network, or
   container. CI enforces **branch coverage with a hard floor**
-  (`--cov-fail-under`, ~88, ratchets up) on Python 3.11–3.13, plus `ruff`
+  (`--cov-fail-under`, ~90, ratchets up) on Python 3.11–3.13, plus `ruff`
   lint + format.
 - **Institutional rules:** every shipped bug gets a regression test in the
   same change; every new external-output parser gets a never-raises property
