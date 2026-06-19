@@ -34,23 +34,42 @@ If a test ever genuinely needs real PCM to exercise the decode/CRC path, use a
 synthetic tone with a known CRC), and **Git LFS** for any binary — never a
 commercial track.
 
-## Layout
+## Layout — backend × format
 
-| Directory | What goes here | Status |
-|-----------|----------------|--------|
-| `EAC_flac/` | The EAC baseline: extraction **log + cue** (the CRCs are the bit-perfect reference). | ✅ committed (baseline) |
-| `EAC_mp3/` | EAC's MP3-reference log/cue, when we baseline lossy output (MP3 is P1; the *extraction* CRCs are shared with `EAC_flac`, the lossy encode is not bit-comparable). | ⬜ not yet |
-| `whipper_flac/` | A whipper rip's **log (+ cue)** of the same disc — added **only when its Copy CRCs match `EAC_flac`'s**. | ⬜ pending parity |
-| `cyanrip_flac/` | A cyanrip rip's **log** of the same disc — added **only when its CRCs match `EAC_flac`'s** (this also closes the >587 read-offset question, KDD-18). | ⬜ pending parity |
+EAC is the baseline for each format; the matching backend dirs hold a rip's
+**log** only once it reaches parity. **Priority order: FLAC (1) → WAV (2) →
+MP3 (3)** — FLAC is the v1 archival format; WAV and MP3 are P1 (see `TASKS.md`).
+
+| | FLAC (priority 1) | WAV (priority 2) | MP3 (priority 3) |
+|---|---|---|---|
+| **EAC** (baseline) | `EAC_flac/` ✅ committed | `EAC_wav/` | `EAC_mp3/` |
+| **whipper** | `whipper_flac/` ⬜ | `whipper_wav/` ⬜ | `whipper_mp3/` ⬜ |
+| **cyanrip** | `cyanrip_flac/` ⬜ | `cyanrip_wav/` ⬜ | `cyanrip_mp3/` ⬜ |
+
+The committed EAC baseline (`EAC_flac/eac_baseline_police_classics.log`) is the
+canonical extraction reference. Its per-track **Copy CRC** is the CRC of the
+ripped PCM, so it's the bit-perfect target for **both FLAC and WAV** (both are
+lossless → decode to identical PCM → identical CRC). **MP3 is lossy**, so an MP3
+encode is *not* bit-comparable; "MP3 parity" means the same extraction CRCs +
+correct encoder/tag behaviour, not identical audio. `EAC_wav/` and `EAC_mp3/`
+therefore reuse this same extraction baseline rather than duplicating it.
 
 ## How to add a parity proof (when a backend reaches it)
 
-1. Rip the **same disc** (`The Police — …: The Classics`, AccurateRip offset
-   +667 on the BDR-209D) with the backend.
-2. Confirm every track's `Copy CRC` equals the value in
-   `EAC_flac/eac_baseline_police_classics.log`.
-3. Drop the backend's `.log` (and `.cue`) into its directory, and add a one-line
-   note here with the date and the result ("12/12 Copy CRCs match EAC").
+1. Rip the **same disc** (*The Police — …: The Classics*, AccurateRip offset
+   +667 on the BDR-209D) with the backend, in the format you're proving.
+2. Run the parity checker against the EAC baseline:
+   ```
+   python3 scripts/eac_parity.py \
+       output_reference/EAC_flac/eac_baseline_police_classics.log \
+       path/to/the/backend/Album.log
+   ```
+   It prints a per-track PASS/FAIL table and exits 0 only on full parity. (It
+   auto-detects EAC / whipper / cyanrip log formats; the comparison logic is
+   `whipper_gui.parity`.)
+3. When it passes, drop the backend's `.log` (and `.cue`) into the matching
+   directory above, and tick the task in `TASKS.md` with the date + result
+   ("14/14 Copy CRCs match EAC").
 
 That commit is the durable evidence the backend is bit-perfect against EAC.
 

@@ -1,4 +1,4 @@
-# cyanrip FLAC — EAC parity proof (pending)
+# cyanrip FLAC — EAC parity proof (pending, priority 1)
 
 Empty until a cyanrip rip of the baseline disc reaches **bit-perfect parity**
 with `../EAC_flac/`. When it does, add the cyanrip `.log` (+ `.cue`) here per the

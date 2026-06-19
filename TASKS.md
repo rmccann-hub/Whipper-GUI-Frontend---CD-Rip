@@ -261,6 +261,35 @@ High-level feature backlog (not bucketed into a sub-section because each is smal
 - **[ ]** Auto-move completed rips to a library folder
 - **[ ]** Additional encoding outputs: **MP3** (via `lame`) and **WAV** (via `sox` or whipper-native). Both encoder backends MUST be detected and offered through the existing P0 #11 dependency-resolution flow — no bespoke install code.
 
+### ⭐ EAC output-parity proof matrix (`output_reference/`)
+
+Prove each backend reproduces EAC bit-for-bit, and **commit the proof**. The EAC
+baseline (log + cue, *The Police — …: The Classics*, BDR-209D, offset +667) is
+banked at `output_reference/EAC_flac/`, and the checker is built:
+`scripts/eac_parity.py` (logic in `whipper_gui.parity`) diffs per-track `Copy CRC`
+across EAC/whipper/cyanrip logs and exits non-zero unless every track matches.
+
+**Each task = HW (user):** rip the baseline disc with the backend in that format,
+run `python3 scripts/eac_parity.py output_reference/EAC_flac/eac_baseline_police_classics.log <the rip's .log>`,
+and when it passes, commit the backend's `.log` (+ `.cue`) into the matching
+`output_reference/` dir as the durable proof. **Do NOT commit audio** (public
+repo + copyright; the CRCs are the proof). Ordered by format priority:
+
+*Priority 1 — FLAC (v1 archival format):*
+- **[ ]** whipper FLAC parity → `output_reference/whipper_flac/` (also the >587-offset check, KDD-18)
+- **[ ]** cyanrip FLAC parity → `output_reference/cyanrip_flac/`
+
+*Priority 2 — WAV (lossless → same Copy CRCs as FLAC):*
+- **[ ]** whipper WAV parity → `output_reference/whipper_wav/`
+- **[ ]** cyanrip WAV parity → `output_reference/cyanrip_wav/`
+
+*Priority 3 — MP3 (P1; lossy → "parity" = same extraction CRCs + correct encoder/tags, not bit-identical audio):*
+- **[ ]** whipper MP3 parity → `output_reference/whipper_mp3/`
+- **[ ]** cyanrip MP3 parity → `output_reference/cyanrip_mp3/`
+
+Done so far: **[x]** EAC baseline committed; **[x]** parity checker + tests
+(`scripts/eac_parity.py`, `parsers/eac_log.py`, `whipper_gui.parity`).
+
 ### P1 — EAC bit-perfect parity gaps
 
 The following whipper CLI options exist but aren't currently surfaced in our Settings dialog. Each is a small addition: a Config field, a Settings widget, a `RipParameters` field, and a flag in `WhipperHostExportedImpl.rip()`. The reference for what "should" be exposed is the EAC bit-perfect guide audit in [PLANNING.md KDD-13](PLANNING.md).

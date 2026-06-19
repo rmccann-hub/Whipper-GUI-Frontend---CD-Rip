@@ -12,14 +12,21 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Added
-- **`output_reference/` — EAC parity baselines (contributor-facing).** A home for
-  reference rip outputs used to prove bit-perfect parity against Exact Audio
-  Copy. The EAC baseline (extraction **log + cue** for the Police test disc) is
-  committed under `EAC_flac/`; `whipper_flac/` and `cyanrip_flac/` are populated
-  **only** once a backend's per-track Copy CRCs match EAC's, as proof. Policy
-  documented in `output_reference/README.md`: comparisons are CRC/log-based, and
-  **no commercial audio is committed** (public repo + copyright + bloat) — the
-  CRCs in the logs already prove bit-perfection.
+- **`output_reference/` — EAC parity baselines + checker (contributor-facing).** A
+  home for reference rip outputs used to prove bit-perfect parity against Exact
+  Audio Copy, laid out as a backend × format matrix (EAC / whipper / cyanrip ×
+  FLAC / WAV / MP3). The EAC baseline (extraction **log + cue** for the Police
+  test disc) is committed under `EAC_flac/`; the backend dirs are populated
+  **only** once a rip's per-track Copy CRCs match EAC's, as proof (priority order
+  FLAC → WAV → MP3, tracked in `TASKS.md`). Policy in
+  `output_reference/README.md`: comparisons are CRC/log-based and **no commercial
+  audio is committed** (public repo + copyright + bloat) — the logs' CRCs prove
+  bit-perfection.
+- **Parity checker.** `scripts/eac_parity.py` (+ `whipper_gui.parity` and a
+  minimal `parsers/eac_log.py`) auto-detects EAC/whipper/cyanrip log formats and
+  diffs per-track Copy CRCs, printing a PASS/FAIL table and exiting non-zero
+  unless every track matches — so proving and committing a backend's parity is
+  one command. Golden-tested against the committed EAC baseline (14/14 tracks).
 
 ## [0.2.8] — 2026-06-18
 

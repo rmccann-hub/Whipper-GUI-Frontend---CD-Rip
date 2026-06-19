@@ -26,6 +26,7 @@ from whipper_gui.parsers.cd_info import DiscInfo, parse_cd_info
 from whipper_gui.parsers.cyanrip_info import parse_cyanrip_info
 from whipper_gui.parsers.cyanrip_log import parse_cyanrip_log
 from whipper_gui.parsers.drive_list import DriveDescriptor, parse_drive_list
+from whipper_gui.parsers.eac_log import parse_eac_copy_crcs
 from whipper_gui.parsers.rip_log import RipLog, parse_rip_log
 
 # `deadline=None`: the parsers are fast, but CI runners are noisy and we
@@ -80,6 +81,13 @@ _FRAGMENTS = st.sampled_from(
         "Offset:         +667 samples",
         "Tracks ripped accurately: 1/2",
         "Ripping errors: many",  # bad int
+        # EAC log shapes (exercise the eac_log parser).
+        "Exact Audio Copy V1.8 from 15. July 2024",
+        "Track  1",
+        "Track  not-a-number",  # bad track number
+        "     Copy CRC B0D122E7",
+        "     Copy CRC nothex!!",  # not 8 hex digits
+        "     Test CRC B0D122E7",
         ":::::",  # degenerate colons
         "",  # blank line
         "\t\t\t",  # whitespace only
@@ -154,6 +162,18 @@ def test_parse_rip_log_never_raises(text: str) -> None:
         for ar in (track.accuraterip_v1, track.accuraterip_v2):
             if ar is not None:
                 assert ar.confidence is None or isinstance(ar.confidence, int)
+
+
+@_SETTINGS
+@given(_any_text)
+def test_parse_eac_copy_crcs_never_raises(text: str) -> None:
+    result = parse_eac_copy_crcs(text)
+    assert isinstance(result, dict)
+    for number, crc in result.items():
+        assert isinstance(number, int)
+        # Only 8-hex-digit Copy CRCs are captured, always upper-cased.
+        assert isinstance(crc, str) and len(crc) == 8
+        assert crc == crc.upper()
 
 
 # --- Invariant 2: a well-formed drive block round-trips -------------------
