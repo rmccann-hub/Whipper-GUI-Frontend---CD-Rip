@@ -532,24 +532,39 @@ def test_unexpected_exception_on_start_emits_error(
 # --- Cancellation ---------------------------------------------------------
 
 
-def test_cancel_sets_flag_and_calls_handle_cancel(
+def test_cancel_before_start_stops_the_subprocess_once_it_exists(
     qapp: QApplication, tmp_path: Path
 ) -> None:
+    """A cancel that lands during rip() startup — before the handle is set —
+    must still stop the subprocess. cancel() can only flip the flag then (it
+    finds _handle is None); start_rip re-checks the flag after it has the
+    handle and cancels it. Regression for the startup-window race where the
+    flag was set but the subprocess kept running and wait() blocked on it."""
     handle = _FakeHandle(lines=["one", "two"], exit_code=-15)
     backend = _FakeBackend(handle=handle)
     worker = RipWorker(backend, _params(tmp_path))
 
-    # Cancel must be safe before start.
+    # Cancel before start: the handle isn't set yet, so only the flag is set.
     worker.cancel()
-    # cancel() before start() — handle isn't yet set, so handle.cancel
-    # is NOT called. The flag is set, though.
     assert handle.cancel_calls == 0
 
-    worker.start_rip()  # but iteration sees the flag set, exits early
+    worker.start_rip()  # gets the handle, sees the flag, and stops the rip
 
-    # After start_rip, the handle exists; calling cancel again should
-    # forward to it.
-    worker.cancel()
+    assert handle.cancel_calls == 1  # the subprocess was actually cancelled
+
+
+def test_cancel_after_start_forwards_to_handle(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    """The normal path: with the handle set, cancel() forwards to it."""
+    handle = _FakeHandle(lines=["one", "two"], exit_code=0)
+    backend = _FakeBackend(handle=handle)
+    worker = RipWorker(backend, _params(tmp_path))
+
+    worker.start_rip()  # no cancel → completes; the startup re-check is a no-op
+    assert handle.cancel_calls == 0
+
+    worker.cancel()  # handle exists now → forwarded
     assert handle.cancel_calls == 1
 
 

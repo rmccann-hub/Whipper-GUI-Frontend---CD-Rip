@@ -232,6 +232,19 @@ class RipWorker(QObject):
             self.finished.emit(False, "")
             return
 
+        # Close the startup-window cancel race: if cancel() arrived while
+        # backend.rip() was still spawning the subprocess — before _handle was
+        # assigned — it could only flip the flag (it found _handle is None).
+        # Now that we hold the handle, honour the pending cancel by stopping the
+        # subprocess; otherwise the loop below would break on the flag but
+        # self._handle.wait() would block on a still-running rip ("Cancel did
+        # nothing" until the 5s force-stop backstop fired).
+        if self._cancelled:
+            try:
+                self._handle.cancel()
+            except Exception:  # noqa: BLE001 — cancel is best-effort
+                log.exception("startup-window cancel() raised; ignored")
+
         # Stream output. Iteration ends when whipper closes its stdout
         # (i.e. exits) or when cancel() flips the flag.
         try:

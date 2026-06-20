@@ -12,6 +12,13 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Fixed
+- **Cancel now reliably stops a rip even in the startup window.** If you hit
+  Cancel in the brief moment while the rip subprocess was still being spawned,
+  the cancel only set a flag — the subprocess wasn't stopped, so the worker
+  blocked waiting for the rip to finish on its own (only the 5-second
+  force-stop backstop eventually caught it). The worker now re-checks the
+  cancel flag the instant it has a process handle and stops it, so Cancel
+  takes effect immediately regardless of timing.
 - **Launch dependency check now applies its result on the GUI thread.** The
   off-thread launch check connected its `finished` signal to a lambda, which Qt
   delivers as a direct connection — so the result handler (which builds the
