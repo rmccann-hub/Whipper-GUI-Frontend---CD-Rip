@@ -94,6 +94,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="open only the uninstaller (used by the Uninstall menu entry)",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="run a first-pass check of the rip environment (no CD needed) "
+        "and exit; prints a pass/fail report",
+    )
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     # Logging is the first thing — any failure below this line shows up
@@ -111,6 +117,23 @@ def main(argv: list[str] | None = None) -> int:
     # Apply the user's debug-logging preference now that config is loaded
     # (configure_logging ran first, before config, to catch startup failures).
     set_debug_logging(cfg.debug_logging)
+
+    # Doctor mode: a no-GUI, no-disc first-pass test of the rip environment.
+    # Runs before QApplication — it's a terminal diagnostic, not a window.
+    if args.doctor:
+        from whipper_gui import preflight
+
+        ctx = preflight.default_context(cfg)
+        color = sys.stdout.isatty()
+        print(f"Whipper GUI preflight — backend: {ctx.backend_name}\n")
+        results = preflight.run_preflight(
+            ctx, on_result=lambda r: print(preflight.format_line(r, color=color))
+        )
+        details = preflight.format_details(results)
+        if details:
+            print("\n" + details)
+        print("\n" + preflight.format_summary(results, color=color))
+        return preflight.exit_code(results)
 
     # QApplication MUST exist before any QWidget. Build it as early as
     # possible so the dep-check dialogs can run.

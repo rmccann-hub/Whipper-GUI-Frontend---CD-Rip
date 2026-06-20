@@ -41,6 +41,22 @@ A run is only meaningful with the **log** attached:
 For a hard-to-reproduce issue, turn on **Settings → Debug logging** first — it
 raises the log file to verbose DEBUG.
 
+### 0.1 — [ ] Preflight / "doctor" (no CD needed) — do this FIRST
+
+Before inserting a disc, run the first-pass environment check:
+
+```
+whipper-gui --doctor        # or: python scripts/preflight.py
+```
+
+It verifies everything the rip pipeline needs *except* the disc read: the
+Distrobox→whipper routing reaches the backend, the drive is detected +
+accessible, the dependency tools are present, and the host can reach MusicBrainz
+/ Cover Art Archive / CTDB. **Expected:** a report ending `Preflight: … ready`
+(exit 0). Any `✗` blocker means a normal rip won't work yet — fix it (the report
+gives a hint) before continuing. This knocks out the boring environmental
+failures; it does **not** replace the bit-perfect hardware proof below.
+
 ---
 
 ## Part A — Full clean-cycle acceptance run

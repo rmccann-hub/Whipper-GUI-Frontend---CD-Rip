@@ -29,6 +29,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   startup path.
 
 ### Added
+- **Preflight / "doctor" check — first-pass test of the rip environment, no CD
+  needed.** Run `whipper-gui --doctor` (or `python scripts/preflight.py`) to
+  verify everything the rip pipeline needs *except* the disc read itself: the
+  Distrobox→whipper routing actually reaches the backend, the optical drive is
+  detected and accessible (a drive lists fine with no disc), the dependency
+  tools are present, and the host can reach MusicBrainz / the Cover Art Archive
+  / CTDB. Prints a clear pass / warn / blocker report and exits non-zero on a
+  hard blocker. It knocks out the boring environmental failure modes before you
+  insert a disc — a bit-perfect rip still needs a real disc on real hardware.
 - **Documentation-currency enforcement (contributor-facing).** `CLAUDE.md` gained
   Critical Rule #7 ("Documentation currency is part of Done") as the always-loaded
   anchor that daisy-chains to the rest; `docs/testing.md §6` Definition of Done
