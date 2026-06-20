@@ -168,6 +168,16 @@ There is no `compass_artifact_*.md` in the repo; the original v1 research valida
 - Whipper binary (host-exported from Distrobox): `~/.local/bin/whipper`
 - MusicBrainz Picard (Flatpak, used for auto-launch on unknown discs): `flatpak run org.musicbrainz.Picard`
 
+### Getting help (Claude Code / Anthropic)
+
+For problems with the **AI tooling itself** — Claude Code, the Claude model, or the Anthropic API. (This is *not* Whipper GUI end-user support; app questions route to the project maintainer, not Anthropic.)
+
+- **Fastest:** the support messenger at [support.anthropic.com](https://support.anthropic.com/en/) — message icon, bottom-right. Or, when signed in, **[Claude.ai](https://claude.ai)** / **[Console](https://console.anthropic.com)** → your initials → **"Get help."** (Signed-in routes faster — they see the account.)
+- **API / developer issues:** [support.claude.com](https://support.claude.com).
+- **Topic-specific email:** safety / harmful content → `usersafety@anthropic.com`; security vulnerability → `security@anthropic.com`; privacy / data request → `privacy@anthropic.com`.
+- **Claude via Amazon Bedrock or Google Vertex:** contact AWS / Google support, not Anthropic directly.
+- Reference: [How can I contact Support?](https://support.anthropic.com/en/articles/9015913-how-can-i-contact-support)
+
 ### Session history
 
 Chronological session notes — what was built, decided, and learned each session — live in **[`docs/session-log.md`](docs/session-log.md)** (newest first). They're kept out of this file so the always-loaded project context stays lean and scannable.
