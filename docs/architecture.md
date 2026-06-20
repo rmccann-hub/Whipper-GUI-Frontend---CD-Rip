@@ -134,6 +134,31 @@ Worker mechanics, all demonstrated in `workers/`:
 - **Never touch widgets from a worker thread.** Communicate results back via
   **signals** (delivered as queued connections on the GUI thread). The worker
   emits `progress`/`status`/`finished`; the GUI updates widgets in the slots.
+- **Connect a cross-thread signal to a *bound QObject method*, never a lambda
+  or free function.** Qt picks the connection type from the *receiver*: a slot
+  with no QObject context (a `lambda`, a module function) defaults to
+  **DirectConnection**, so it runs on the **emitting** (worker) thread — even
+  though you wired it from the GUI thread. A bound method of a GUI-thread
+  `QObject` gets AutoConnection → QueuedConnection → runs on the GUI thread.
+  This bit us: the launch dependency check connected `worker.finished` to a
+  lambda, so `_apply_dependency_report` (which builds resolver dialogs) ran on
+  the worker thread, creating widgets off the GUI thread ("QObject::setParent:
+  ... in a different thread"). Fix was `worker.finished.connect(self._on_…)`
+  with a bound method; stash any per-call state on `self`. The app-startup
+  smoke test (`tests/test_app_smoke.py`) now fails on any cross-thread Qt
+  warning so this class of bug can't come back silently.
+- **Long, non-cancellable post-rip work → daemon thread + queued signal, NOT a
+  `closeEvent`-joined `QThread`.** The deterministic-cleanup rule below assumes
+  you can bound-wait the thread at close. When you *can't* — CTDB verify and
+  PCM decode can run far longer than any sane `wait()` timeout — don't put it on
+  a `QThread` you join in `closeEvent`: if the window closes mid-run, you either
+  block the close or **destroy a running `QThread`, which aborts the app**. Use
+  a daemon `threading.Thread` that reports back via a queued signal (e.g.
+  `ctdb_verify_done`); daemon threads die with the process and are never joined
+  on close. The post-rip tagging/cover-art/CTDB chain runs this way. (When two
+  daemon-thread steps touch the *same* files — tagging and cover-art both run
+  `metaflac` — run them **sequentially on one thread**, not two, to avoid a
+  same-file race.)
 - **Clean up deterministically:** connect `worker.finished → thread.quit`,
   `worker.finished → worker.deleteLater`, `thread.finished →
   thread.deleteLater`. **Join/stop threads before the window closes**
@@ -147,6 +172,13 @@ Worker mechanics, all demonstrated in `workers/`:
 - Use thread-safe primitives for cancellation flags — a plain `bool` set from
   the GUI thread and read by the worker is fine under the GIL; anything richer
   needs care.
+- **Cancellation: re-check the flag right after you acquire the resource it
+  acts on.** A `cancel()` that "stop the subprocess if `self._handle` is set"
+  silently does nothing if Cancel lands *during* the spawn (flag set, handle
+  not yet assigned) — the child then runs to completion and `wait()` blocks.
+  The spawn window is a real race. After assigning `self._handle` in
+  `RipWorker.start_rip`, re-read `self._cancelled` and `cancel()` the handle if
+  it's set. Same shape for any "set flag now, act on it later" cancellation.
 
 ### 3.3 Invoking external programs (subprocess)
 The GUI shells out constantly (whipper, flatpak, eject, pkill):
