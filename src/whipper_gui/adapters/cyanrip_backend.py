@@ -36,6 +36,7 @@ from whipper_gui.adapters.whipper_backend import (
     RipMetadata,
     WhipperBackend,
     WhipperError,
+    run_capture,
 )
 from whipper_gui.parsers.cd_info import DiscInfo
 from whipper_gui.parsers.cyanrip_info import parse_cyanrip_info
@@ -231,21 +232,14 @@ class CyanripImpl(WhipperBackend):
         )
 
     def _run(self, args: list[str], timeout: float = _INFO_TIMEOUT_S) -> str:
-        argv = [self._binary, *args]
-        log.debug("cyanrip: %s", " ".join(argv))
-        try:
-            proc = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                stdin=subprocess.DEVNULL,
-            )
-        except FileNotFoundError as exc:
-            raise WhipperError(f"cyanrip binary not found at {self._binary}") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise WhipperError(f"cyanrip timed out after {timeout:.0f}s") from exc
-        return (proc.stdout or "") + (proc.stderr or "")
+        # cyanrip's info/version probes share whipper's run-capture core; only
+        # the timeout (longer here), the tool name, and closing stdin differ.
+        # cyanrip never needs the exit code (its parsers degrade on bad output),
+        # so we keep just the combined stdout+stderr.
+        _rc, combined = run_capture(
+            "cyanrip", self._binary, args, timeout=timeout, stdin_devnull=True
+        )
+        return combined
 
 
 def _read_sysfs(path: Path) -> str:

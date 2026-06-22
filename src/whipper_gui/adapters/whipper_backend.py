@@ -112,6 +112,46 @@ class WhipperError(Exception):
         self.output: str = output
 
 
+def run_capture(
+    tool_name: str,
+    binary: str,
+    args: list[str],
+    *,
+    timeout: float,
+    stdin_devnull: bool = False,
+) -> tuple[int, str]:
+    """Run a one-shot ripper subprocess; return (returncode, combined output).
+
+    The shared core of both backends' info/version probes (whipper's
+    ``_run_capture`` and cyanrip's ``_run``). It deliberately does NOT raise on
+    a non-zero exit — some callers (drive analyze, offset find) classify the
+    output themselves — but it DOES translate the two unrecoverable failures
+    into a :class:`WhipperError` the GUI can surface: a missing binary and a
+    timeout.
+
+    The pieces that genuinely differ between backends are parameters, not
+    forks: ``timeout`` (whipper's info probes and cyanrip's differ on purpose),
+    ``tool_name`` (shapes the log line and the error messages), and
+    ``stdin_devnull`` (cyanrip reads stdin and must have it closed; whipper
+    inherits, matching ``subprocess.run``'s default of ``stdin=None``).
+    """
+    argv: list[str] = [binary, *args]
+    log.debug("%s: %s", tool_name, " ".join(argv))
+    try:
+        proc = subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL if stdin_devnull else None,
+        )
+    except FileNotFoundError as exc:
+        raise WhipperError(f"{tool_name} binary not found at {binary}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise WhipperError(f"{tool_name} timed out after {timeout:.0f}s") from exc
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
 @dataclass(frozen=True)
 class RipMetadata:
     """The GUI's already-fetched album/track metadata, offered to the backend.
@@ -536,20 +576,7 @@ class WhipperHostExportedImpl(WhipperBackend):
         need to classify the output themselves before deciding it's an
         error.
         """
-        argv: list[str] = [str(self._binary), *args]
-        log.debug("whipper: %s", " ".join(argv))
-        try:
-            proc = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except FileNotFoundError as exc:
-            raise WhipperError(f"whipper binary not found at {self._binary}") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise WhipperError(f"whipper timed out after {timeout:.0f}s") from exc
-        return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+        return run_capture("whipper", str(self._binary), args, timeout=timeout)
 
     def _run_info(self, args: list[str]) -> str:
         """Run a one-shot info command; return combined output, raising

@@ -21,8 +21,14 @@ from whipper_gui.adapters.whipper_backend import RipMetadata, WhipperError
 
 
 def _patch_run(monkeypatch, *, stdout: str = "", stderr: str = "", raises=None):
-    """Stub cyanrip_backend.subprocess.run with a fixed result (or exception)."""
-    import whipper_gui.adapters.cyanrip_backend as mod
+    """Stub the subprocess.run that cyanrip's info/version probes use.
+
+    cyanrip's `_run` now delegates to the shared `run_capture` helper, which
+    lives in `whipper_backend` — so the call resolves `subprocess.run` through
+    THAT module, and the patch must target it there (docs/testing.md §8: move
+    the monkeypatch target to where the code now lives).
+    """
+    import whipper_gui.adapters.whipper_backend as mod
 
     def fake_run(argv, **kwargs):
         if raises is not None:
@@ -231,7 +237,9 @@ def test_disc_info_runs_info_only_offline(monkeypatch: pytest.MonkeyPatch) -> No
     """disc_info must use info-only mode (-I) with MusicBrainz disabled (-N)
     — identification is local; the GUI does its own MB lookup — and pass the
     selected device."""
-    import whipper_gui.adapters.cyanrip_backend as mod
+    # cyanrip's `_run` delegates to the shared run_capture in whipper_backend,
+    # so the subprocess.run patch targets that module (see _patch_run).
+    import whipper_gui.adapters.whipper_backend as mod
 
     seen: list[list[str]] = []
 
