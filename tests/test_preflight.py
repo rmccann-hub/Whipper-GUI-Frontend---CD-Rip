@@ -299,6 +299,59 @@ def test_routing_drilldown_never_raises_on_bad_host():
     assert "could not diagnose" in detail and hint
 
 
+# --- check_read_offset -----------------------------------------------------
+
+
+def test_check_read_offset_cyanrip():
+    res = preflight.check_read_offset(
+        Config(ripper_backend="cyanrip", read_offset=667), backend_name="cyanrip"
+    )
+    assert res.status is Status.OK
+    assert "cyanrip applies" in res.summary and "+667" in res.summary
+
+
+def test_check_read_offset_override():
+    res = preflight.check_read_offset(
+        Config(override_read_offset=True, read_offset=667),
+        backend_name="whipper",
+        read_offsets=lambda: [],  # ignored when override is on
+    )
+    assert res.status is Status.OK
+    assert "override on" in res.summary and "+667" in res.summary
+
+
+def test_check_read_offset_whipper_conf_present():
+    from whipper_gui.offset_config import WhipperConfOffset
+
+    res = preflight.check_read_offset(
+        Config(override_read_offset=False),
+        backend_name="whipper",
+        read_offsets=lambda: [WhipperConfOffset(drive="PIONEER", offset=667)],
+    )
+    assert res.status is Status.OK
+    assert "whipper.conf" in res.summary and "+667" in res.summary
+
+
+def test_check_read_offset_whipper_conf_missing_warns():
+    res = preflight.check_read_offset(
+        Config(override_read_offset=False),
+        backend_name="whipper",
+        read_offsets=lambda: [],
+    )
+    assert res.status is Status.WARN
+    assert res.hint
+
+
+def test_check_read_offset_reader_crash_is_caught():
+    def boom():
+        raise RuntimeError("x")
+
+    res = preflight.check_read_offset(
+        Config(override_read_offset=False), backend_name="whipper", read_offsets=boom
+    )
+    assert res.status is Status.WARN
+
+
 # --- check_drives ----------------------------------------------------------
 
 

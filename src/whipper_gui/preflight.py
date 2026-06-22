@@ -54,6 +54,7 @@ from whipper_gui.config import Config
 from whipper_gui.ctdb.toc import DiscToc
 from whipper_gui.deps.manager import DependencyManager
 from whipper_gui.drive_access import SEVERITY_OK, diagnose_drive_access
+from whipper_gui.offset_config import WhipperConfOffset, read_drive_offsets
 from whipper_gui.paths import CYANRIP_BINARY_DEFAULT
 
 # Project URL used as the MusicBrainz user-agent contact (MB policy wants a
@@ -431,6 +432,53 @@ def check_drives(backend: WhipperBackend) -> CheckResult:
     )
 
 
+def check_read_offset(
+    cfg: Config,
+    *,
+    backend_name: str,
+    read_offsets: Callable[[], list[WhipperConfOffset]] = read_drive_offsets,
+) -> CheckResult:
+    """Surface the read offset whipper will ACTUALLY apply.
+
+    The offset is the one setting that silently corrupts a rip if it's wrong,
+    and for the whipper backend without override it lives in whipper.conf — not
+    the GUI's stored copy. cyanrip applies the offset directly (``-s``), so
+    whipper.conf is irrelevant there. Never raises.
+    """
+    if backend_name == "cyanrip":
+        return CheckResult(
+            "Read offset",
+            Status.OK,
+            f"cyanrip applies the offset directly (-s {cfg.read_offset:+d}); "
+            "whipper.conf is not consulted",
+        )
+    if cfg.override_read_offset:
+        return CheckResult(
+            "Read offset",
+            Status.OK,
+            f"override on → {cfg.read_offset:+d} samples (passed as --offset)",
+        )
+    try:
+        offsets = read_offsets()
+    except Exception as exc:  # noqa: BLE001 — never crash the diagnostic
+        return CheckResult(
+            "Read offset",
+            Status.WARN,
+            "could not read whipper.conf",
+            detail=str(exc),
+        )
+    if not offsets:
+        return CheckResult(
+            "Read offset",
+            Status.WARN,
+            "no read offset set in whipper.conf",
+            hint="whipper refuses to rip without it — run the drive-setup "
+            "wizard (Settings → Re-detect…), or tick Override with a known value.",
+        )
+    detail = "; ".join(f"{o.drive} → {o.offset:+d}" for o in offsets)
+    return CheckResult("Read offset", Status.OK, f"whipper.conf: {detail}")
+
+
 def check_drive_access(
     *, diagnose: Callable[[], object] = diagnose_drive_access
 ) -> CheckResult:
@@ -572,6 +620,7 @@ def run_preflight(
     emit(check_dependencies(ctx.dependency_manager))
     emit(check_backend_routing(ctx.backend, backend_name=ctx.backend_name))
     emit(check_drives(ctx.backend))
+    emit(check_read_offset(ctx.cfg, backend_name=ctx.backend_name))
     emit(check_drive_access())
     if network:
         emit(check_musicbrainz(ctx.mb_client))

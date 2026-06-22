@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from whipper_gui import offset_config
 from whipper_gui.config import Config
 
 # Read offset range. AccurateRip's per-drive offsets are typically in
@@ -120,6 +122,25 @@ class SettingsDialog(QDialog):
             "overriding whatever the drive setup wizard wrote to whipper.conf."
         )
         form.addRow("", self._override_offset_check)
+
+        # Show the offset whipper will ACTUALLY apply, read live from
+        # whipper.conf — not the GUI's stored copy above. These can drift (the
+        # wizard or a hand-edit writes whipper.conf; the spinbox is our cache),
+        # and a wrong offset silently corrupts every rip, so surfacing the
+        # authoritative value is a real trust check. Reading this tiny file on
+        # the GUI thread is fine (it's bytes, not a subprocess/network call).
+        self._live_offset_label: QLabel = QLabel(
+            f"whipper.conf read offset: {offset_config.describe_conf_offsets()}",
+            self,
+        )
+        self._live_offset_label.setWordWrap(True)
+        self._live_offset_label.setToolTip(
+            "What whipper will use when Override is off (it's authoritative "
+            "then). With Override on, the value above is used instead. "
+            "'none set' means whipper will refuse to rip until you run "
+            "Re-detect…."
+        )
+        form.addRow("", self._live_offset_label)
 
         # --- Tool paths ---
         self._whipper_path_edit, whipper_row = self._build_file_row(config.whipper_path)

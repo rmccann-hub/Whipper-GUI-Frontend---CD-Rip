@@ -29,6 +29,16 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   startup path.
 
 ### Added
+- **Settings + `--doctor` now show the read offset whipper will *actually*
+  apply.** Previously the Settings field showed only the GUI's stored copy of
+  the read offset; when the whipper backend rips without "Override", the
+  authoritative value lives in `whipper.conf` (written by the drive-setup
+  wizard or hand-edited) and the two can drift — and a wrong read offset
+  silently corrupts every rip. Settings now displays the live `whipper.conf`
+  per-drive offset beneath the field, and `--doctor` gained a "Read offset"
+  check that reports it (or warns "none set — whipper will refuse to rip"),
+  with cyanrip noted as applying the offset directly (`-s`). New never-raises
+  `whipper.conf` parser in `offset_config.py`.
 - **Preflight / "doctor" check — first-pass test of the rip environment, no CD
   needed.** Run `whipper-gui --doctor` (or `python scripts/preflight.py`) to
   verify everything the rip pipeline needs *except* the disc read itself: the
