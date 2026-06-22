@@ -27,6 +27,7 @@ version.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 
@@ -220,8 +221,6 @@ class CyanripImpl(WhipperBackend):
         if device:
             args += ["-d", device]
         out = self._run(args)
-        import re
-
         match = re.search(r"offset[^\-0-9]*(?P<offset>-?\d+)", out, re.IGNORECASE)
         if match:
             return int(match.group("offset"))
