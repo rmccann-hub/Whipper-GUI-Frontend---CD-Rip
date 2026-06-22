@@ -94,7 +94,7 @@ This project is as much about building durable standards as shipping the app —
 
 Read these alongside this file when picking up a session:
 
-- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-20)
+- **`PLANNING.md`** — architecture, module design, key design decisions (KDD-01 through KDD-21)
 - **`TASKS.md`** — active task checklist; update status (`[ ]` → `[~]` → `[x]`) as work progresses. Sections: P0 (v1 release, T01-T32), P1.1 (install/uninstall ease — highest-priority P1 subset), P1 (broader backlog), P2 (future), Out of scope.
 - **`DEPENDENCIES.md`** — dep table with last release dates and replacement plans; review per the cadence stated in that file
 - **`README.md`** — outward-facing project description and install instructions

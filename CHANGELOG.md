@@ -37,6 +37,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   which Qt queues to the GUI thread. Found by a headless smoke-run of the real
   startup path.
 
+### Changed
+- **Internal refactor (no behaviour change).** A whole-codebase pass to cut
+  redundancy and improve readability, with the test suite green and branch
+  coverage held at every step: a shared composition root (`composition.py`) the
+  GUI and `--doctor` both build adapters through; a `deps/step_engine.py` module
+  for the step-engine types the setup and teardown engines share (the teardown
+  engine no longer imports its core types from the setup engine); one
+  `workers.start_worker_thread()` helper for the QThread lifecycle wiring that
+  eight call sites had each open-coded; and DRY cleanups in `offset_config`
+  (one section scanner) and the two ripper backends (one `run_capture`). See
+  PLANNING.md KDD-21.
+
 ### Added
 - **Settings + `--doctor` now show the read offset whipper will *actually*
   apply.** Previously the Settings field showed only the GUI's stored copy of

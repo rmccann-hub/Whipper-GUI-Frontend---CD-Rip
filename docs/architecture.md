@@ -57,11 +57,15 @@ pieces independently testable and replaceable.
 | **Parsers** | `parsers/` | Turn external tool output (rip logs, disc info) into typed dataclasses. Pure, never raise. | stdlib only |
 | **Deps** | `deps/` | The single dependency self-management subsystem (detect → install → guide) and the host bootstrap/teardown engines. | adapters, stdlib |
 | **Domain** | `ctdb/` | Backend-independent CTDB verify (TOC math, PCM decode, CRC). | adapters, stdlib |
-| **Core** | `config.py`, `paths.py`, `logging_setup.py`, `app.py` | Config schema, well-known paths, app entry/composition root. | everything (composition) |
+| **Core** | `config.py`, `paths.py`, `logging_setup.py`, `app.py`, `composition.py` | Config schema, well-known paths, app entry, and the composition root. | everything (composition) |
 
-`app.py` is the **composition root**: it constructs the concrete adapters,
-picks the backend from config, and injects everything into `MainWindow`.
-Nothing else should construct adapters — inject them, so tests can pass fakes.
+`app.py` is the **composition root**, with the reusable construction logic in
+`composition.py`: `build_backend(cfg)` (the whipper/cyanrip choice + the
+host-exported-path fallback) and `build_musicbrainz_client()`. `app.py` injects
+everything into `MainWindow`; `preflight.default_context()` (the `--doctor`
+diagnostic) builds the *same* adapters through the *same* helpers, so the GUI and
+the doctor can never diverge. Nothing else should construct adapters — inject
+them, so tests can pass fakes.
 
 > **Code style** (type hints, naming, ~300-line module heuristic, heavy
 > intent-comments, no clever metaprogramming) is owned by `CLAUDE.md`
@@ -335,6 +339,17 @@ point covers every caller. A patch that silently stops intercepting is how the
 2026-06-13 `RipMixin` extraction briefly let a test start a real rip thread.
 Patching an attribute *on a shared module object* (`drive_control.eject_drive`)
 is unaffected by where the caller lives.
+
+This isn't only about *methods* moving — a **shared helper** relocates name
+resolution too. When `cyanrip._run` was routed through `whipper_backend.run_capture`
+(2026-06-22), `subprocess.run` began resolving in `whipper_backend`, so the
+cyanrip tests' `subprocess.run` patch had to move there with it. The mirror-image
+trick is to design the helper so it *doesn't* relocate the patchable seam: the
+`workers.start_worker_thread` helper takes the `QThread` the caller already
+created (rather than constructing one), so every test that patches a module's
+`QThread` keeps intercepting. **When extracting a helper, ask which names it now
+resolves and whether any test patches them** — then either move the patch or keep
+the construction at the call site.
 
 ## 6. Packaging, building & releasing
 

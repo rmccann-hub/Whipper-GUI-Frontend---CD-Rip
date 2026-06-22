@@ -76,10 +76,15 @@ Whipper-GUI-Frontend---CD-Rip/
         ├── __init__.py                  # package version + metadata
         ├── __main__.py                  # `python -m whipper_gui` entry point
         ├── app.py                       # QApplication construction + startup sequence
+        ├── composition.py               # composition root: build adapters from config (shared by app + preflight)
         ├── config.py                    # TOML config load/save + defaults + schema
         ├── logging_setup.py             # logging configuration (rotating file + console)
         ├── paths.py                     # user dirs, config path, log path constants
         ├── offset_config.py             # read/detect whipper.conf read-offset state
+        ├── preflight.py                 # --doctor checks (mirrors the composition root; never-raise)
+        ├── parity.py                    # compare a rip's Copy CRCs against an EAC baseline
+        ├── update_check.py              # "is a newer release published?" (self-update, KDD-17b)
+        ├── update_install.py            # download + checksum-verify + atomic self-install (KDD-17b)
         ├── drive_access.py              # diagnose no-drive cause (no_device / permission / ok)
         ├── drive_control.py             # eject + force-stop a runaway drive on cancel (Critical Rule #3)
         ├── help_content.py              # in-code User Guide markdown (avoids AppImage package-data)
@@ -111,14 +116,17 @@ Whipper-GUI-Frontend---CD-Rip/
         │   ├── resolvers.py             # AutoInstaller, QueuedInstaller, ManualPrompt
         │   ├── host_setup.py            # bootstrap arm: Distrobox/container/whipper/cyanrip install + export (KDD-17c)
         │   ├── host_teardown.py         # teardown arm: the in-app Uninstaller's engine (keeps distrobox/podman + music)
+        │   ├── step_engine.py           # shared step-engine vocabulary (StepStatus/StepResult/CommandRunner/SubprocessRunner/StepEngine)
         │   └── version.py               # version-string parsing utility
         │
-        ├── parsers/                     # whipper stdout/log parsing (named-group regexes)
+        ├── parsers/                     # whipper/cyanrip/EAC stdout+log parsing (named-group regexes)
         │   ├── __init__.py
         │   ├── rip_log.py               # parse the `.log` file whipper writes per rip
         │   ├── drive_list.py            # parse `whipper drive list`
         │   ├── cd_info.py               # parse `whipper cd info` (defines the shared DiscInfo)
-        │   └── cyanrip_info.py          # parse `cyanrip -I` into the same DiscInfo (KDD-18)
+        │   ├── cyanrip_info.py          # parse `cyanrip -I` into the same DiscInfo (KDD-18)
+        │   ├── cyanrip_log.py           # parse cyanrip's per-album log into the shared RipLog (KDD-18)
+        │   └── eac_log.py               # parse EAC rip logs (per-track Copy CRCs; the parity baseline)
         │
         ├── ui/
         │   ├── __init__.py
@@ -147,11 +155,16 @@ Whipper-GUI-Frontend---CD-Rip/
         │       └── manual_install.py    # tier (c) copyable search string dialog
         │
         └── workers/                     # long-running operations off the GUI thread
-            ├── __init__.py
+            ├── __init__.py              # start_worker_thread() — the shared one-shot QThread lifecycle wiring
             ├── rip_worker.py            # drives the rip subprocess (whipper or cyanrip)
             ├── mb_worker.py             # drives MusicBrainz queries
             ├── drive_setup_worker.py    # drives drive analyze / offset find off-thread
-            └── host_setup_worker.py     # drives the setup AND teardown engines off-thread (StepEngine)
+            ├── host_setup_worker.py     # drives the setup AND teardown engines off-thread (StepEngine)
+            ├── drive_list_worker.py     # drives list_drives() off-thread (cold-container probe)
+            ├── disc_info_worker.py      # drives disc_info() off-thread
+            ├── dependency_worker.py     # drives the launch-time dependency probe off-thread
+            ├── update_worker.py         # drives the release check + the download/verify/install off-thread
+            └── ctdb_worker.py           # drives CTDB verify for a finished rip off-thread (KDD-14)
 ```
 
 ---
@@ -164,11 +177,16 @@ One paragraph per module, no more. If a module's paragraph creeps beyond a few s
 
 - **`__init__.py`** — exposes package version (read by `pyproject.toml` and `--version` CLI). No runtime logic.
 - **`__main__.py`** — invoked by `python -m whipper_gui`. Imports and calls `app.main()`. Stays tiny so packaging tools and AppImage entry points have a stable target.
-- **`app.py`** — builds the `QApplication`, instantiates the `DependencyManager` and runs its initial check (which may show install dialogs before the main window appears), then constructs and shows the `MainWindow`. Wires logging early so any failure during startup is captured.
+- **`app.py`** — builds the `QApplication`, constructs the adapters via `composition` (the shared composition root), instantiates the `DependencyManager` and runs its initial check (which may show install dialogs before the main window appears), then constructs and shows the `MainWindow`. Wires logging early so any failure during startup is captured.
+- **`composition.py`** — the composition root: `build_backend(cfg)` (whipper/cyanrip selection + the host-exported-path fallback) and `build_musicbrainz_client()` plus the shared `CONTACT_URL`. Both `app.py` (the GUI) and `preflight.default_context()` (the `--doctor` diagnostic) build their adapters here, so the two can never wire them differently. Construction does no I/O. (KDD-21.)
 - **`config.py`** — pure-Python TOML config loader/saver. Reads `~/.config/whipper-gui/config.toml` via `tomllib` (stdlib in 3.11+), writes via `tomli-w`. Defines the default config dict and a schema version. Atomic writes (temp file + rename) so a crash mid-save doesn't corrupt the file.
 - **`logging_setup.py`** — configures Python's `logging` module once at startup. Rotating file handler at `~/.local/share/whipper-gui/log.txt`, plus a console handler at INFO. Project modules use `logging.getLogger(__name__)` everywhere; no module configures handlers itself.
 - **`paths.py`** — module-level constants for the user config dir, log dir, and any other path computed from `XDG_*` env vars or hard-coded fallbacks. Single source of truth so paths aren't recomputed at call sites.
-- **`offset_config.py`** — reads `whipper.conf` (and the GUI's `--offset` override) to tell whether a read offset is configured; backs the drive-setup wizard's first-run auto-offer.
+- **`offset_config.py`** — reads `whipper.conf` (and the GUI's `--offset` override) to tell whether a read offset is configured; backs the drive-setup wizard's first-run auto-offer. One shared section scanner (`_iter_conf_offsets`) + one file reader (`_read_conf_text`) feed both the "any offset set?" check and the per-drive read-out, so the two filters can't drift.
+- **`preflight.py`** — the `--doctor`/`scripts/preflight.py` checks: a no-disc, never-raise first-pass test of the rip environment (backend routing, drives, dependencies, network reachability). `default_context()` mirrors `app.py`'s composition via the shared `composition` root.
+- **`parity.py`** — compares a rip's per-track Copy CRCs against an EAC baseline log (`output_reference/`, `docs/test-plan.md`); the bit-perfect-equivalence check.
+- **`update_check.py`** — "is a newer release published?" against the GitHub releases API (self-update, KDD-17b). Delivery is handled by `update_install.py`.
+- **`update_install.py`** — download → checksum-verify → atomic self-install of an AppImage update (KDD-17b amendment), off-thread via `workers/update_worker.py`.
 - **`drive_access.py`** — pure-stdlib `diagnose_drive_access()` classifying the no-drive case as `no_device` / `permission` (gives the `usermod -aG` fix) / `ok`. Probes are injectable for testing.
 - **`drive_control.py`** — host-first best-effort `eject_drive()` and `force_stop_drive()` for a runaway drive on cancel. This is the one approved exception to Critical Rule #3 (force-stop only; see CLAUDE.md).
 - **`help_content.py`** — the User Guide Markdown kept *in code* (not packaged data, to dodge AppImage package-data pitfalls); rendered by the Help dialogs.
@@ -204,8 +222,9 @@ Implements brief P0 #11. **All** dependency checks live here. CLAUDE.md Critical
 - **`checks.py`** — probe functions. One per dependency: `check_whipper()`, `check_metaflac()`, `check_libdiscid()`, `check_picard_flatpak()`, `check_python_pkg(name)`. Each returns a `ProbeResult` (present: bool, version: str | None, location: str | None).
 - **`resolvers.py`** — three resolver classes corresponding to the three tiers. `AutoInstaller` runs silent installs after one confirmation dialog (pipx, `flatpak install --user`). `QueuedInstaller` drives `ui.dialogs.pending_installs`. `ManualPrompt` drives `ui.dialogs.manual_install`. The resolvers are dumb about which tier a dep belongs to — that's the registry's job; resolvers just execute.
 - **`version.py`** — small helper: parse a version string out of CLI output using a named-group regex, compare semver-ish strings against a minimum. Tiny, well-tested.
-- **`host_teardown.py`** — the **teardown arm** (the in-app Uninstaller's engine): idempotent steps removing shortcuts → host exports → the `ripping` container → optionally `whipper.conf` and the running AppImage → the GUI's own settings + logs LAST (so the log survives a failed step). Injectable runner + file/tree removers, dry-run, per-step `StepResult`s. The keep-contract is test-pinned: the only mutating command it can issue is `distrobox rm --force ripping` — Distrobox/podman and music are never targets.
-- **`host_setup.py`** — the **bootstrap arm** of this subsystem (KDD-17c): an idempotent step engine (Distrobox → container backend → `ripping` container → whipper-in-container → optional cyanrip-from-COPR → host export) behind an injectable `CommandRunner`, so the orchestration is fully unit-testable and supports dry-run. Host-root installs use `pkexec` (graphical polkit — a GUI has no TTY for sudo); in-container installs stay `sudo`. Also home to `cyanrip_on_host()` so presence checks don't scatter (Critical Rule #6).
+- **`step_engine.py`** — the shared vocabulary both host step-engines speak: `StepStatus`/`StepResult` (per-step outcome), the injectable `CommandRunner` Protocol + its real `SubprocessRunner`, and the `StepEngine` Protocol one worker drives both arms through. Lives here (not in `host_setup`) so the teardown engine doesn't depend on the setup engine for its core types (KDD-21).
+- **`host_teardown.py`** — the **teardown arm** (the in-app Uninstaller's engine): idempotent steps removing shortcuts → host exports → the `ripping` container → optionally `whipper.conf` and the running AppImage → the GUI's own settings + logs LAST (so the log survives a failed step). Injectable runner + file/tree removers, dry-run, per-step `StepResult`s (from `step_engine`). The keep-contract is test-pinned: the only mutating command it can issue is `distrobox rm --force ripping` — Distrobox/podman and music are never targets.
+- **`host_setup.py`** — the **bootstrap arm** of this subsystem (KDD-17c): an idempotent step engine (Distrobox → container backend → `ripping` container → whipper-in-container → optional cyanrip-from-COPR → host export) behind an injectable `CommandRunner` (from `step_engine`), so the orchestration is fully unit-testable and supports dry-run. Host-root installs use `pkexec` (graphical polkit — a GUI has no TTY for sudo); in-container installs stay `sudo`. Also home to `cyanrip_on_host()` so presence checks don't scatter (Critical Rule #6).
 
 ### Whipper output parsers (`parsers/`)
 
@@ -244,12 +263,20 @@ PySide6 widgets and dialogs. Each module is one screen or one widget; nothing he
 
 ### Workers (`workers/`)
 
-Long-running operations on background `QThread`s so the GUI stays responsive.
+Long-running operations on background `QThread`s so the GUI stays responsive. The
+package `__init__` provides `start_worker_thread(worker, thread, on_started, *, also_quit_on=())`,
+the one-shot lifecycle wiring (moveToThread → `finished`→`quit` → `thread.finished`→`deleteLater`
+→ start) every call site shares; the caller still creates the thread (so test patches of a
+module's `QThread` keep working) and connects its own result slots first.
 
 - **`rip_worker.py`** — `RipWorker(QObject)` moved to a `QThread`. Owns the rip subprocess. Emits `log_line(str)` for each line of whipper output, `progress(...)` for parseable progress events, `finished(success, rip_log_path)` on exit, `error(message)` on failure. Supports cancel via subprocess terminate + child-process cleanup.
-- **`mb_worker.py`** — `MusicBrainzWorker(QObject)` moved to a `QThread`. Drives `MusicBrainzClient` calls (which can take a few seconds and shouldn't block input). Emits `releases_returned(list)` or `error(message)`.
+- **`mb_worker.py`** — `MusicBrainzWorker(QObject)` moved to a `QThread`. Drives `MusicBrainzClient` calls (which can take a few seconds and shouldn't block input). Emits `releases_returned(list)` or `error(message)`. The one *persistent* worker (window lifetime), so it's wired by hand rather than via `start_worker_thread`.
 - **`drive_setup_worker.py`** — `DriveSetupWorker(QObject)` moved to a `QThread`. Runs the wizard's `drive analyze` / `offset find` via cancellable `Popen` so closing the dialog mid-detection can't orphan a running process or strand the drive.
-- **`host_setup_worker.py`** — `HostSetupWorker(QObject)` moved to a `QThread`. Runs any `StepEngine` (a Protocol both `HostSetup` and `HostTeardown` satisfy — one worker drives setup and uninstall) off the GUI thread, relaying per-step `StepResult`s as signals; supports cancel at step boundaries.
+- **`host_setup_worker.py`** — `HostSetupWorker(QObject)` moved to a `QThread`. Runs any `StepEngine` (a Protocol in `deps/step_engine.py` that both `HostSetup` and `HostTeardown` satisfy — one worker drives setup and uninstall) off the GUI thread, relaying per-step `StepResult`s as signals; supports cancel at step boundaries.
+- **`drive_list_worker.py` / `disc_info_worker.py`** — run `list_drives()` / `disc_info()` off-thread (both shell out to the backend, slow on a cold container); emit `finished`/`failed`.
+- **`dependency_worker.py`** — runs `DependencyManager.check_all()` (the launch-time probe) off-thread; emits `finished(report)`.
+- **`update_worker.py`** — `UpdateCheckWorker` (release lookup) + `UpdateInstallWorker` (download/verify/install with progress) off-thread.
+- **`ctdb_worker.py`** — runs CTDB verify for a finished rip off-thread on a daemon thread (KDD-14 Phase 1; it can outlive any sane `wait()`, see architecture.md §3.2).
 
 ---
 
@@ -687,3 +714,16 @@ Decided after a session where the code and `CHANGELOG.md` stayed current but `do
 - **Why this shape.** For an LLM agent the highest-leverage lever is the file guaranteed to be loaded every session — a rule placed anywhere else gets deferred. CI catches the one piece a machine *can* check ("was the file touched"); it cannot judge whether a lesson was actually graduated, so the **rule, not CI, is the primary mechanism**. This deliberately mirrors the existing institutional "every shipped bug gets a regression test in the same change" rule.
 - **Implementation lesson (the gate's own first bug).** The opt-out matcher first used a substring grep for `[skip changelog]`, which matched the commit message that *documented* the marker — a self-skip. Fixed to require the marker as its own line (`^\s*\[skip changelog\]\s*$`): prose mentions never match, deliberate opt-outs do. Caught by a local simulation before push and confirmed green in real CI.
 - **Status:** SHIPPED (2026-06-20). Rule #7 + `testing.md §6` items + the CI `changelog` job are all live; the `changelog` job was confirmed `success` on the introducing commit (and the `[skip changelog]` opt-out on the follow-up record commit).
+
+### KDD-21 — Behaviour-preserving refactor: shared composition root, step-engine module, and one worker-thread helper (decided 2026-06-22)
+
+A whole-codebase, behaviour-preserving refactor (user-requested "complete refactor") to cut redundancy, improve readability, and split/merge by cohesion. No feature or contract change; the 943-test suite stayed green at every commit (now 950) and branch coverage rose 92.04 % → 92.43 %. The structural decisions worth recording:
+
+- **One composition root (`composition.py`).** `app.py` and `preflight.default_context()` each built the same adapters (backend selection + host-exported-path fallback, MusicBrainz client, contact URL). They now both call `composition.build_backend()` / `build_musicbrainz_client()`, so the GUI and `--doctor` can't wire the adapters differently. The trivial zero-arg adapters (`CtdbHttpImpl`, `DependencyManager`) stay inline at each site — wrapping them would add indirection without removing duplication. `app.py` imports it *inside* the startup-guard `try:` so an import failure still surfaces the fatal dialog.
+- **Step-engine vocabulary split out (`deps/step_engine.py`).** `StepStatus`/`StepResult`/`CommandRunner`/`SubprocessRunner`/`StepEngine` were defined in `host_setup.py`, so the *teardown* engine imported its core types from the *setup* engine — a backwards sibling dependency. They moved to their own module both engines (and the worker + dialogs) depend on. This is the canonical "split a file that's secretly doing two jobs" — driven by the import graph, not a line count.
+- **One worker-thread lifecycle helper (`workers.start_worker_thread`).** Eight one-shot call sites repeated the same moveToThread → `finished`→`quit` → `thread.finished`→`deleteLater` → start wiring. The helper centralises it but **takes the thread the caller created** (rather than constructing it), so a test patching a module's `QThread` still intercepts — the design choice that made this low-risk. A base class was rejected (the prompt's own steer and ours): the signal shapes differ per worker (single `finished` vs `finished`+`failed` vs `step`+`finished`), and the persistent MusicBrainz worker doesn't fit the one-shot teardown at all, so it's left wired by hand.
+- **DRY within modules.** `offset_config` collapsed two parse paths + two identical file-read blocks into one section scanner + one reader (two filters preserve the deliberate difference that "any offset set?" spans all sections while "per-drive offsets" do not — pinned by a new characterization test). The two backends' `_run_capture`/`_run` became one `run_capture()` (per-backend timeout kept on purpose). `find_offset`'s function-local `import re` hoisted to module top.
+- **Lessons (graduated so we don't repeat them):**
+  - **A shared helper relocates where a name resolves — move the monkeypatch target with it.** Routing cyanrip's `_run` through `whipper_backend.run_capture` meant `subprocess.run` now resolves in `whipper_backend`, so the cyanrip tests' patch moved there too (the same rule as KDD-19 / architecture.md §5, now with a *non-mixin* example).
+  - **For Qt-thread wiring, keep object *construction* at the call site and centralise only the wiring.** Passing the thread in (not creating it in the helper) is what preserved every `module.QThread` test patch — construct-in-helper would have silently bypassed them.
+  - **Running the real entry points during QA finds what the suite can't.** `whipper-gui --doctor`, run for real in the QA sweep, exposed a *pre-existing* crash (`HostSetup()` built without its required `runner` on the never-tested `host=None` path). Flagged and fixed separately (its own commit + regression test + CHANGELOG), never folded into a refactor commit — the "find a bug → stop and flag, don't silently fix inside a refactor" discipline.
