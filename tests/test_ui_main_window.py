@@ -106,9 +106,10 @@ def _detail() -> ReleaseDetail:
             artist_credit="Artist",
             date="2024",
             track_count=2,
+            genre="Rock",
         ),
         tracks=(
-            TrackSummary(number=1, title="One"),
+            TrackSummary(number=1, title="One", isrc="AAAAA0000001"),
             TrackSummary(number=2, title="Two"),
         ),
     )
@@ -1398,7 +1399,11 @@ def test_start_rip_worker_snapshots_track_table_metadata(
     from whipper_gui.workers.rip_worker import RipParameters
 
     window = teardown_threads()
-    window._track_table.set_release(_detail())
+    detail = _detail()
+    window._track_table.set_release(detail)
+    # genre + per-track ISRC are MB-only silent passthroughs read from the
+    # stored release (normally set by _on_mb_release_detail); set it directly.
+    window._current_release_detail = detail
     seen: list[RipParameters] = []
 
     class _NoopWorker:
@@ -1438,7 +1443,13 @@ def test_start_rip_worker_snapshots_track_table_metadata(
     assert meta.album_artist == "Artist"
     assert meta.album_title == "Album"
     assert meta.year == "2024"
-    assert meta.tracks == ((1, "One", ""), (2, "Two", ""))
+    # Editable fields (title/artist) come from the table; genre + ISRC are the
+    # silent MB passthroughs pulled from the stored release detail.
+    assert meta.genre == "Rock"
+    assert [(t.number, t.title, t.artist, t.isrc) for t in meta.tracks] == [
+        (1, "One", "", "AAAAA0000001"),
+        (2, "Two", "", ""),
+    ]
 
 
 class _FakeThread:

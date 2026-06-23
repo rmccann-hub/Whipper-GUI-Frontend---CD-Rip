@@ -17,7 +17,7 @@ Contract this mixin expects from the host window (all set in
 ``_rip_cancelled``/``_auto_retry_done``/``_force_stop_done``/
 ``_force_stop_timer``/``_force_stop_thread``/``_eject_thread``/
 ``_post_rip_thread``/``_cover_art_fetcher``/``_pending_picard_launch``/
-``_current_release_id``/``_ctdb_client``/``_ctdb_thread``;
+``_current_release_id``/``_current_release_detail``/``_ctdb_client``/``_ctdb_thread``;
 the ``rip_post_processing_done``, ``cover_art_done`` and
 ``ctdb_verify_done`` signals; and the cross-mixin methods
 ``self._auto_apply_known_offset`` / ``self._on_drive_setup`` (DriveMixin).
@@ -40,7 +40,7 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 
 from whipper_gui import drive_control
 from whipper_gui.adapters import cover_art
-from whipper_gui.adapters.whipper_backend import RipMetadata
+from whipper_gui.adapters.whipper_backend import RipMetadata, TrackTag
 from whipper_gui.offset_config import is_offset_configured
 from whipper_gui.parsers.cyanrip_log import looks_like_cyanrip_log, parse_cyanrip_log
 from whipper_gui.parsers.rip_log import parse_rip_log
@@ -157,14 +157,34 @@ class RipMixin:
         # cyanrip is fed these tags directly so it never needs its own
         # MusicBrainz lookup (Critical Rule #5, KDD-18 metadata model).
         album = self._track_table.album_metadata()
+        # Genre / disc number / per-track ISRC are MusicBrainz-only silent
+        # passthroughs (not editable in the table), so they come from the stored
+        # release — and only when it matches THIS rip (guards a stale detail from
+        # a previous disc, and unknown-album rips where release_id is "").
+        detail = self._current_release_detail
+        if detail is not None and detail.summary.mbid == params.release_id:
+            genre = detail.summary.genre
+            disc_number = detail.summary.disc_number
+            total_discs = detail.summary.total_discs
+            isrc_by_number = {t.number: t.isrc for t in detail.tracks}
+        else:
+            genre, disc_number, total_discs, isrc_by_number = "", 1, 1, {}
         params = replace(
             params,
             metadata=RipMetadata(
                 album_artist=album.artist,
                 album_title=album.title,
                 year=album.year,
+                genre=genre,
+                disc_number=disc_number,
+                total_discs=total_discs,
                 tracks=tuple(
-                    (t.number, t.title, t.artist_credit)
+                    TrackTag(
+                        number=t.number,
+                        title=t.title,
+                        artist=t.artist_credit,
+                        isrc=isrc_by_number.get(t.number, ""),
+                    )
                     for t in self._track_table.tracks()
                 ),
             ),

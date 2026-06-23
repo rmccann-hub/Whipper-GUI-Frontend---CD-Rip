@@ -286,18 +286,26 @@ def _metadata_args(metadata: RipMetadata | None, release_id: str) -> list[str]:
         album_pairs.append(f"album_artist={_escape_meta_value(meta.album_artist)}")
     if meta.year:
         album_pairs.append(f"date={_escape_meta_value(meta.year)}")
+    if meta.genre:
+        album_pairs.append(f"genre={_escape_meta_value(meta.genre)}")
+    # FFmpeg/Vorbis `disc` tag, only for multi-disc sets ("n/total"); a plain
+    # single CD gets no disc tag (no point tagging 1/1).
+    if meta.total_discs > 1:
+        album_pairs.append(f"disc={meta.disc_number}/{meta.total_discs}")
     if release_id:
         album_pairs.append(f"musicbrainz_albumid={_escape_meta_value(release_id)}")
     if album_pairs:
         args += ["-a", ":".join(album_pairs)]
-    for number, title, artist in meta.tracks:
+    for track in meta.tracks:
         track_pairs: list[str] = []
-        if title:
-            track_pairs.append(f"title={_escape_meta_value(title)}")
-        if artist:
-            track_pairs.append(f"artist={_escape_meta_value(artist)}")
+        if track.title:
+            track_pairs.append(f"title={_escape_meta_value(track.title)}")
+        if track.artist:
+            track_pairs.append(f"artist={_escape_meta_value(track.artist)}")
+        if track.isrc:
+            track_pairs.append(f"isrc={_escape_meta_value(track.isrc)}")
         if track_pairs:
-            args += ["-t", f"{number}={':'.join(track_pairs)}"]
+            args += ["-t", f"{track.number}={':'.join(track_pairs)}"]
     return args
 
 

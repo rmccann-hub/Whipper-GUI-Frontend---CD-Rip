@@ -153,6 +153,22 @@ def run_capture(
 
 
 @dataclass(frozen=True)
+class TrackTag:
+    """One track's tags for a metadata-fed backend (cyanrip's `-t`).
+
+    `number` is the 1-based track position. `title`/`artist` are the
+    (possibly user-edited) values from the track table; `isrc` is the
+    MusicBrainz-supplied recording ISRC (silent passthrough — not editable),
+    empty when MB has none.
+    """
+
+    number: int
+    title: str = ""
+    artist: str = ""
+    isrc: str = ""
+
+
+@dataclass(frozen=True)
 class RipMetadata:
     """The GUI's already-fetched album/track metadata, offered to the backend.
 
@@ -162,13 +178,18 @@ class RipMetadata:
     backends that can be fed tags directly (cyanrip's `-a`/`-t`) use it so
     the rip needs no in-container network and the user's edits win.
 
-    `tracks` holds (track_number, title, artist) triples, 1-based numbers.
+    `tracks` holds :class:`TrackTag` entries, 1-based numbers. The album-level
+    `genre` / `disc_number` / `total_discs` are MusicBrainz-supplied silent
+    passthroughs (best-effort; defaults are harmless when MB has nothing).
     """
 
     album_artist: str = ""
     album_title: str = ""
     year: str = ""
-    tracks: tuple[tuple[int, str, str], ...] = ()
+    genre: str = ""
+    disc_number: int = 1
+    total_discs: int = 1
+    tracks: tuple[TrackTag, ...] = ()
 
 
 class RipHandle:

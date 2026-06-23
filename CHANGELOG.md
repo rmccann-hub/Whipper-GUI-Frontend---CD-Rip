@@ -50,6 +50,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   PLANNING.md KDD-21.
 
 ### Added
+- **Richer tags on cyanrip rips (genre, disc number, per-track ISRC).** The
+  cyanrip backend was fed only album/artist/title/year/MBID + per-track
+  title/artist, so its rips were tagged more sparsely than whipper's. The
+  MusicBrainz lookup now also carries the top genre tag, the disc numbering, and
+  each recording's ISRC, and these flow to cyanrip's `-a`/`-t` (FFmpeg
+  `genre`/`disc`/`isrc`). They are **silent passthroughs** — read from the
+  identified MusicBrainz release, not editable in the track table — and
+  best-effort (empty when MB has nothing). whipper rips are unaffected (whipper
+  tags itself from `--release-id`).
 - **Settings + `--doctor` now show the read offset whipper will *actually*
   apply.** Previously the Settings field showed only the GUI's stored copy of
   the read offset; when the whipper backend rips without "Override", the

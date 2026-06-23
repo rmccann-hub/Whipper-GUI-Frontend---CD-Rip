@@ -263,9 +263,9 @@ def test_metadata_param_forwarded_to_backend(
 ) -> None:
     """RipParameters.metadata (the GUI's tag snapshot) must reach the
     backend so cyanrip can be fed -a/-t."""
-    from whipper_gui.adapters.whipper_backend import RipMetadata
+    from whipper_gui.adapters.whipper_backend import RipMetadata, TrackTag
 
-    meta = RipMetadata(album_title="X", tracks=((1, "One", "A"),))
+    meta = RipMetadata(album_title="X", tracks=(TrackTag(1, "One", "A"),))
     handle = _FakeHandle(lines=[], exit_code=0)
     backend = _FakeBackend(handle=handle)
     worker = RipWorker(backend, _params(tmp_path, metadata=meta))

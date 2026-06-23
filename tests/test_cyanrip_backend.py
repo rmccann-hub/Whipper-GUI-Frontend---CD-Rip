@@ -17,7 +17,7 @@ from whipper_gui.adapters.cyanrip_backend import (
     _metadata_args,
     scheme_from_template,
 )
-from whipper_gui.adapters.whipper_backend import RipMetadata, WhipperError
+from whipper_gui.adapters.whipper_backend import RipMetadata, TrackTag, WhipperError
 
 
 def _patch_run(monkeypatch, *, stdout: str = "", stderr: str = "", raises=None):
@@ -95,7 +95,13 @@ def test_rip_argv_always_disables_mb_and_feeds_gui_metadata() -> None:
         album_artist="The Police",
         album_title="Greatest Hits",
         year="1992",
-        tracks=((1, "Roxanne", "The Police"), (2, "Can't Stand Losing You", "")),
+        genre="Rock",
+        disc_number=1,
+        total_discs=2,  # multi-disc → a "disc=n/total" tag is emitted
+        tracks=(
+            TrackTag(1, "Roxanne", "The Police", isrc="GBAAA0000001"),
+            TrackTag(2, "Can't Stand Losing You"),
+        ),
     )
     argv = _impl()._build_rip_argv(
         "/dev/sr0",
@@ -112,10 +118,12 @@ def test_rip_argv_always_disables_mb_and_feeds_gui_metadata() -> None:
     assert "album=Greatest Hits" in album_arg
     assert "album_artist=The Police" in album_arg
     assert "date=1992" in album_arg
+    assert "genre=Rock" in album_arg
+    assert "disc=1/2" in album_arg
     assert "musicbrainz_albumid=1e477f68-c407-4eae-ad01-518528cedc2c" in album_arg
     track_args = [argv[i + 1] for i, a in enumerate(argv) if a == "-t"]
-    assert track_args[0] == "1=title=Roxanne:artist=The Police"
-    # No artist → the artist= pair is skipped; the ' is escaped for
+    assert track_args[0] == "1=title=Roxanne:artist=The Police:isrc=GBAAA0000001"
+    # No artist/isrc → those pairs are skipped; the ' is escaped for
     # av_get_token (which treats bare ' as a quote character).
     assert track_args[1] == "2=title=Can\\'t Stand Losing You"
     # Templates: dir part → -D, file part → -F, tokens translated.
@@ -151,11 +159,12 @@ def test_meta_value_escaping_makes_separators_safe() -> None:
 
 
 def test_metadata_args_skip_empty_fields() -> None:
+    # Single disc + no genre → only the album title; no disc=/genre= noise.
     args = _metadata_args(RipMetadata(album_title="X"), release_id="")
     assert args == ["-a", "album=X"]
     assert _metadata_args(None, release_id="") == []
-    # A track with neither title nor artist contributes no -t at all.
-    args = _metadata_args(RipMetadata(tracks=((3, "", ""),)), release_id="")
+    # A track with no title/artist/isrc contributes no -t at all.
+    args = _metadata_args(RipMetadata(tracks=(TrackTag(3),)), release_id="")
     assert args == []
 
 

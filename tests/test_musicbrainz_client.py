@@ -72,8 +72,14 @@ def _sample_release_by_id() -> dict[str, Any]:
             ],
             "date": "1973-03-01",
             "country": "GB",
+            # Folksonomy tags → genre is the highest-count one ("rock", 8).
+            "tag-list": [
+                {"name": "progressive rock", "count": "5"},
+                {"name": "rock", "count": "8"},
+            ],
             "medium-list": [
                 {
+                    "position": "1",
                     "format": "CD",
                     "track-count": "2",
                     "track-list": [
@@ -83,6 +89,8 @@ def _sample_release_by_id() -> dict[str, Any]:
                             "recording": {
                                 "title": "Speak to Me",
                                 "length": "67000",
+                                # string-form isrc-list
+                                "isrc-list": ["GBN9Y1100001"],
                                 "artist-credit": [
                                     {
                                         "artist": {"name": "Pink Floyd"},
@@ -97,6 +105,8 @@ def _sample_release_by_id() -> dict[str, Any]:
                             "recording": {
                                 "title": "Breathe",
                                 "length": "165000",
+                                # dict-form isrc-list
+                                "isrc-list": [{"id": "GBN9Y1100002"}],
                                 "artist-credit": [
                                     {
                                         "artist": {"name": "Pink Floyd"},
@@ -259,6 +269,48 @@ def test_release_by_mbid_returns_detail_with_tracks(
     assert detail.tracks[0].length_ms == 67000
     assert detail.tracks[1].number == 2
     assert detail.tracks[1].title == "Breathe"
+    # New silent-passthrough fields: genre (top tag), disc numbering, ISRCs
+    # (both the string and dict isrc-list shapes are handled).
+    assert detail.summary.genre == "rock"
+    assert detail.summary.disc_number == 1
+    assert detail.summary.total_discs == 1
+    assert detail.tracks[0].isrc == "GBN9Y1100001"
+    assert detail.tracks[1].isrc == "GBN9Y1100002"
+
+
+def test_release_by_mbid_degrades_on_sparse_or_odd_metadata(
+    client: MusicBrainzNgsImpl, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The genre/disc/ISRC extraction never raises and defaults cleanly when MB
+    omits tags/ISRCs or returns odd shapes (a non-dict tag, an unnumbered
+    medium, a blank ISRC before a real one)."""
+    response = {
+        "release": {
+            "id": "x",
+            "title": "T",
+            "artist-credit": [],
+            "tag-list": ["not-a-dict", {"name": "", "count": "9"}],  # both unusable
+            "medium-list": [
+                {
+                    "track-list": [
+                        {
+                            "position": "1",
+                            "recording": {
+                                "title": "A",
+                                "isrc-list": ["", {"id": "GBN9Y1100009"}],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+    monkeypatch.setattr(musicbrainzngs, "get_release_by_id", lambda *a, **kw: response)
+    detail = client.release_by_mbid("x")
+    assert detail.summary.genre == ""  # no usable tag → blank, not a crash
+    assert detail.summary.disc_number == 1  # medium has no position
+    assert detail.summary.total_discs == 1
+    assert detail.tracks[0].isrc == "GBN9Y1100009"  # blank entry skipped
 
 
 def test_release_by_mbid_raises_on_webservice_error(

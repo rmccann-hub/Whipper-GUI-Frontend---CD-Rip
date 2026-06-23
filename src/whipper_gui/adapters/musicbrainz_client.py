@@ -75,6 +75,7 @@ class TrackSummary:
     title: str
     artist_credit: str = ""
     length_ms: int | None = None
+    isrc: str = ""  # recording ISRC, when MB has one (requires the "isrcs" include)
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,9 @@ class ReleaseSummary:
     catalog_number: str = ""
     medium_format: str = ""  # e.g. "CD"
     disambiguation: str = ""
+    genre: str = ""  # top MB tag (requires the "tags" include); "" when none
+    disc_number: int = 1  # this medium's position in the release
+    total_discs: int = 1  # number of media in the release
 
 
 @dataclass(frozen=True)
@@ -185,7 +189,9 @@ class MusicBrainzNgsImpl(MusicBrainzClient):
         try:
             response = musicbrainzngs.get_release_by_id(
                 mbid,
-                includes=["artists", "recordings", "labels", "media"],
+                # "tags" → a genre (top folksonomy tag; MB has no plain "genres"
+                # include in musicbrainzngs 0.7.1); "isrcs" → per-recording ISRCs.
+                includes=["artists", "recordings", "labels", "media", "tags", "isrcs"],
             )
         except musicbrainzngs.WebServiceError as exc:
             raise MusicBrainzQueryError(f"MB release fetch failed: {exc}") from exc
@@ -228,8 +234,10 @@ def _summary_from_release_dict(release: dict) -> ReleaseSummary:
     country = release.get("country", "")
     disambiguation = release.get("disambiguation", "")
 
-    track_count = _first_medium_track_count(release.get("medium-list", []))
-    medium_format = _first_medium_format(release.get("medium-list", []))
+    media = release.get("medium-list", [])
+    track_count = _first_medium_track_count(media)
+    medium_format = _first_medium_format(media)
+    disc_number, total_discs = _disc_numbering(media)
 
     label, catalog_number = _first_label_info(release.get("label-info-list", []))
 
@@ -244,6 +252,9 @@ def _summary_from_release_dict(release: dict) -> ReleaseSummary:
         catalog_number=catalog_number,
         medium_format=medium_format,
         disambiguation=disambiguation,
+        genre=_top_tag_name(release),
+        disc_number=disc_number,
+        total_discs=total_discs,
     )
 
 
@@ -268,6 +279,7 @@ def _tracks_from_release_dict(release: dict) -> tuple[TrackSummary, ...]:
                 title=recording.get("title", "") or track.get("title", ""),
                 artist_credit=_artist_credit_string(recording.get("artist-credit", [])),
                 length_ms=length_ms,
+                isrc=_first_isrc(recording),
             )
         )
     return tuple(tracks)
@@ -301,6 +313,46 @@ def _first_medium_format(media: list) -> str:
     if not media:
         return ""
     return media[0].get("format", "")
+
+
+def _disc_numbering(media: list) -> tuple[int, int]:
+    """Return (disc_number, total_discs) from the medium-list.
+
+    We rip the first medium (multi-disc selection is P1), so its `position` is
+    the disc number; the total is how many media the release has. Defaults to
+    1/1 when the list is empty or unnumbered.
+    """
+    total = max(len(media), 1)
+    disc_number = (_safe_int(media[0].get("position")) if media else None) or 1
+    return disc_number, total
+
+
+def _top_tag_name(release: dict) -> str:
+    """The highest-voted folksonomy tag as a best-effort genre, or "".
+
+    MB has no curated genre in musicbrainzngs 0.7.1's includes, so we use the
+    most-applied tag (often a genre like "rock"). Empty when the release is
+    untagged or the "tags" include wasn't requested.
+    """
+    best_name, best_count = "", -1
+    for tag in release.get("tag-list", []):
+        if not isinstance(tag, dict):
+            continue
+        name = tag.get("name", "")
+        count = _safe_int(tag.get("count")) or 0
+        if name and count > best_count:
+            best_name, best_count = name, count
+    return best_name
+
+
+def _first_isrc(recording: dict) -> str:
+    """First ISRC for a recording, or "". MB returns isrc-list as strings or
+    `{"id": ...}` dicts depending on the response shape — handle both."""
+    for item in recording.get("isrc-list", []):
+        isrc = item.get("id", "") if isinstance(item, dict) else str(item)
+        if isrc:
+            return isrc
+    return ""
 
 
 def _first_label_info(infos: list) -> tuple[str, str]:
