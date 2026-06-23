@@ -314,8 +314,11 @@ class SettingsDialog(QDialog):
             "After a successful rip, re-encode each FLAC at the maximum level "
             "(`flac -8`) to shrink it. Lossless and verified — the audio stays "
             "bit-identical and the tags and cover art are preserved. Needs "
-            "`flac`; runs in the background. Off by default (it costs some CPU "
-            "and time for a modest size saving)."
+            "`flac`; runs in the background. Off by default: the smaller file "
+            "uses a higher prediction order, so it costs a little more CPU/"
+            "battery to DECODE on playback — negligible on a phone or PC today, "
+            "but if you play on low-power portable players, leaving this off "
+            "(whipper's default level) is the lighter choice."
         )
         form.addRow("Re-compress FLACs:", self._recompress_flac_check)
 

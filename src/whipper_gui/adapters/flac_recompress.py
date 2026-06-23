@@ -34,13 +34,27 @@ _FLAC_BINARY: str = "flac"
 # proves the decoded audio is bit-identical regardless of level, so the priority
 # (bit-perfect) holds no matter what and the smaller file is the bonus.
 #
+# WHY THIS IS OPT-IN / OFF BY DEFAULT (the real reason, not just "modest gain"):
+# higher compression raises the LPC prediction order — the `-l` setting, which
+# the decoder must apply per sample. whipper's default is `-5` (`-l 8`); `-8` is
+# `-l 12`. A higher order = more multiply-accumulates per sample to DECODE, so a
+# `-8` file costs a little more CPU/battery to play back. Historically (the ~2015
+# logic) this mattered on low-power portable players; on modern phones/desktops
+# it's largely negligible, but it's a real reason a library aimed at mobile
+# playback might prefer to leave files at whipper's `-5`. Both `-5` and `-8` stay
+# inside the FLAC "Subset" (max LPC order 12 at <=48kHz), so this is a decode-
+# *effort* difference, never a hardware-compatibility one. Net: the smaller file
+# trades a touch of playback cost — hence opt-in, with whipper's `-5` the safe,
+# mobile-friendly default.
+#
 # The docs list exactly two ways to compress *further* while staying lossless —
 # `-e/--exhaustive-model-search` and `-p/--qlp-coeff-precision-search` — both
-# flagged "(expensive!)". They typically buy well under 1% for several times the
-# encode time, a bad trade for an optional background size-shrink that runs on
-# every track, so we deliberately stop at the `-8` preset. To trade time for
-# that last sliver later, append "-e"/"-p" here — the rest of the pipeline
-# (verify, atomic swap, never-raise) is unchanged.
+# flagged "(expensive!)". They keep `-l` at 12 (so they would NOT add decode
+# cost) but typically buy well under 1% for several times the *encode* time, a
+# bad trade for an optional background step that runs on every track, so we
+# deliberately stop at the `-8` preset. To trade encode time for that last sliver
+# later, append "-e"/"-p" here — the rest of the pipeline (verify, atomic swap,
+# never-raise) is unchanged.
 _LEVEL: str = "-8"
 # A full re-encode is heavier than `--test`; give each file a generous bound.
 _TIMEOUT_S: float = 300.0

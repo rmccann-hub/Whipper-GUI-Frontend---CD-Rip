@@ -60,8 +60,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   is best-effort and runs off the GUI thread (folded into the existing post-rip
   tag/cover thread, so it runs *after* tagging and art). It's skipped for cyanrip,
   which already encodes at maximum compression — the Settings toggle is greyed out
-  there with an explanation. New `Config.recompress_flac_after_rip` and a
-  `WhipperBackend.produces_max_compression_flac()` capability flag.
+  there with an explanation. **Off by default for a real reason, not just the
+  modest size gain:** `-8` uses a higher LPC prediction order (`-l 12`) than
+  whipper's `-5` (`-l 8`), which costs a little more CPU/battery to *decode* on
+  playback — negligible on modern phones/PCs, but the lighter choice for low-power
+  portable players (both levels stay inside the FLAC Subset, so it's a decode-
+  effort difference, never a compatibility one). New
+  `Config.recompress_flac_after_rip` and a
+  `WhipperBackend.produces_max_compression_flac()` capability flag. Shipped flags
+  (`-8 --verify --silent -f -o`) verified current against the xiph spec.
 - **Post-rip FLAC integrity verification (new "Verify FLACs" setting, on by
   default).** whipper proves every track decodes back to the read PCM by passing
   `flac --verify` during the rip; cyanrip (FFmpeg) does not, so a cyanrip rip
