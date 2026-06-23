@@ -106,7 +106,8 @@ Read these alongside this file when picking up a session:
 - **`docs/testing.md`** — the testing strategy & standards (the trophy + hardware gate, the five-tier case taxonomy, property/golden/fault-injection guidance, the coverage gate, and the institutional rules: every bug gets a regression test; parsers never raise)
 - **`docs/test-plan.md`** — manual & release testing: the end-to-end acceptance run, the EAC output-parity check, the distro + problem-permutation matrices, and the deep single-feature gated cases (absorbed the former `docs/release-testing.md`)
 - **`docs/session-log.md`** — chronological session history (what was built/decided/learned each session, newest first). Read it for *continuity*; durable lessons graduate from it into the docs above.
-- **`docs/archive/`** — retired point-in-time investigations (ecosystem audit, read-offset, upstream-modification/CTDB spec); durable conclusions have graduated into KDDs / DEPENDENCIES / adapter comments (see `docs/archive/README.md`)
+- **`docs/ripper-engine-strategy.md`** — living research/options doc on forking/combining whipper + cyanrip long-term (licensing, option menu, decision gates). Revisits KDD-18; research only, not a commitment.
+- **`docs/archive/`** — retired point-in-time investigations (ecosystem audit, read-offset, upstream-modification/CTDB spec) **plus external reference material** (the EAC archival master guide); durable conclusions have graduated into KDDs / DEPENDENCIES / adapter comments (see `docs/archive/README.md`)
 
 If `PLANNING.md` and the brief conflict, the brief wins on requirements/scope and `PLANNING.md` wins on implementation choices. If `PLANNING.md` and the research output conflict, raise it with the user — don't silently pick.
 

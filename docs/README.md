@@ -45,7 +45,8 @@ These two files, together with the top-level `CLAUDE.md`, `PLANNING.md`, `TASKS.
 | [`appimage-testing.md`](appimage-testing.md) | How the AppImage is built (on every push to `main`, on demand for any branch, and at release) and how to test it in each case — including branches with no published release yet. |
 | [`log-format-comparison.md`](log-format-comparison.md) | Side-by-side comparison of whipper's rip log against EAC's, anchoring [PLANNING.md KDD-11](../PLANNING.md). The hand-authored EAC log at `tests/fixtures/rip_log_eac_reference.log` is the comparison's data. |
 | [`session-log.md`](session-log.md) | **Chronological session history** — what each Claude Code session built, decided, and learned (newest first). The project's institutional memory; durable lessons graduate from here into the docs above. |
-| [`archive/`](archive/README.md) | Retired point-in-time investigations (ecosystem audit, read-offset, upstream-modification/CTDB spec). Their durable conclusions have graduated into KDDs / DEPENDENCIES / adapter comments — see `archive/README.md` for the map. |
+| [`ripper-engine-strategy.md`](ripper-engine-strategy.md) | **Research / options (living, long-horizon):** the feasibility of forking and/or combining whipper + cyanrip and maintaining our own engine — licensing analysis, the option menu, and decision gates. Revisits KDD-18's "never fork" stance; a commitment requires a new KDD. |
+| [`archive/`](archive/README.md) | Retired point-in-time investigations (ecosystem audit, read-offset, upstream-modification/CTDB spec) **plus external reference material** (the EAC archival master guide). Their durable conclusions have graduated into KDDs / DEPENDENCIES / adapter comments — see `archive/README.md` for the map. |
 
 ## Where the rest of the project context lives
 

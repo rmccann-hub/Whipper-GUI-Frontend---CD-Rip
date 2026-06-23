@@ -691,6 +691,15 @@ Decided 2026-06-04 (user-approved; this is a sanctioned evolution of the distrib
 
 Decided 2026-06-04 after a researched ecosystem audit ([docs/archive/ecosystem-audit-2026-06.md](docs/archive/ecosystem-audit-2026-06.md)), prompted by whipper's `offset find` failing on real hardware (Pioneer BDR-209D) and the question of long-term foundation.
 
+> **Under long-term research (2026-06-23, maintainer-requested).** The "never
+> fork" stance is the *current* operating decision, but the maintainer has asked
+> to keep forking/combining whipper + cyanrip open as a long-horizon option
+> (after the v1 feature set works and hardware parity is proven). The licensing
+> is favourable (both forkable under our GPL-3.0 — see
+> [docs/ripper-engine-strategy.md](docs/ripper-engine-strategy.md)); the live
+> question is maintenance cost. Any move to actually fork/combine **amends this
+> KDD with a new one** — it is not a silent override.
+
 - **whipper is effectively stalled.** Last release **v0.10.0, 2021-05-17 (~5 years)**; it imports `pkg_resources`, which is gone from setuptools ≥81 and Python 3.14 — a known compatibility cliff we currently paper over by installing `python3-setuptools` in the container. It still rips correctly today (Fedora packages 0.10.0), so this is a monitored risk, not an emergency.
 - **cyanrip is the successor** (active: v0.9.3.1, 2024-06-05; C + FFmpeg; LGPL-2.1; AccurateRip v1/v2 + EAC CRC32 + MusicBrainz + ReplayGain; no Python cliff). We invoke rippers as subprocesses, so LGPL-2.1 is fine against GPL-3.0-only.
 - **Decision:** keep whipper now; build **`CyanripImpl`** behind the existing `WhipperBackend` ABC as a config-selectable second backend (the ABC was designed for exactly this). **Never fork whipper** — forking inherits its maintenance burden + the `pkg_resources` cliff; if ripper-level changes are ever needed, contribute to *cyanrip* (active) instead. Writing our own ripper and upstreaming our GUI into whipper are both rejected (see the audit's options table).
