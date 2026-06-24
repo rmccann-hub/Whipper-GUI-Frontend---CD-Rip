@@ -311,14 +311,15 @@ class SettingsDialog(QDialog):
         )
         self._recompress_flac_check.setChecked(config.recompress_flac_after_rip)
         self._recompress_flac_check.setToolTip(
-            "After a successful rip, re-encode each FLAC at the maximum level "
-            "(`flac -8`) to shrink it. Lossless and verified — the audio stays "
-            "bit-identical and the tags and cover art are preserved. Needs "
-            "`flac`; runs in the background. Off by default: the smaller file "
-            "uses a higher prediction order, so it costs a little more CPU/"
-            "battery to DECODE on playback — negligible on a phone or PC today, "
-            "but if you play on low-power portable players, leaving this off "
-            "(whipper's default level) is the lighter choice."
+            "After a successful rip, re-encode each FLAC at maximum effort "
+            "(`flac -8 -e -p`) to shrink it as far as flac can. Lossless and "
+            "verified — the audio stays bit-identical and the tags and cover art "
+            "are preserved. Needs `flac`; runs in the background (the exhaustive "
+            "encode is slow, but that's encode time only). Off by default: the "
+            "smaller file uses a higher prediction order, so it costs a little "
+            "more CPU/battery to DECODE on playback — negligible on a phone or PC "
+            "today, but if you play on low-power portable players, leaving this "
+            "off (whipper's default level) is the lighter choice."
         )
         form.addRow("Re-compress FLACs:", self._recompress_flac_check)
 

@@ -52,8 +52,11 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ### Added
 - **Optional post-rip FLAC re-compression (new "Re-compress FLACs" setting, off
   by default).** whipper encodes FLAC at the tool default (`-5`); turning this on
-  re-encodes each output FLAC at the maximum level (`flac -8 --verify`) after the
-  rip to shrink the files. It's **lossless and verified** — the audio stays
+  re-encodes each output FLAC at maximum effort (`flac -8 -e -p --verify` —
+  exhaustive model + coefficient search) after the rip to shrink the files as far
+  as flac can. `-e -p` cost a lot of *encode* time for a small extra gain but add
+  **no** decode cost (they keep `-l 12`), so they're free in the dimension that
+  matters for playback. It's **lossless and verified** — the audio stays
   bit-identical — and `flac` preserves the tags and embedded cover art when it
   re-encodes, so nothing the rip wrote is lost. Each file is swapped in
   atomically, so a failure (or a crash) leaves the original untouched; the step

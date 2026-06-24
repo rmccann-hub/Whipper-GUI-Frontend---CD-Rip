@@ -43,8 +43,18 @@ def test_all_reencoded_swaps_in_the_temp(tmp_path: Path) -> None:
     assert result.ok and result.ran
     assert result.reencoded == 2
     assert result.failures == ()
-    # Each invocation is `flac -8 --verify --silent -f -o <tmp> <orig>`.
-    assert seen[0][:6] == ["flac", "-8", "--verify", "--silent", "-f", "-o"]
+    # Each invocation is `flac -8 -e -p --verify --silent -f -o <tmp> <orig>`
+    # (`-e -p` = exhaustive search: max compression, lossless, no decode cost).
+    assert seen[0][:8] == [
+        "flac",
+        "-8",
+        "-e",
+        "-p",
+        "--verify",
+        "--silent",
+        "-f",
+        "-o",
+    ]
     assert seen[0][-1] == str(a)
     # The originals were replaced with the re-encoded bytes; no temp left behind.
     assert a.read_bytes() == b"smaller"

@@ -480,7 +480,9 @@ Whipper's compression level isn't configurable from `whipper.conf` or any whippe
 
 ```bash
 # What the "Re-compress FLACs" toggle does, per file, after a rip.
-flac -8 --verify -f -o <tmp> <file> && mv <tmp> <file>
+# -8 = max preset; -e -p = exhaustive search (a bit smaller still, much slower
+# to encode, but NO extra decode cost); --verify proves it's bit-identical.
+flac -8 -e -p --verify -f -o <tmp> <file> && mv <tmp> <file>
 ```
 
 It runs in the background (never freezes the window), swaps each file in atomically (a failure leaves the original untouched), and **`flac` preserves the tags and embedded cover art** when it re-encodes, so nothing is lost. The toggle is greyed out for the cyanrip backend, which **already encodes FLAC at maximum compression** — there's nothing to re-compress there.

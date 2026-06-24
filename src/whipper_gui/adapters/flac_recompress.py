@@ -2,10 +2,11 @@
 """Optional post-rip FLAC re-compression to the maximum level.
 
 whipper encodes FLAC at the tool default (`-5`); this re-encodes each output FLAC
-at `-8` (flac's `--best`) to shrink the files. It is **lossless and `--verify`'d**,
-so the audio is provably bit-identical to before, and `flac` **preserves all
-metadata** (Vorbis tags, embedded cover art, cuesheet) when it re-encodes a FLAC
-input — so the tags whipper wrote and any art the GUI embedded survive.
+at `-8 -e -p` (flac's `--best` plus exhaustive model + coefficient search) to
+shrink the files as far as flac can. It is **lossless and `--verify`'d**, so the
+audio is provably bit-identical to before, and `flac` **preserves all metadata**
+(Vorbis tags, embedded cover art, cuesheet) when it re-encodes a FLAC input — so
+the tags whipper wrote and any art the GUI embedded survive.
 
 Opt-in (default off) and pointless for backends that already max compression
 (cyanrip), which the GUI skips. Each file is re-encoded to a sibling temp file and
@@ -47,17 +48,22 @@ _FLAC_BINARY: str = "flac"
 # trades a touch of playback cost — hence opt-in, with whipper's `-5` the safe,
 # mobile-friendly default.
 #
-# The docs list exactly two ways to compress *further* while staying lossless —
-# `-e/--exhaustive-model-search` and `-p/--qlp-coeff-precision-search` — both
-# flagged "(expensive!)". They keep `-l` at 12 (so they would NOT add decode
-# cost) but typically buy well under 1% for several times the *encode* time, a
-# bad trade for an optional background step that runs on every track, so we
-# deliberately stop at the `-8` preset. To trade encode time for that last sliver
-# later, append "-e"/"-p" here — the rest of the pipeline (verify, atomic swap,
-# never-raise) is unchanged.
+# We DO add the two further-but-still-lossless options the docs list —
+# `-e/--exhaustive-model-search` and `-p/--qlp-coeff-precision-search`, both
+# flagged "(expensive!)". The maintainer is fine trading encode time for size
+# (2026-06-23), and crucially these keep `-l` at 12, so they squeeze a bit more
+# out at the cost of (much) slower *encoding* only — they add **no decode cost**,
+# which is the dimension that matters for playback. The gain over plain `-8` is
+# small (typically well under 1%), but it's free in every dimension we care about
+# (still lossless, still `--verify`'d, no extra playback cost), so when a user has
+# opted in to re-compressing at all, we go all the way. To drop back to the plain
+# `-8` preset, set `_EXTRA_FLAGS = ()` — nothing else changes.
 _LEVEL: str = "-8"
-# A full re-encode is heavier than `--test`; give each file a generous bound.
-_TIMEOUT_S: float = 300.0
+_EXTRA_FLAGS: tuple[str, ...] = ("-e", "-p")
+# A full re-encode is heavier than `--test`, and `-e -p` make it heavier still;
+# give each file a generous bound (a long track on slow hardware can take a while
+# under exhaustive search). The maintainer accepts the encode time.
+_TIMEOUT_S: float = 600.0
 
 Runner = Callable[[list[str]], int]
 
@@ -122,7 +128,17 @@ def recompress_flac_files(
     reencoded = 0
     for path in paths:
         tmp = path.with_name(path.name + ".recompress.tmp")
-        argv = [binary, _LEVEL, "--verify", "--silent", "-f", "-o", str(tmp), str(path)]
+        argv = [
+            binary,
+            _LEVEL,
+            *_EXTRA_FLAGS,
+            "--verify",
+            "--silent",
+            "-f",
+            "-o",
+            str(tmp),
+            str(path),
+        ]
         try:
             rc = run(argv)
         except FileNotFoundError:
