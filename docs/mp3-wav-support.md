@@ -81,6 +81,10 @@ time; whipper = always FLAC, then transcode.
   workaround is moot — frame it as "only if we ever ship CBR/ABR," not a default.
   ([Hydrogenaudio LAME](https://wiki.hydrogenaudio.org/index.php/LAME),
   [Joint stereo](https://wiki.hydrogenaudio.org/index.php?title=Joint_stereo))
+- **Empirically confirmed (2026-06-25):** the maintainer's EAC MP3 rip of the
+  baseline disc uses exactly this — `lame3.100.1` with `-V 0` and ID3 tags on
+  (EAC's command line: `-V 0 %source% %dest%`). So `-V0` is the right default,
+  and our `ffmpeg -q:a 0` transcode (== `-V0`) matches EAC's own MP3 config.
 - **FFmpeg libmp3lame mapping** (the path cyanrip uses, and the path a whipper
   re-encode would use): `-q:a N` = VBR = lame `-V N`; `-b:a` = CBR/ABR;
   `joint_stereo` defaults on. The standalone-lame *algorithm-quality* `-q` maps to

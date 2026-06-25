@@ -12,6 +12,14 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Fixed
+- **EAC-parity checker now reads real EAC logs (UTF-16).** EAC writes its
+  `.log` as UTF-16-with-BOM; `scripts/eac_parity.py` read it as UTF-8, so every
+  character became a replacement char, the parser found zero Copy CRCs, and the
+  tool reported a false "NOT parity (0/N)" on a perfectly good rip. Reading is
+  now byte-sniffed (`whipper_gui.parity.decode_log_bytes`: UTF-16 LE/BE BOM,
+  UTF-8 BOM, a NUL-heavy heuristic for BOM-less UTF-16, else UTF-8; never
+  raises). Found running a real EAC MP3 log through the checker; regression
+  tests added (the committed baseline had been converted to UTF-8, which hid it).
 - **`--doctor` no longer crashes when the ripper backend is unreachable.** When
   the backend probe failed (e.g. whipper not installed) and no diagnostic host
   was injected — the normal command-line path — the failure-diagnosis code built

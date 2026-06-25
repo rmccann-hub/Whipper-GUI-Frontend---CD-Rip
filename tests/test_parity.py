@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from whipper_gui.parity import compare_logs, track_copy_crcs
+from whipper_gui.parity import compare_logs, decode_log_bytes, track_copy_crcs
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _EAC_BASELINE = (
@@ -162,6 +162,62 @@ def test_mp3_rip_parities_on_extraction_crc() -> None:
     report = compare_logs(base, mp3_rip_log)
     assert report.ok is True
     assert report.matched == 14
+
+
+# --- decode_log_bytes: EAC writes UTF-16 (regression) ----------------------
+#
+# Real EAC logs are UTF-16-with-BOM. Reading them as UTF-8 turned every char
+# into a replacement char → the parser found zero CRCs → the parity check
+# silently reported "NOT parity (0/N)" on a perfectly good rip. Found 2026-06-25
+# when a real EAC MP3 log was run through scripts/eac_parity.py.
+
+
+def test_decode_utf16le_bom() -> None:
+    text = "Exact Audio Copy\n     Copy CRC B0D122E7\n"
+    raw = b"\xff\xfe" + text.encode("utf-16-le")
+    assert decode_log_bytes(raw) == text
+
+
+def test_decode_utf16be_bom() -> None:
+    text = "Exact Audio Copy\n     Copy CRC B0D122E7\n"
+    raw = b"\xfe\xff" + text.encode("utf-16-be")
+    assert decode_log_bytes(raw) == text
+
+
+def test_decode_utf8_bom() -> None:
+    text = "Log created by: whipper 0.10.0\n"
+    assert decode_log_bytes(b"\xef\xbb\xbf" + text.encode("utf-8")) == text
+
+
+def test_decode_plain_utf8() -> None:
+    text = "cyanrip 0.9.3.1\n  EAC CRC32:     AAAA1111\n"
+    assert decode_log_bytes(text.encode("utf-8")) == text
+
+
+def test_decode_bomless_utf16le_heuristic() -> None:
+    # No BOM, but NUL-heavy → guessed as UTF-16-LE.
+    text = "Exact Audio Copy\n     Copy CRC AAAA1111\n"
+    assert decode_log_bytes(text.encode("utf-16-le")) == text
+
+
+def test_decode_never_raises_on_garbage() -> None:
+    # Arbitrary bytes must not blow up (errors="replace").
+    assert isinstance(decode_log_bytes(b"\xff\xfe\x00\x01\x80\x81"), str)
+    assert isinstance(decode_log_bytes(b"\x80\x81\x82"), str)
+
+
+def test_utf16_eac_log_parities_after_decode() -> None:
+    """The actual bug: an EAC log encoded as UTF-16 must compare clean once
+    decoded, instead of every track reading as 'missing'."""
+    crcs = {1: "AAAA1111", 2: "BBBB2222"}
+    baseline = _eac(crcs)
+    eac_utf16_bytes = b"\xff\xfe" + _eac(crcs).encode("utf-16-le")
+    candidate = decode_log_bytes(eac_utf16_bytes)
+    report = compare_logs(baseline, candidate)
+    assert report.ok is True
+    assert report.matched == 2
+    # And the pre-fix failure mode (decode as UTF-8) would have found nothing:
+    assert track_copy_crcs(eac_utf16_bytes.decode("utf-8", errors="replace")) == {}
 
 
 # --- CLI smoke (scripts/eac_parity.py) ------------------------------------

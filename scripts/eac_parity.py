@@ -26,7 +26,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from whipper_gui.parity import ParityReport, compare_logs
+from whipper_gui.parity import ParityReport, compare_logs, decode_log_bytes
 
 
 def _print_report(baseline: Path, candidate: Path, report: ParityReport) -> None:
@@ -60,7 +60,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        baseline_text = args.baseline.read_text(encoding="utf-8", errors="replace")
+        # Read bytes + sniff the encoding: EAC logs are UTF-16, whipper/cyanrip
+        # are UTF-8. Reading a real EAC log as UTF-8 would yield zero CRCs.
+        baseline_text = decode_log_bytes(args.baseline.read_bytes())
     except OSError as exc:
         print(f"cannot read baseline {args.baseline}: {exc}", file=sys.stderr)
         return 2
@@ -68,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     all_ok = True
     for candidate in args.candidate:
         try:
-            candidate_text = candidate.read_text(encoding="utf-8", errors="replace")
+            candidate_text = decode_log_bytes(candidate.read_bytes())
         except OSError as exc:
             print(f"cannot read {candidate}: {exc}", file=sys.stderr)
             all_ok = False

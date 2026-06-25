@@ -32,6 +32,32 @@ from whipper_gui.parsers.eac_log import looks_like_eac_log, parse_eac_copy_crcs
 from whipper_gui.parsers.rip_log import parse_rip_log
 
 
+def decode_log_bytes(raw: bytes) -> str:
+    """Decode rip-log bytes to text, honoring the encoding the tool wrote.
+
+    **EAC writes its logs as UTF-16** (with a BOM) — naively reading them as
+    UTF-8 turns every character into a replacement char, so the parser finds no
+    CRCs and the parity check silently false-fails (every track "missing").
+    whipper/cyanrip write UTF-8. We sniff the BOM (and fall back to a NUL-heavy
+    heuristic for the rare BOM-less UTF-16), then default to UTF-8. Never raises
+    — undecodable bytes are replaced.
+    """
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="replace")  # BOM picks LE/BE
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw.decode("utf-8-sig", errors="replace")
+    # BOM-less UTF-16 is rare, but an ASCII-ish UTF-16 file is ~half NUL bytes;
+    # if the head is NUL-heavy, guess UTF-16 and its endianness from where the
+    # NULs fall (LE → the high byte, at odd indices, is NUL).
+    head = raw[:256]
+    if head and head.count(0) > len(head) // 4:
+        le_nuls = sum(1 for i in range(1, len(head), 2) if head[i] == 0)
+        be_nuls = sum(1 for i in range(0, len(head), 2) if head[i] == 0)
+        enc = "utf-16-le" if le_nuls >= be_nuls else "utf-16-be"
+        return raw.decode(enc, errors="replace")
+    return raw.decode("utf-8", errors="replace")
+
+
 def track_copy_crcs(text: str) -> dict[int, str]:
     """Per-track ``{number: uppercase Copy CRC}`` from a rip log of ANY backend.
 
