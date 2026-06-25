@@ -40,3 +40,26 @@ htmlcov/
 *.swp
 *.swo
 .DS_Store
+
+# Copyrighted media — NEVER commit (CLAUDE.md Critical rule #8). This repo is
+# public; committing a music file redistributes copyrighted material, even if
+# it's only a temporary test file. We commit rip *logs* + per-track CRCs as the
+# proof, never the audio. This is a backstop for the rule, not a substitute for
+# it. (If you ever need a genuinely free/CC0/self-generated sample, override per
+# file with `git add -f` — and be sure it's not a commercial track.)
+*.flac
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.ogg
+*.oga
+*.opus
+*.wv
+*.ape
+*.wma
+*.aiff
+*.aif
+*.alac
+*.dsf
+*.dff

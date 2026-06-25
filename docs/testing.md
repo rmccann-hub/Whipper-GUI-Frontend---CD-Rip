@@ -164,6 +164,14 @@ tiers. "I added a happy-path test" is not done.
    thread in headless mode (hard abort). Patching an attribute on a **shared
    module object** (`drive_control.eject_drive`) is unaffected by caller
    location.
+9. **No copyrighted media in the repo — not even a temporary test fixture**
+   (`CLAUDE.md` Critical rule #8). The repo is public, so a committed music file
+   redistributes copyrighted material. Test real audio **outside** the repo (the
+   scratchpad or `/tmp`), delete it after, and commit only the **text** proof —
+   rip logs + per-track CRCs (the CRCs prove bit-perfection without the audio).
+   If a test truly needs real PCM, generate a synthetic tone or use a CC0/
+   public-domain clip — never a commercial track. `.gitignore` denies audio
+   extensions as a backstop.
 
 ## 6. Definition of Done (testing) — paste into every PR
 
@@ -177,6 +185,8 @@ tiers. "I added a happy-path test" is not done.
 - [ ] Coverage gate passes; gate not lowered.
 - [ ] If the change touches hardware-only behaviour, [test-plan.md](test-plan.md)
       has a new/updated checklist item.
+- [ ] **No copyrighted media staged** — no audio file (`.flac`/`.wav`/`.mp3`/…)
+      in the commit, even a temporary test fixture. — *CLAUDE.md Critical Rule #8*
 - [ ] `CHANGELOG.md` `[Unreleased]` has a bullet for the change, **in the same
       commit** (CI enforces this; a pure historical-record commit opts out with a
       `[skip changelog]` line of its own in the commit message). — *CLAUDE.md

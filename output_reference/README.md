@@ -21,10 +21,13 @@ wider community database.
 So the comparison is **log-to-log (CRCs)**, not audio-to-audio. That's why this
 directory stores **logs and cue sheets, never the decoded audio**:
 
-- **Copyright.** This repository is public. The reference disc (*The Police —
-  Every Breath You Take: The Classics*) is a commercial recording; committing
-  its FLAC/WAV/MP3 audio here would publicly redistribute copyrighted material.
-  Owning the disc does not grant that right.
+- **Copyright (project-wide rule — `CLAUDE.md` Critical rule #8).** This
+  repository is public. The reference disc (*The Police — Every Breath You Take:
+  The Classics*) is a commercial recording; committing its FLAC/WAV/MP3 audio
+  here would publicly redistribute copyrighted material. Owning the disc does not
+  grant that right. This applies to **any** copyrighted media **anywhere in the
+  repo, even a temporary test file** — never `git add` one. `.gitignore` denies
+  audio extensions as a backstop.
 - **It isn't needed.** The CRCs in the log already prove bit-perfection.
 - **Repo bloat.** Full-album audio is hundreds of MB and would live in git
   history forever.

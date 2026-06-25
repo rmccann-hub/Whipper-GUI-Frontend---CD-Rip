@@ -42,6 +42,12 @@ A run is only meaningful with the **log** attached:
 For a hard-to-reproduce issue, turn on **Settings → Debug logging** first — it
 raises the log file to verbose DEBUG.
 
+> ⚠️ **Never put ripped audio in the repo** (`CLAUDE.md` Critical rule #8). These
+> tests rip and re-encode real commercial CDs — keep all `.flac`/`.wav`/`.mp3`
+> output under `~/Music/…` or a temp dir, **never** inside the working tree, and
+> never `git add` one even temporarily. When a test asks you to attach evidence,
+> attach the **log** (and per-track CRCs), never the audio.
+
 ### 0.1 — [ ] Preflight / "doctor" (no CD needed) — do this FIRST
 
 Before inserting a disc, run the first-pass environment check:
