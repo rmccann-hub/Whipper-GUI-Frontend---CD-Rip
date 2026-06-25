@@ -82,8 +82,24 @@ def test_wav_transcode_uses_pcm_and_no_metadata(tmp_path: Path) -> None:
     assert (tmp_path / "01.wav").read_bytes() == b"RIFF....WAVE"
     argv = seen[0]
     assert "pcm_s16le" in argv  # CD-format PCM
+    # Audio-only: explicitly excludes any embedded cover (RIFF can't hold it),
+    # so a FLAC with art still transcodes cleanly.
+    assert argv[argv.index("-map") + 1] == "0:a"
     assert "-map_metadata" not in argv  # WAV/RIFF can't carry the tags
     assert "libmp3lame" not in argv
+
+
+def test_custom_binary_path_is_used(tmp_path: Path) -> None:
+    a = _make_flac(tmp_path / "01.flac")
+    seen: list[list[str]] = []
+
+    def runner(argv: list[str]) -> int:
+        seen.append(argv)
+        Path(argv[-1]).write_bytes(b"x")
+        return 0
+
+    transcode_files([a], fmt="mp3", binary="/opt/ffmpeg/bin/ffmpeg", runner=runner)
+    assert seen[0][0] == "/opt/ffmpeg/bin/ffmpeg"
 
 
 def test_unsupported_format_is_a_clean_noop(tmp_path: Path) -> None:

@@ -45,7 +45,7 @@ MP3 (3)** — FLAC is the v1 archival format; WAV and MP3 are P1 (see `TASKS.md`
 
 | | FLAC (priority 1) | WAV (priority 2) | MP3 (priority 3) |
 |---|---|---|---|
-| **EAC** (baseline) | `EAC_flac/` ✅ committed | `EAC_wav/` | `EAC_mp3/` |
+| **EAC** (baseline) | `EAC_flac/` ✅ committed | `EAC_wav/` | `EAC_mp3/` 🟡 imperfect (12/14; see its README) |
 | **whipper** | `whipper_flac/` ⬜ | `whipper_wav/` ⬜ | `whipper_mp3/` ⬜ |
 | **cyanrip** | `cyanrip_flac/` ⬜ | `cyanrip_wav/` ⬜ | `cyanrip_mp3/` ⬜ |
 

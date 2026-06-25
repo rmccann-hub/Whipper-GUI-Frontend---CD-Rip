@@ -114,8 +114,10 @@ def _build_argv(
             "mp3",
             str(tmp),
         ]
-    # WAV: 16-bit LE PCM (CD format); RIFF carries no tags/art, so none mapped.
-    return base + ["-c:a", "pcm_s16le", "-f", "wav", str(tmp)]
+    # WAV: 16-bit LE PCM (CD format). `-map 0:a` = audio only — explicitly
+    # excludes any embedded cover (RIFF can't carry it), so a FLAC with art
+    # transcodes cleanly. RIFF carries no tags either, so none mapped.
+    return base + ["-map", "0:a", "-c:a", "pcm_s16le", "-f", "wav", str(tmp)]
 
 
 def transcode_files(

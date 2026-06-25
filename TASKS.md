@@ -289,13 +289,15 @@ repo + copyright; the CRCs are the proof). Ordered by format priority:
 - **[ ]** cyanrip WAV parity → `output_reference/cyanrip_wav/`
 
 *Priority 3 — MP3 (P1; lossy → "parity" = same extraction CRCs + correct encoder/tags, not bit-identical audio):*
+- **[~]** EAC MP3 reference stored → `output_reference/EAC_mp3/` (2026-06-25, **imperfect**: 12/14 vs the FLAC baseline — tracks 3/4 read errors this session; kept for the encoder-config reference `lame -V 0` + ID3. Re-rip clean to replace; see its README).
 - **[ ]** whipper MP3 parity → `output_reference/whipper_mp3/`
 - **[ ]** cyanrip MP3 parity → `output_reference/cyanrip_mp3/`
 
 Done so far: **[x]** EAC baseline committed; **[x]** parity checker + tests
 (`scripts/eac_parity.py`, `parsers/eac_log.py`, `whipper_gui.parity`); **[x]**
 WAV/MP3 parity *semantics* pinned (WAV reuses the FLAC baseline; MP3 = extraction
-CRC only) — `tests/test_parity.py`, [docs/mp3-wav-support.md](docs/mp3-wav-support.md) §1.
+CRC only) — `tests/test_parity.py`, [docs/mp3-wav-support.md](docs/mp3-wav-support.md) §1;
+**[x]** checker reads EAC's native UTF-16 logs (was UTF-8-only → false 0/N).
 So the WAV/MP3 rows below only await a real backend rip — the checker is ready.
 
 ### P1 — EAC bit-perfect parity gaps

@@ -1,0 +1,277 @@
+Exact Audio Copy V1.8 from 15. July 2024
+
+EAC extraction logfile from 25. June 2026, 18:09
+
+The Police / Every Breath You Take: The Classics
+
+Used drive  : PIONEER BD-RW   BDR-209D   Adapter: 1  ID: 0
+
+Read mode               : Secure
+Utilize accurate stream : Yes
+Defeat audio cache      : Yes
+Make use of C2 pointers : No
+
+Read offset correction                      : 667
+Overread into Lead-In and Lead-Out          : No
+Fill up missing offset samples with silence : Yes
+Delete leading and trailing silent blocks   : No
+Null samples used in CRC calculations       : Yes
+Used interface                              : Native Win32 interface for Win NT & 2000
+Gap handling                                : Appended to previous track
+
+Used output format              : User Defined Encoder
+Selected bitrate                : 1024 kBit/s
+Quality                         : High
+Add ID3 tag                     : Yes
+Command line compressor         : C:\Program Files (x86)\Exact Audio Copy\lame3.100.1-x64\lame.exe
+Additional command line options : -V 0 %source% %dest%
+
+
+TOC of the extracted CD
+
+     Track |   Start  |  Length  | Start sector | End sector 
+    ---------------------------------------------------------
+        1  |  0:00.00 |  3:13.12 |         0    |    14486   
+        2  |  3:13.12 |  3:01.05 |     14487    |    28066   
+        3  |  6:14.17 |  4:51.28 |     28067    |    49919   
+        4  | 11:05.45 |  5:02.00 |     49920    |    72569   
+        5  | 16:07.45 |  4:00.72 |     72570    |    90641   
+        6  | 20:08.42 |  4:07.08 |     90642    |   109174   
+        7  | 24:15.50 |  4:21.07 |    109175    |   128756   
+        8  | 28:36.57 |  3:45.30 |    128757    |   145661   
+        9  | 32:22.12 |  3:01.00 |    145662    |   159236   
+       10  | 35:23.12 |  4:14.45 |    159237    |   178331   
+       11  | 39:37.57 |  5:00.30 |    178332    |   200861   
+       12  | 44:38.12 |  5:15.23 |    200862    |   224509   
+       13  | 49:53.35 |  4:53.42 |    224510    |   246526   
+       14  | 54:47.02 |  4:55.55 |    246527    |   268706   
+
+
+Track  1
+
+     Filename C:\Users\rmccann\Music\01 - Roxanne - The Police.wav
+
+     Pre-gap length  0:00:02.00
+
+     Peak level 94.2 %
+     Extraction speed 4.4 X
+     Track quality 100.0 %
+     Test CRC B0D122E7
+     Copy CRC B0D122E7
+     Accurately ripped (confidence 200)  [22B9924D]  (AR v2)
+     Copy OK
+
+Track  2
+
+     Filename C:\Users\rmccann\Music\02 - Can't Stand Losing You - The Police.wav
+
+     Pre-gap length  0:00:02.13
+
+     Peak level 94.2 %
+     Extraction speed 4.9 X
+     Track quality 100.0 %
+     Test CRC 985AAE32
+     Copy CRC 985AAE32
+     Accurately ripped (confidence 200)  [31C28378]  (AR v2)
+     Copy OK
+
+Track  3
+
+     Filename C:\Users\rmccann\Music\03 - Message in a Bottle - The Police.wav
+
+     Peak level 97.6 %
+     Extraction speed 3.3 X
+     Track quality 99.8 %
+     Test CRC 576AAED2
+     Copy CRC 418F6CF8
+     Cannot be verified as accurate (confidence 200)  [B7EFCED4], AccurateRip returned [96DF8C22]  (AR v2)
+     Copy OK
+
+Track  4
+
+     Filename C:\Users\rmccann\Music\04 - Walking on the Moon - The Police.wav
+
+     Pre-gap length  0:00:02.10
+
+     Peak level 98.8 %
+     Extraction speed 5.6 X
+     Track quality 99.9 %
+     Test CRC 60D796AE
+     Copy CRC 1D0079A1
+     Cannot be verified as accurate (confidence 200)  [952C775E], AccurateRip returned [BB959D84]  (AR v2)
+     Copy OK
+
+Track  5
+
+     Filename C:\Users\rmccann\Music\05 - Don't Stand So Close to Me - The Police.wav
+
+     Pre-gap length  0:00:01.53
+
+     Peak level 94.2 %
+     Extraction speed 6.5 X
+     Track quality 100.0 %
+     Test CRC E0036697
+     Copy CRC E0036697
+     Cannot be verified as accurate (confidence 200)  [9EEB8843], AccurateRip returned [BCF4E815]  (AR v2)
+     Copy OK
+
+Track  6
+
+     Filename C:\Users\rmccann\Music\06 - De Do Do Do, De Da Da Da - The Police.wav
+
+     Peak level 97.6 %
+     Extraction speed 6.9 X
+     Track quality 100.0 %
+     Test CRC B32769D6
+     Copy CRC B32769D6
+     Accurately ripped (confidence 200)  [34DA67DB]  (AR v2)
+     Copy OK
+
+Track  7
+
+     Filename C:\Users\rmccann\Music\07 - Every Little Thing She Does Is Magic - The Police.wav
+
+     Pre-gap length  0:00:01.40
+
+     Peak level 98.8 %
+     Extraction speed 7.2 X
+     Track quality 100.0 %
+     Test CRC CCBFF669
+     Copy CRC CCBFF669
+     Accurately ripped (confidence 200)  [154797B6]  (AR v2)
+     Copy OK
+
+Track  8
+
+     Filename C:\Users\rmccann\Music\08 - Invisible Sun - The Police.wav
+
+     Pre-gap length  0:00:01.13
+
+     Peak level 98.8 %
+     Extraction speed 6.5 X
+     Track quality 99.9 %
+     Test CRC D723C1B0
+     Copy CRC D723C1B0
+     Accurately ripped (confidence 200)  [1BF9F320]  (AR v2)
+     Copy OK
+
+Track  9
+
+     Filename C:\Users\rmccann\Music\09 - Spirits in the Material World - The Police.wav
+
+     Pre-gap length  0:00:01.25
+
+     Peak level 98.8 %
+     Extraction speed 7.4 X
+     Track quality 100.0 %
+     Test CRC 6F6E4A5F
+     Copy CRC 6F6E4A5F
+     Accurately ripped (confidence 200)  [2916AB38]  (AR v2)
+     Copy OK
+
+Track 10
+
+     Filename C:\Users\rmccann\Music\10 - Every Breath You Take - The Police.wav
+
+     Pre-gap length  0:00:01.96
+
+     Peak level 98.8 %
+     Extraction speed 6.9 X
+     Track quality 99.9 %
+     Test CRC 3A33519F
+     Copy CRC 3A33519F
+     Accurately ripped (confidence 200)  [0A992ABA]  (AR v2)
+     Copy OK
+
+Track 11
+
+     Filename C:\Users\rmccann\Music\11 - King of Pain - The Police.wav
+
+     Peak level 98.8 %
+     Extraction speed 8.4 X
+     Track quality 100.0 %
+     Test CRC 56BFC63D
+     Copy CRC 56BFC63D
+     Accurately ripped (confidence 200)  [CC3B6091]  (AR v2)
+     Copy OK
+
+Track 12
+
+     Filename C:\Users\rmccann\Music\12 - Wrapped Around Your Finger - The Police.wav
+
+     Peak level 98.8 %
+     Extraction speed 8.7 X
+     Track quality 100.0 %
+     Test CRC D78CEAEF
+     Copy CRC D78CEAEF
+     Accurately ripped (confidence 200)  [FDA33730]  (AR v2)
+     Copy OK
+
+Track 13
+
+     Filename C:\Users\rmccann\Music\13 - Don't Stand So Close to Me '86 - The Police.wav
+
+     Pre-gap length  0:00:01.20
+
+     Peak level 98.8 %
+     Extraction speed 8.9 X
+     Track quality 100.0 %
+     Test CRC DA6A4DAF
+     Copy CRC DA6A4DAF
+     Accurately ripped (confidence 200)  [4FDBEAA8]  (AR v2)
+     Copy OK
+
+Track 14
+
+     Filename C:\Users\rmccann\Music\14 - Message in a Bottle (new classic rock mix) - The Police.wav
+
+     Pre-gap length  0:00:01.56
+
+     Peak level 96.6 %
+     Extraction speed 9.1 X
+     Track quality 100.0 %
+     Test CRC 787BA2D6
+     Copy CRC 787BA2D6
+     Accurately ripped (confidence 200)  [A5AB0AE9]  (AR v2)
+     Copy OK
+
+
+11 track(s) accurately ripped
+ 3 track(s) could not be verified as accurate
+
+Some tracks could not be verified as accurate
+
+No errors occurred
+
+End of status report
+
+---- AcoustID Plugin V1.2.0
+
+Submitting 14 results to AcoustID
+
+AcoustID successfully submitted
+
+
+---- CUETools DB Plugin V2.2.6
+
+[CTDB TOCID: rbv6HzZ9MTKJWoGvgrfulbDjYqI-] found
+Submit result: insufficient quality
+Track | CTDB Status
+  1   | (1429/1443) Accurately ripped
+  2   | (1431/1443) Accurately ripped
+  3   | (1341/1443) Differs in 14 samples @04:05:17,04:11:32
+  4   | (1341/1443) Differs in 3 samples @00:24:65
+  5   | (  2/1443) Accurately ripped, or (1341/1443) differs in 3 samples @02:24:59
+  6   | (1427/1443) Accurately ripped
+  7   | (1429/1443) Accurately ripped
+  8   | (1434/1443) Accurately ripped
+  9   | (1433/1443) Accurately ripped
+ 10   | (1422/1443) Accurately ripped
+ 11   | (1417/1443) Accurately ripped
+ 12   | (1411/1443) Accurately ripped
+ 13   | (1416/1443) Accurately ripped
+ 14   | (1404/1443) Accurately ripped
+If you are sure that your rip contains errors, you can use CUETools to repair it.
+
+
+==== Log checksum 5C348076D80569DEF5F757238A7C08B8BEFA731469D16F16EB3A66D771B8BED6 ====
