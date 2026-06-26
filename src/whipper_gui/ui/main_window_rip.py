@@ -20,7 +20,8 @@ Contract this mixin expects from the host window (all set in
 ``_current_release_id``/``_current_release_detail``/``_ctdb_client``/``_ctdb_thread``/
 ``_flac_verify_thread``;
 the ``rip_post_processing_done``, ``cover_art_done``,
-``ctdb_verify_done``, ``flac_verify_done`` and ``flac_recompress_done`` signals;
+``ctdb_verify_done``, ``flac_verify_done``, ``flac_recompress_done`` and
+``transcode_done`` signals;
 and the cross-mixin methods
 ``self._auto_apply_known_offset`` / ``self._on_drive_setup`` (DriveMixin).
 
@@ -47,6 +48,13 @@ from whipper_gui.adapters.flac_recompress import (
     recompress_flac_files,
 )
 from whipper_gui.adapters.flac_verify import FlacVerifyResult
+from whipper_gui.adapters.transcode import (
+    SUPPORTED_FORMATS as TRANSCODE_FORMATS,
+)
+from whipper_gui.adapters.transcode import (
+    TranscodeResult,
+    transcode_files,
+)
 from whipper_gui.adapters.whipper_backend import RipMetadata, TrackTag
 from whipper_gui.offset_config import is_offset_configured
 from whipper_gui.parsers.cyanrip_log import looks_like_cyanrip_log, parse_cyanrip_log
@@ -407,7 +415,15 @@ class RipMixin:
                 self._config.recompress_flac_after_rip
                 and not self._backend.produces_max_compression_flac()
             )
-            if tag or embed or save_file or recompress:
+            # Output format: both backends rip to FLAC, so a non-FLAC choice
+            # means a post-rip transcode (FLAC kept as the master). "flac" (or
+            # any value we don't transcode) leaves transcode_fmt empty = no-op.
+            transcode_fmt = (
+                self._config.output_format
+                if self._config.output_format in TRANSCODE_FORMATS
+                else ""
+            )
+            if tag or embed or save_file or recompress or transcode_fmt:
                 rip_dir = Path(log_path).parent if log_path else params.output_dir
                 self._start_post_rip_processing(
                     rip_dir,
@@ -417,6 +433,8 @@ class RipMixin:
                     embed=embed,
                     save_file=save_file,
                     recompress=recompress,
+                    transcode_fmt=transcode_fmt,
+                    mp3_vbr_quality=self._config.mp3_vbr_quality,
                 )
                 post_rip_thread = self._post_rip_thread
             else:
@@ -538,19 +556,25 @@ class RipMixin:
         embed: bool,
         save_file: bool,
         recompress: bool = False,
+        transcode_fmt: str = "",
+        mp3_vbr_quality: int = 0,
     ) -> None:
-        """Run unknown-mode tagging, then cover art, then FLAC re-compress, on
-        ONE daemon thread.
+        """Run unknown-mode tagging, then cover art, then FLAC re-compress, then
+        an optional transcode, on ONE daemon thread.
 
         Why one thread, in this order: the first two steps shell out to
         ``metaflac`` on the SAME FLAC files, and the re-compress step *rewrites*
         those same files — so all three MUST run sequentially: tag first, then
         embed/save the front cover, then re-compress. Two processes mutating one
         FLAC at the same time race each other and corrupt or lose the tags,
-        artwork, or audio. Re-compress runs LAST so it operates on the final,
-        fully-tagged-and-arted files (``flac`` preserves their tags and embedded
-        art when it re-encodes). Running them on one worker (rather than three)
-        is what guarantees the ordering.
+        artwork, or audio. Re-compress runs after the metaflac work so it
+        operates on the final, fully-tagged-and-arted files (``flac`` preserves
+        their tags and embedded art when it re-encodes). The transcode runs
+        **last** of all, so it reads the final FLACs (tagged, arted, and
+        possibly re-compressed) and derives the chosen output format from them;
+        it writes *sibling* files and never touches the FLAC, so it can't race
+        the earlier steps. Running them on one worker (rather than several) is
+        what guarantees the ordering.
 
         Why off the GUI thread at all: each step is a subprocess per file
         (~1-2s), so a multi-track album would freeze the event loop for tens of
@@ -614,15 +638,34 @@ class RipMixin:
                     self.flac_recompress_done.emit(result)
                 except RuntimeError:  # window destroyed — nothing to update
                     pass
+            # 4) Transcode LAST, reading the final FLACs (tagged, arted, and
+            #    possibly re-compressed) to derive the chosen non-FLAC output.
+            #    Writes sibling files and keeps the FLAC as the master; never
+            #    raises. Outcome reported via transcode_done.
+            if transcode_fmt:
+                try:
+                    tresult = transcode_files(
+                        sorted(rip_dir.rglob("*.flac")),
+                        fmt=transcode_fmt,
+                        mp3_vbr_quality=mp3_vbr_quality,
+                    )
+                except Exception:  # noqa: BLE001 — must never crash the GUI
+                    log.exception("transcode failed unexpectedly")
+                    tresult = TranscodeResult(error="failed unexpectedly")
+                try:
+                    self.transcode_done.emit(tresult)
+                except RuntimeError:  # window destroyed — nothing to update
+                    pass
 
         log.info(
             "post-rip processing in %s "
-            "(tag=%s, cover-art embed=%s save=%s, recompress=%s)",
+            "(tag=%s, cover-art embed=%s save=%s, recompress=%s, transcode=%s)",
             rip_dir,
             tag,
             embed,
             save_file,
             recompress,
+            transcode_fmt or "no",
         )
         thread = threading.Thread(target=work, daemon=True)
         self._post_rip_thread = thread
@@ -750,6 +793,35 @@ class RipMixin:
         else:
             message = f"FLAC re-compress: {result.reencoded} file(s) re-compressed."
         if result.failures:
+            log.warning("%s", message)
+        else:
+            log.info("%s", message)
+        self._rip_progress.append_log_line(message)
+
+    # --- Post-rip transcode (when a non-FLAC output format is selected) -------
+
+    def _on_transcoded(self, result: object) -> None:
+        """Transcode finished — record the outcome (runs on the GUI thread).
+
+        The FLAC master is always kept, so a transcode failure never costs the
+        user their lossless rip — it's informational, not alarming. A per-file
+        failure is noted (the FLAC is still there to retry from); a "couldn't run
+        at all" (e.g. ``ffmpeg`` missing) is a skip; a clean pass notes how many
+        files were written.
+        """
+        if not isinstance(result, TranscodeResult):
+            return
+        if result.error:
+            message = f"Transcode: skipped — {result.error} (FLAC master kept)"
+        elif result.failures:
+            names = ", ".join(p.name for p in result.failures)
+            message = (
+                f"Transcode: {result.transcoded} file(s) written; "
+                f"{len(result.failures)} failed (FLAC master kept): {names}"
+            )
+        else:
+            message = f"Transcode: {result.transcoded} file(s) written."
+        if result.failures or result.error:
             log.warning("%s", message)
         else:
             log.info("%s", message)

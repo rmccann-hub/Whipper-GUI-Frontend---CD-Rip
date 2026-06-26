@@ -2552,6 +2552,107 @@ def test_on_flac_recompressed_logs_outcome(teardown_threads) -> None:
     assert window._rip_progress._status_label.text() == "Done."
 
 
+# --- Post-rip transcode (non-FLAC output format) --------------------------
+
+
+def _stub_transcode(monkeypatch: pytest.MonkeyPatch, sink: list[dict]):
+    """Replace the real transcode with a recorder; return its result."""
+    from whipper_gui.adapters.transcode import TranscodeResult
+
+    def fake(paths, *, fmt, mp3_vbr_quality=0, **_kw) -> TranscodeResult:
+        sink.append({"paths": list(paths), "fmt": fmt, "q": mp3_vbr_quality})
+        return TranscodeResult(transcoded=len(list(paths)))
+
+    monkeypatch.setattr("whipper_gui.ui.main_window_rip.transcode_files", fake)
+
+
+def test_transcode_skipped_for_flac_output(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Default output_format == "flac" → the rip IS the deliverable, no transcode.
+    calls: list[dict] = []
+    _stub_transcode(monkeypatch, calls)
+    window = teardown_threads(config=Config(output_format="flac"))
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, "")
+    if window._post_rip_thread is not None:
+        window._post_rip_thread.join(timeout=10)
+
+    assert calls == []
+
+
+def test_transcode_runs_for_nonflac_output(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A non-FLAC output format → transcode runs on the post-rip thread over the
+    FLACs the rip wrote (transcode is stubbed; no real ffmpeg runs)."""
+    calls: list[dict] = []
+    _stub_transcode(monkeypatch, calls)
+    window = teardown_threads(config=Config(output_format="wavpack", mp3_vbr_quality=0))
+
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    (album_dir / "02 - B.flac").write_bytes(b"")
+    (album_dir / "01 - A.flac").write_bytes(b"")
+    log_file = album_dir / "Album.log"
+    log_file.write_text("", encoding="utf-8")
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, str(log_file))
+    assert window._post_rip_thread is not None  # folded into post-rip processing
+    window._post_rip_thread.join(timeout=10)
+
+    assert len(calls) == 1
+    assert calls[0]["fmt"] == "wavpack"
+    assert [p.name for p in calls[0]["paths"]] == ["01 - A.flac", "02 - B.flac"]
+
+
+def test_transcode_passes_mp3_quality(
+    teardown_threads, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[dict] = []
+    _stub_transcode(monkeypatch, calls)
+    window = teardown_threads(config=Config(output_format="mp3", mp3_vbr_quality=0))
+
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - A.flac").write_bytes(b"")
+    log_file = album_dir / "Album.log"
+    log_file.write_text("", encoding="utf-8")
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, str(log_file))
+    window._post_rip_thread.join(timeout=10)
+
+    assert calls[0]["fmt"] == "mp3" and calls[0]["q"] == 0
+
+
+def test_on_transcoded_logs_outcome(teardown_threads) -> None:
+    """The slot (GUI thread) notes the count on success, the failed files on a
+    partial failure, and a skip on a couldn't-run — none alarming (the FLAC
+    master is always kept), so the status line is never hijacked."""
+    from whipper_gui.adapters.transcode import TranscodeResult
+
+    window = teardown_threads()
+    lines: list[str] = []
+    window._rip_progress.append_log_line = lines.append  # type: ignore[method-assign]
+    window._rip_progress.set_status("Done.")
+
+    window._on_transcoded(TranscodeResult(transcoded=3))
+    assert any("3 file(s) written" in line for line in lines)
+
+    window._on_transcoded(
+        TranscodeResult(transcoded=1, failures=(Path("02 - Bad.flac"),))
+    )
+    assert any("failed" in line and "02 - Bad.flac" in line for line in lines)
+
+    window._on_transcoded(TranscodeResult(error="'ffmpeg' not found"))
+    assert any("skipped" in line and "FLAC master kept" in line for line in lines)
+
+    assert window._rip_progress._status_label.text() == "Done."
+
+
 def test_window_closes_during_ctdb_verify_without_blocking(
     teardown_threads, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

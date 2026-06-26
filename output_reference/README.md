@@ -49,7 +49,9 @@ commercial track.
 
 EAC is the baseline for each format; the matching backend dirs hold a rip's
 **log** only once it reaches parity. **Priority order: FLAC (1) → WAV (2) →
-MP3 (3)** — FLAC is the v1 archival format; WAV and MP3 are P1 (see `TASKS.md`).
+MP3 (3)** — FLAC is the archival master and the first parity target; the
+WavPack/MP3/WAV *output formats* now ship (KDD-22), but their per-backend parity
+*proofs* still await real-hardware rips (see `TASKS.md`).
 
 | | FLAC (priority 1) | WAV (priority 2) | MP3 (priority 3) |
 |---|---|---|---|

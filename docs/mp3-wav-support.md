@@ -1,11 +1,12 @@
 # Multi-format output (FLAC · WavPack · MP3 · WAV) — research + design (P1)
 
-**Status:** research + design. The **product decisions are now locked** (maintainer
-sign-off 2026-06-26 — see §5); the **encoder facts and args are verified current**
-against the upstream docs (§3); the **foundation is built but not yet wired to a rip**
-(§6). **Critical Rule #4 (FLAC-only for v1) still gates the user-facing build** — the
-rip-flow integration + Settings selector are the one scope-changing piece that flips
-that rule, presented separately for go/no-go. Nothing here is reachable by the user yet.
+**Status:** **shipped (2026-06-26, maintainer sign-off).** The **product decisions are
+locked** (§5); the **encoder facts and args are verified current** against the upstream
+docs (§3); the **feature is built, wired, and tested** (§6). This flipped the original
+Critical Rule #4 ("FLAC-only for v1") — FLAC is now the default and the archival
+*master*, with WavPack/MP3/WAV as derived outputs (see CLAUDE.md Critical Rule #4).
+This doc remains the design-of-record; the one open item is embedding cover art *inside*
+`.wv` (a documented limitation in §6, not a blocker).
 
 The maintainer's directive that shaped the locked decisions (2026-06-26):
 
@@ -206,13 +207,22 @@ plus the MP3 quality knob (`mp3_vbr_quality: int = 0` → `-V0`/`-q:a 0`). Defau
 The dataclass+`asdict` round-trips new fields for free (as the FLAC toggles did).
 *(Built today for `flac`/`wav`/`mp3`; `wavpack` is the one value still to add.)*
 
-**(b) Backend capability flag.** `WhipperBackend.native_output_formats() ->
-frozenset[str]` (default `{"flac"}`; cyanrip overrides to its `-o` set). The GUI then
-chooses per backend:
-- **cyanrip** (native) → pass `-o <format>` (and `-b` for MP3) at rip time. *But*
-  note §2: for VBR MP3 and for fully-controlled WavPack tags/art, prefer the
-  transcode path even on cyanrip, or accept cyanrip's CBR/max-WavPack defaults.
-- **whipper** (FLAC-only) → rip FLAC as today, then **post-rip transcode**.
+**(b) Implementation decision — transcode-always (built 2026-06-26).** Rather than
+branch on `WhipperBackend.native_output_formats()` (which stays as a *reserved*
+capability seam), the GUI uses **one uniform path for both backends**: every rip
+produces FLAC (whipper natively; cyanrip is invoked with `-o flac`), and a non-FLAC
+choice is a **post-rip transcode** of that FLAC. Why this over per-backend native
+encode:
+- **Best-practice MP3 on *both* backends.** cyanrip's native MP3 is CBR/ABR (`-b`),
+  not VBR; routing MP3 through ffmpeg `-q:a 0` gives the `-V0` VBR we want regardless
+  of backend (§2, §3).
+- **FLAC master always exists** (decision 2) — uniform, no special-casing.
+- **One code path to test**, identical for whipper and cyanrip; no native-vs-transcode
+  fork. The tiny extra encode time is acceptable ("fine to add encoding time").
+
+`native_output_formats()` is kept as a documented seam for a future "skip the
+transcode and let cyanrip encode natively" optimization, but nothing consumes it for
+the rip in v1 of this feature.
 
 **(c) Post-rip transcode adapter** (`adapters/transcode.py`), modelled on
 `adapters/flac_recompress.py`: `transcode_files(paths, *, fmt, ...) ->
@@ -311,13 +321,28 @@ file) resolves them. Recorded here as the contract the build implements.
   (`deps/checks.py::check_ffmpeg`, `deps/registry.py`, `DEPENDENCIES.md`), optional,
   manual tier.
 
-**Not yet built (the build that flips Critical Rule #4 — held for go/no-go):**
-- **WavPack encoder** in `transcode.py` (standalone `wavpack -hh -m -v -x` +
-  APEv2 tags/cover) and its `wavpack` dependency registration + `config.py` value.
-- **Rip-flow integration** — cyanrip native `-o` argv (+ `-b`/format) and the whipper
-  post-rip transcode call, folded into the post-rip daemon thread.
-- **Settings UI** — the format selector, the MP3-is-lossy note, and the WAV
-  no-tags/art warning.
+**Feature shipped — user-facing (2026-06-26, maintainer sign-off; flips Critical
+Rule #4):**
+- **WavPack output** added to `transcode.py` (ffmpeg `-c:a wavpack`, lossless,
+  APEv2 text tags; writes `.wv`). Empirically confirmed bit-identical PCM
+  round-trip (lossless) and that text tags carry over.
+- **Rip-flow integration** — the transcode is folded into the existing post-rip
+  daemon thread (after tag → cover → re-compress, so it reads the final FLACs),
+  reported via a new `transcode_done` queued signal. Transcode-always model
+  (§4(b)); FLAC kept as the master.
+- **Settings UI** — the **Output format** selector (FLAC / WavPack / MP3 / WAV)
+  and a live WAV "no tags/art" warning. `to_config()` now round-trips
+  `output_format` (and preserves `mp3_vbr_quality`, which had been silently reset).
+- Tests across the adapter, the settings dialog, and the post-rip finish handler
+  (skip-for-flac, run-for-non-flac, quality passthrough, slot rendering).
 
-These wire the feature to the user, which is where Critical Rule #4 (FLAC-only for
-v1) and the now-locked §5 decisions bite — held for the explicit go/no-go.
+**Known limitation / future enhancement (not blocking):**
+- **Embedded cover art inside `.wv`.** ffmpeg's WavPack muxer accepts only a single
+  (audio) stream, so it can't embed the front cover *in* the `.wv`. The album-folder
+  `cover.<ext>` (written by the cover-art step) is the universal image, so WavPack
+  rips still get "a good cover image" — just not embedded. Embedding it requires the
+  standalone `wavpack` tool (APEv2 binary `Cover Art (Front)` tag), a `wavpack`
+  dependency to register through the subsystem; deferred until it can be
+  hardware-validated. WAV embeds nothing by design (RIFF).
+- **MP3 `-V` level** stays fixed at 0 (config field exists for a future Settings
+  spinbox).

@@ -10,6 +10,7 @@ A Linux GUI front-end for the [`whipper`](https://github.com/whipper-team/whippe
 - **Runs whipper inside Distrobox.** The GUI calls the host-exported `whipper` binary; it never bundles whipper or tries to install it. This is intentional — see [PLANNING.md §8 KDD-07](PLANNING.md).
 - **Single-file AppImage** for the GUI itself; no system-level installs required.
 - **Bypasses whipper's interactive prompt** by querying MusicBrainz directly and passing `--release-id` to whipper. You never see a terminal prompt.
+- **Choose your output format** — FLAC (default), WavPack, MP3, or WAV. FLAC is always produced as the lossless master; other formats are derived from it, so you never lose the archival copy. See [Audio output](#audio-output-what-you-get-what-you-dont).
 - **Distribution model:** AppImage primary, `pipx` secondary.
 
 ---
@@ -455,11 +456,28 @@ The UI is the same either way — same drive picker, same track table, same nami
 
 ## Audio output: what you get, what you don't
 
-*(This section describes the default **whipper** backend. cyanrip encodes through FFmpeg — also FLAC by default in this GUI — but the flag-by-flag details below are whipper's.)*
+**Output format** is chosen in **Settings → Output format**: **FLAC** (default),
+**WavPack** (`.wv`), **MP3**, or **WAV**. Every rip produces FLAC first — the lossless
+archival *master* — and for any other choice the GUI **keeps that FLAC** and creates
+the selected format alongside it (a quick post-rip transcode via ffmpeg). So you never
+lose the lossless master, whatever you pick.
 
-This GUI doesn't decide how audio is encoded — **whipper does**, and its encoder settings are hardcoded upstream. Worth knowing what those settings are.
+| Format | Lossless? | Tags | Cover art | Use it for |
+|--------|-----------|------|-----------|------------|
+| **FLAC** | ✅ (verified bit-perfect) | ✅ | ✅ embedded | The archive. The master copy. |
+| **WavPack** (`.wv`) | ✅ | ✅ | folder `cover.jpg`¹ | A lossless library in a different container |
+| **MP3** | ❌ best-quality VBR (~245 kbps) | ✅ | ✅ embedded | Phones, cars, portability |
+| **WAV** | ✅ | ❌ | ❌ | Raw PCM interchange only (the GUI warns) |
 
-### FLAC (v1, the only supported format)
+¹ The front cover always lands in the album folder as an image file; ffmpeg can't embed
+art *inside* a `.wv` (a known limitation — see `docs/mp3-wav-support.md`). For embedded
+lossless art, FLAC is the choice.
+
+The flag-by-flag detail below is about how each format is encoded.
+
+*(The encoder details for FLAC describe what the default **whipper** backend hardcodes; the cyanrip backend encodes FLAC through FFmpeg, also at maximum quality.)*
+
+### FLAC (default — the lossless archival master)
 
 Whipper invokes the `flac` binary with this exact command, once per track:
 
@@ -493,28 +511,31 @@ Why isn't this a bigger deal otherwise? **All FLAC compression levels are lossle
 
 The full FLAC encoder reference, including every flag whipper *isn't* using, is at [xiph.org/flac/documentation_tools_flac.html](https://xiph.org/flac/documentation_tools_flac.html).
 
-### MP3 and WAV (P1 — not in v1)
+### WavPack, MP3, and WAV (derived from the FLAC master)
 
-The brief lists MP3 and WAV as backlog. Once v1 ships, the plan is:
-
-- **WAV:** `sox` re-encodes the FLAC files to WAV after rip. No quality loss (FLAC is lossless; WAV is uncompressed PCM).
-- **MP3:** `lame` re-encodes the FLAC files to MP3 with sensible defaults (probably VBR `-V0` for "indistinguishable from source") and optionally configurable.
-
-Both encoder backends will be detected through the same dependency self-management subsystem as everything else — no bespoke install code. See [TASKS.md](TASKS.md) P1 section.
-
-If you need MP3 *today* and don't want to wait for P1, you can transcode by hand after a rip:
+When you pick a non-FLAC format, after each rip the GUI transcodes the FLAC master to
+your choice with **ffmpeg**, keeping the FLAC. It runs in the background (never freezes
+the window), writes each file atomically, and **never costs you the lossless master** —
+a transcode failure just means you still have the FLAC to retry from. Per file:
 
 ```bash
-# MP3 VBR V0 (transparent to source)
-for f in *.flac; do
-    lame -V 0 "$f" "${f%.flac}.mp3"
-done
+# WavPack — lossless, tags carried over (APEv2)
+ffmpeg -i <file>.flac -map_metadata 0 -map 0:a -c:a wavpack <file>.wv
 
-# WAV
-for f in *.flac; do
-    sox "$f" "${f%.flac}.wav"
-done
+# MP3 — best-quality VBR (== lame -V0, ~245 kbps), tags + embedded cover
+ffmpeg -i <file>.flac -map_metadata 0 -id3v2_version 3 -c:v copy \
+       -c:a libmp3lame -q:a 0 <file>.mp3
+
+# WAV — raw 16-bit PCM (no tags or cover art — RIFF can't hold them)
+ffmpeg -i <file>.flac -map 0:a -c:a pcm_s16le <file>.wav
 ```
+
+`ffmpeg` is the single encoder dependency for all three (it's already present wherever
+the cyanrip backend is — cyanrip is built on FFmpeg), detected through the same
+dependency self-management subsystem as everything else — no bespoke install code. The
+MP3 setting follows [HydrogenAudio's Recommended LAME](https://wiki.hydrogenaudio.org/index.php/LAME):
+VBR `-V0` (joint-stereo on), the highest-quality VBR. Design + the full encoder-argument
+rationale: [docs/mp3-wav-support.md](docs/mp3-wav-support.md).
 
 ### Compared to EAC's bit-perfect settings
 

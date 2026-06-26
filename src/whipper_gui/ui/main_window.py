@@ -111,6 +111,10 @@ class MainWindow(
     # thread) with the RecompressResult, so the FLAC re-compress outcome renders
     # on the GUI thread.
     flac_recompress_done = Signal(object)
+    # Emitted (from the post-rip processing daemon thread; queued to the GUI
+    # thread) with the TranscodeResult, so the FLAC→MP3/WavPack/WAV transcode
+    # outcome renders on the GUI thread.
+    transcode_done = Signal(object)
 
     def __init__(
         self,
@@ -265,6 +269,9 @@ class MainWindow(
         self.flac_verify_done.connect(self._on_flac_verified)
         # FLAC re-compress outcome (opt-in, off by default) lands in the rip log.
         self.flac_recompress_done.connect(self._on_flac_recompressed)
+        # Transcode outcome (when a non-FLAC output format is selected) lands in
+        # the rip log view.
+        self.transcode_done.connect(self._on_transcoded)
 
         self.setCentralWidget(central)
 

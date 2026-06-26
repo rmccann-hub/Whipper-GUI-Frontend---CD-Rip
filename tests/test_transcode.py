@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Tests for the optional post-rip FLAC→MP3/WAV transcode adapter.
+"""Tests for the post-rip FLAC→MP3/WavPack/WAV transcode adapter.
 
 The `ffmpeg` subprocess is injected (a fake runner), so these run with no real
 binary. Contract (mirrors flac_recompress): never raise; distinguish "couldn't
@@ -15,7 +15,11 @@ from pathlib import Path
 import pytest
 
 from whipper_gui.adapters import transcode
-from whipper_gui.adapters.transcode import TranscodeResult, transcode_files
+from whipper_gui.adapters.transcode import (
+    SUPPORTED_FORMATS,
+    TranscodeResult,
+    transcode_files,
+)
 
 
 def _make_flac(path: Path, content: bytes = b"FLACdata") -> Path:
@@ -87,6 +91,38 @@ def test_wav_transcode_uses_pcm_and_no_metadata(tmp_path: Path) -> None:
     assert argv[argv.index("-map") + 1] == "0:a"
     assert "-map_metadata" not in argv  # WAV/RIFF can't carry the tags
     assert "libmp3lame" not in argv
+
+
+def test_wavpack_writes_wv_sibling_lossless_with_tags(tmp_path: Path) -> None:
+    a = _make_flac(tmp_path / "01 - A.flac")
+    seen: list[list[str]] = []
+
+    def runner(argv: list[str]) -> int:
+        seen.append(argv)
+        Path(argv[-1]).write_bytes(b"wvpk....")
+        return 0
+
+    result = transcode_files([a], fmt="wavpack", runner=runner)
+
+    assert result.ok
+    # The extension is ".wv", NOT ".wavpack" — derived from the format→ext map.
+    assert (tmp_path / "01 - A.wv").read_bytes() == b"wvpk...."
+    assert not (tmp_path / "01 - A.wavpack").exists()
+    assert a.read_bytes() == b"FLACdata"  # FLAC master kept
+    argv = seen[0]
+    assert "wavpack" in argv  # the lossless WavPack encoder
+    assert "libmp3lame" not in argv and "pcm_s16le" not in argv
+    # Text tags carry over (APEv2), but the cover stream is dropped: ffmpeg's
+    # WavPack muxer only accepts a single stream, so we map audio only.
+    assert "-map_metadata" in argv
+    assert argv[argv.index("-map") + 1] == "0:a"
+    assert "-c:v" not in argv  # no attached-picture copy (muxer rejects it)
+
+
+def test_supported_formats_are_the_transcode_targets() -> None:
+    # FLAC is the native rip format (no transcode); these are the derived ones.
+    assert SUPPORTED_FORMATS == {"mp3", "wavpack", "wav"}
+    assert "flac" not in SUPPORTED_FORMATS
 
 
 def test_custom_binary_path_is_used(tmp_path: Path) -> None:

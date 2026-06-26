@@ -170,6 +170,42 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Ripping backend:", self._backend_combo)
 
+        # --- Output format ---
+        # Both backends rip to FLAC (the lossless master); a non-FLAC choice is
+        # derived afterwards by a post-rip ffmpeg transcode, with the FLAC kept.
+        # Item data is the raw config value.
+        self._format_combo: QComboBox = QComboBox(self)
+        for label, value in (
+            ("FLAC — lossless archival master (recommended)", "flac"),
+            ("WavPack (.wv) — lossless, with tags", "wavpack"),
+            ("MP3 — lossy, best-quality VBR, with tags + cover", "mp3"),
+            ("WAV — raw PCM, no tags or cover art", "wav"),
+        ):
+            self._format_combo.addItem(label, value)
+        format_index = self._format_combo.findData(config.output_format)
+        self._format_combo.setCurrentIndex(format_index if format_index >= 0 else 0)
+        self._format_combo.setToolTip(
+            "What the rip delivers. FLAC is the lossless archival master and is "
+            "always produced; for any other choice the GUI keeps that FLAC and "
+            "creates the selected format alongside it (a post-rip transcode). "
+            "FLAC and WavPack are lossless; MP3 is high-quality lossy (VBR ~245 "
+            "kbps) for portability; WAV is raw PCM and can't store tags or art."
+        )
+        form.addRow("Output format:", self._format_combo)
+
+        # WAV is the one format that can't carry tags/cover art (RIFF has no
+        # tag chunk). Surface that the moment WAV is picked so it's never a
+        # silent surprise — WavPack is the lossless-with-tags alternative.
+        self._wav_warning_label: QLabel = QLabel(
+            "⚠ WAV can't store tags or cover art. For lossless audio that keeps "
+            "your metadata, choose WavPack instead.",
+            self,
+        )
+        self._wav_warning_label.setWordWrap(True)
+        form.addRow("", self._wav_warning_label)
+        self._format_combo.currentIndexChanged.connect(self._update_wav_warning)
+        self._update_wav_warning()
+
         # --- Toggles ---
         self._auto_picard_check: QCheckBox = QCheckBox(
             "Launch MusicBrainz Picard on unknown discs", self
@@ -432,6 +468,10 @@ class SettingsDialog(QDialog):
             verify_flac_after_rip=self._verify_flac_check.isChecked(),
             recompress_flac_after_rip=self._recompress_flac_check.isChecked(),
             ripper_backend=self._backend_combo.currentData(),
+            output_format=self._format_combo.currentData(),
+            # MP3 quality isn't exposed yet (fixed at the best-practice -V0);
+            # preserve the stored value so saving Settings never resets it.
+            mp3_vbr_quality=self._config.mp3_vbr_quality,
             # Preserve fields the dialog doesn't model, so saving Settings
             # never silently resets them (these one-time "already offered"
             # flags being reset is what re-triggered the first-run prompts).
@@ -443,6 +483,10 @@ class SettingsDialog(QDialog):
         )
 
     # --- Internals ---------------------------------------------------------
+
+    def _update_wav_warning(self) -> None:
+        """Show the no-tags/art warning only when WAV is the selected format."""
+        self._wav_warning_label.setVisible(self._format_combo.currentData() == "wav")
 
     def _apply_backend_capabilities(self) -> None:
         """Enable/disable per-backend options to match the selected backend.

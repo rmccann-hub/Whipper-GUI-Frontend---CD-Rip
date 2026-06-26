@@ -321,12 +321,15 @@ class WhipperBackend(ABC):
         """The output formats (among the ones the GUI offers) this backend can
         produce *natively*, in one rip.
 
-        Default ``{"flac"}`` — whipper is FLAC-only, so MP3/WAV for the whipper
-        path is a post-rip ffmpeg transcode (P1; see ``adapters/transcode.py``
-        and ``docs/mp3-wav-support.md``). cyanrip overrides to add the formats
-        it emits directly via ``-o``. The GUI uses this to decide native-encode
-        vs. transcode for the selected format. (P1 groundwork — no rip path
-        consumes it yet; v1 stays FLAC-only per Critical Rule #4.)
+        Default ``{"flac"}`` — whipper is FLAC-only. cyanrip overrides to add the
+        formats it emits directly via ``-o``.
+
+        **Reserved seam (KDD-22):** the shipped multi-format feature uses a
+        *transcode-always* model instead — every rip produces FLAC and a non-FLAC
+        choice is a post-rip ffmpeg transcode (``adapters/transcode.py``), which
+        gives best-practice VBR MP3 on both backends and always keeps the FLAC
+        master. So nothing consumes this method for the rip today; it's kept for a
+        future "let cyanrip encode natively and skip the transcode" optimization.
         """
         return frozenset({"flac"})
 

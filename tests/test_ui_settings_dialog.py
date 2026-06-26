@@ -185,6 +185,46 @@ def test_backend_combo_reflects_config_and_round_trips(qapp: QApplication) -> No
     assert dialog.to_config().ripper_backend == "cyanrip"
 
 
+# --- Output format -------------------------------------------------------
+
+
+def test_output_format_defaults_to_flac(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())
+    assert dialog._format_combo.currentData() == "flac"
+    assert dialog.to_config().output_format == "flac"
+
+
+def test_output_format_reflects_config_and_round_trips(qapp: QApplication) -> None:
+    for fmt in ("wavpack", "mp3", "wav"):
+        dialog = SettingsDialog(Config(output_format=fmt))
+        assert dialog._format_combo.currentData() == fmt
+        assert dialog.to_config().output_format == fmt
+
+
+def test_output_format_user_change_survives_to_config(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())  # starts on flac
+    dialog._format_combo.setCurrentIndex(dialog._format_combo.findData("wavpack"))
+    assert dialog.to_config().output_format == "wavpack"
+
+
+def test_saving_settings_preserves_mp3_quality(qapp: QApplication) -> None:
+    # mp3_vbr_quality isn't a widget yet; saving must not reset it from a
+    # non-default stored value.
+    out = SettingsDialog(Config(mp3_vbr_quality=2)).to_config()
+    assert out.mp3_vbr_quality == 2
+
+
+def test_wav_warning_only_visible_for_wav(qapp: QApplication) -> None:
+    # Hidden for the formats that DO carry tags/art…
+    for fmt in ("flac", "wavpack", "mp3"):
+        dialog = SettingsDialog(Config(output_format=fmt))
+        assert dialog._wav_warning_label.isVisibleTo(dialog) is False
+    # …and shown the moment WAV is selected (live, before OK).
+    dialog = SettingsDialog(Config())
+    dialog._format_combo.setCurrentIndex(dialog._format_combo.findData("wav"))
+    assert dialog._wav_warning_label.isVisibleTo(dialog) is True
+
+
 def test_to_config_preserves_one_time_prompt_flags(qapp: QApplication) -> None:
     """Saving Settings must NOT reset the 'already offered' flags (doing so
     re-triggered the first-run prompts)."""

@@ -1,26 +1,39 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Optional post-rip transcode of whipper's FLAC output to MP3 or WAV.
+"""Post-rip transcode of the rip's FLAC output to MP3, WavPack, or WAV.
 
-whipper is FLAC-only (its encode profiles were removed in v0.5.0), so a
-portable/lossy copy is a **post-rip re-encode** of each FLAC via ffmpeg. The
-cyanrip backend doesn't need this — it emits MP3/WAV natively via ``-o`` — so
-this adapter is the whipper path's transcoder (see ``docs/mp3-wav-support.md``).
+Both backends always rip to FLAC (whipper is FLAC-only; the cyanrip path is
+invoked with ``-o flac``). When the user picks a different output format, the GUI
+keeps that FLAC as the archival master and **derives** the chosen format from it
+with a post-rip ffmpeg re-encode — this adapter. One uniform path for both
+backends means the MP3 is always best-practice VBR (cyanrip's *native* MP3 is
+only CBR), and there is always a lossless FLAC master (the north star).
+See ``docs/mp3-wav-support.md``.
 
 **The FLAC stays the archival master.** We write a NEW sibling file next to each
-FLAC (``01 - x.flac`` → ``01 - x.mp3``) and never touch the FLAC — the north
-star is a trustworthy lossless library, with MP3/WAV as a derived copy.
+FLAC (``01 - x.flac`` → ``01 - x.mp3``/``.wv``/``.wav``) and never touch the
+FLAC. The derived file is additive.
 
-Per format (facts verified 2026-06-23, docs/mp3-wav-support.md §3):
-  * **MP3** — libmp3lame VBR ``-q:a N`` (== lame ``-V N``; N=0 ≈ transparent),
-    joint-stereo left on (ffmpeg default). The LAME ``-q4`` noise-shaping bug is
-    CBR/ABR-only, so VBR is unaffected. Tags + embedded cover art are carried
-    over (``-map_metadata 0`` + copying the attached-picture stream → ID3 APIC).
+Per format (facts verified against upstream docs, docs/mp3-wav-support.md §3):
+  * **MP3** (lossy) — libmp3lame VBR ``-q:a N`` (== lame ``-V N``; N=0 ≈ the
+    highest VBR, ~245 kbps), joint-stereo left on (ffmpeg default). The LAME
+    ``-q4`` noise-shaping bug is CBR/ABR-only, so VBR is unaffected. Tags **and**
+    embedded cover art carry over (``-map_metadata 0`` + copying the
+    attached-picture stream → ID3 APIC).
+  * **WavPack** (``.wv``, lossless) — ``-c:a wavpack`` (lossless by default;
+    verified bit-identical PCM round-trip). Text tags carry over to APEv2
+    (``-map_metadata 0``), but ffmpeg's WavPack muxer can hold **only the audio
+    stream** ("This muxer only supports a single WavPack stream"), so the
+    embedded cover is dropped here — the front cover still lands in the album
+    folder as ``cover.<ext>`` via the cover-art step (the universal image
+    guarantee). Embedding art *inside* the ``.wv`` needs the standalone
+    ``wavpack`` tool (APEv2 binary tag) — a documented future enhancement.
   * **WAV** — 16-bit LE PCM (CD format). RIFF carries **no** rich tags or cover
-    art; the GUI warns about that separately.
+    art; the GUI warns about that separately (WavPack is the lossless-with-tags
+    answer instead).
 
 Each file is encoded to a sibling temp and then **atomically renamed in**, so a
-failure (or a crash) never leaves a half-written MP3/WAV. Opt-in (P1; nothing
-calls this on the v1 FLAC-only path yet). Best-effort; **never raises**.
+failure (or a crash) never leaves a half-written output. Best-effort; **never
+raises**.
 """
 
 from __future__ import annotations
@@ -35,9 +48,14 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 _FFMPEG_BINARY: str = "ffmpeg"
-# Formats this adapter knows how to produce. Anything else (e.g. "flac") is a
-# no-op — whipper already produced the FLAC, there's nothing to transcode.
-_SUPPORTED_FORMATS: frozenset[str] = frozenset({"mp3", "wav"})
+# Formats this adapter knows how to produce, mapped to their file extension.
+# Anything else (e.g. "flac") is a no-op — the rip already produced the FLAC,
+# there's nothing to transcode. Note WavPack's extension is ".wv", not
+# "wavpack", so we can't derive the suffix from the format name alone.
+_FORMAT_EXT: dict[str, str] = {"mp3": "mp3", "wavpack": "wv", "wav": "wav"}
+# Public so the GUI can tell whether a chosen output_format needs a transcode
+# (anything here) or is the native rip format ("flac" → no-op).
+SUPPORTED_FORMATS: frozenset[str] = frozenset(_FORMAT_EXT)
 # Transcoding one CD track is quick (seconds), but give a generous per-file
 # bound for slow hardware / long tracks.
 _TIMEOUT_S: float = 300.0
@@ -114,6 +132,22 @@ def _build_argv(
             "mp3",
             str(tmp),
         ]
+    if fmt == "wavpack":
+        # WavPack: lossless by default. `-map 0:a` = audio only — ffmpeg's
+        # WavPack muxer rejects more than one stream, so the embedded cover
+        # can't ride along (the folder cover.<ext> covers the image). Text
+        # tags carry over to APEv2 via -map_metadata.
+        return base + [
+            "-map_metadata",
+            "0",
+            "-map",
+            "0:a",
+            "-c:a",
+            "wavpack",
+            "-f",
+            "wavpack",
+            str(tmp),
+        ]
     # WAV: 16-bit LE PCM (CD format). `-map 0:a` = audio only — explicitly
     # excludes any embedded cover (RIFF can't carry it), so a FLAC with art
     # transcodes cleanly. RIFF carries no tags either, so none mapped.
@@ -138,15 +172,16 @@ def transcode_files(
     written atomically (``os.replace`` of a sibling temp), so the rip is never
     left with a half-written MP3/WAV. The source FLAC is always kept.
     """
-    if fmt not in _SUPPORTED_FORMATS:
+    if fmt not in SUPPORTED_FORMATS:
         # "flac" or anything we don't transcode → nothing to do, cleanly.
         return TranscodeResult()
 
     run = runner or _default_runner
     failures: list[Path] = []
     transcoded = 0
+    ext = _FORMAT_EXT[fmt]
     for src in paths:
-        dest = src.with_suffix(f".{fmt}")
+        dest = src.with_suffix(f".{ext}")
         tmp = dest.with_name(dest.name + ".transcode.tmp")
         argv = _build_argv(binary, src, tmp, fmt, mp3_vbr_quality)
         try:

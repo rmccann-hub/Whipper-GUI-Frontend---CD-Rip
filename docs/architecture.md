@@ -288,11 +288,17 @@ count, starts sharing the file.)
 5. Gate any backend-specific Settings widgets in `settings_dialog.py`
    (`_apply_backend_capabilities`) — grey out, explain, never lose values.
 
-### Add an output format (MP3, WAV, …)
-Route the encoder through the dependency subsystem (no bespoke install code),
-add the format to `Config`, and pass it through `RipParameters` → the backend
-argv. FLAC-only is a v1 scope rule (Critical Rule #4), so this is a
-deliberate, reviewed expansion.
+### Add an output format
+WavPack, MP3, and WAV already ship (KDD-22); FLAC is the always-produced lossless
+**master** and other formats are *derived* from it by a post-rip transcode
+(`adapters/transcode.py`). To add another (e.g. ALAC, Opus): add it to
+`transcode.py`'s `_FORMAT_EXT`/`_build_argv` (one ffmpeg branch), add the value to
+the `Config.output_format` choices + the Settings combo, and round-trip it in
+`SettingsDialog.to_config()` (exposing a config field is incomplete until
+`to_config` carries it — KDD-22). The transcode runs **last** in the post-rip
+daemon thread (after tag → cover → re-compress), writing sibling files so it can't
+race the metaflac steps. Route any new encoder binary through the dependency
+subsystem (no bespoke install code, Critical Rule #6 + #4).
 
 ### Add a dependency
 Register it in `deps/registry.py` with its probe and install tiers. Mark it

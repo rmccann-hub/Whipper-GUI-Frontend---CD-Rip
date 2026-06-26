@@ -196,19 +196,19 @@ SPECS: list[DependencySpec] = [
     ),
     DependencySpec(
         dep_id="ffmpeg",
-        display_name="ffmpeg (MP3/WAV transcoder)",
+        display_name="ffmpeg (WavPack/MP3/WAV transcoder)",
         probe=_probe_ffmpeg,
         min_version=(4, 0),
         tier=Tier.MANUAL,
         install_command=None,
         search_string="install ffmpeg Bazzite Fedora host export Distrobox",
         description=(
-            "Optional (P1). Only needed to transcode whipper's FLAC output to "
-            "MP3 or WAV — whipper is FLAC-only, so a portable copy is a post-rip "
-            "ffmpeg re-encode (libmp3lame for MP3). The cyanrip backend encodes "
-            "those formats natively and doesn't need this. Already present "
-            "wherever cyanrip is installed (cyanrip is built on FFmpeg)."
+            "Optional. The encoder for the Output-format feature (KDD-22): "
+            "transcodes the FLAC master to WavPack, MP3, or WAV when a non-FLAC "
+            "output is selected. Absent only disables non-FLAC output (FLAC "
+            "ripping is unaffected, and the FLAC master is always kept). Already "
+            "present wherever cyanrip is installed (cyanrip is built on FFmpeg)."
         ),
-        optional=True,  # absent only disables the optional MP3/WAV transcode
+        optional=True,  # absent only disables non-FLAC output (FLAC unaffected)
     ),
 ]

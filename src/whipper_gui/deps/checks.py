@@ -138,12 +138,12 @@ def check_flac(binary_name: str = "flac") -> ProbeResult:
 def check_ffmpeg(binary_name: str = "ffmpeg") -> ProbeResult:
     """Probe `ffmpeg`, expected on PATH.
 
-    Used (P1) to transcode whipper's FLAC output to MP3/WAV — whipper is
-    FLAC-only, so a portable copy is a post-rip ffmpeg re-encode (libmp3lame
-    for MP3, pcm_s16le for WAV). Optional: its absence just means the MP3/WAV
-    transcode can't run (FLAC ripping is unaffected, and the cyanrip backend
-    encodes those formats natively). ffmpeg prints its version to `-version`
-    (single dash, unlike the GNU `--version` the other probes use).
+    The encoder for the Output-format feature (KDD-22): every rip produces FLAC
+    (the master), and a non-FLAC choice is a post-rip ffmpeg transcode of that
+    FLAC — WavPack (`-c:a wavpack`), MP3 (libmp3lame), or WAV (pcm_s16le).
+    Optional: its absence just disables non-FLAC output (FLAC ripping is
+    unaffected, and the FLAC master is always kept). ffmpeg prints its version
+    to `-version` (single dash, unlike the GNU `--version` the other probes use).
     """
     ran, output, location = _run_version_command([binary_name, "-version"])
     if not ran or location is None:

@@ -125,8 +125,8 @@ def test_output_format_defaults_flac_and_round_trips(
     _redirect_config(tmp_path, monkeypatch)
 
     cfg = config_module.load()
-    # Default must stay FLAC — v1 is FLAC-only (Critical Rule #4); MP3/WAV are
-    # P1 groundwork not yet wired to a rip.
+    # Default stays FLAC — the lossless archival master (Critical Rule #4);
+    # WavPack/MP3/WAV are derived from it when selected (KDD-22).
     assert cfg.output_format == "flac"
     assert cfg.mp3_vbr_quality == 0
 

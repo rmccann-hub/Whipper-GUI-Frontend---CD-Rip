@@ -325,9 +325,10 @@ def test_produces_max_compression_flac_true() -> None:
 
 
 def test_native_output_formats_includes_wav_and_mp3() -> None:
-    # cyanrip emits these natively via `-o`, so no post-rip transcode is needed.
+    # cyanrip CAN emit these natively via `-o`. This stays a reserved capability
+    # seam (KDD-22) — the shipped feature transcodes from FLAC for both backends.
     fmts = _impl().native_output_formats()
-    assert {"flac", "wav", "mp3"} <= fmts
+    assert {"flac", "wav", "mp3", "wavpack"} <= fmts
 
 
 def test_find_offset_parses_value(monkeypatch: pytest.MonkeyPatch) -> None:

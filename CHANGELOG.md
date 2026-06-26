@@ -64,6 +64,19 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   PLANNING.md KDD-21.
 
 ### Added
+- **Choose your output format — FLAC, WavPack, MP3, or WAV (new "Output format"
+  setting).** Every rip still produces FLAC as the lossless archival **master**;
+  when you pick another format the app keeps that FLAC and creates the selected
+  format alongside it (a quick background transcode), so you never lose the
+  lossless copy. **FLAC** and **WavPack** (`.wv`) are lossless; **MP3** is
+  best-quality VBR (`-V0`, ~245 kbps) with tags and embedded cover art; **WAV** is
+  raw PCM and can't carry tags or art (the Settings page warns you, and points you
+  at WavPack for lossless-with-tags). The transcode runs off the GUI thread, writes
+  each file atomically, and never costs you the master if it fails. Uses `ffmpeg`
+  (already present wherever the cyanrip backend is), routed through the existing
+  dependency subsystem — no new install path. Note: cover art is embedded in FLAC
+  and MP3 but, for now, lands beside the `.wv` as a folder image rather than inside
+  it (a tooling limit — see docs/mp3-wav-support.md). New `Config.output_format`.
 - **Enforced safety layer (contributor-facing).** New `.githooks/pre-commit`
   hard-blocks committing audio/copyrighted media (Critical Rule #8) — even via
   `git add -f` — so the rule is a guarantee, not just guidance (`dev-setup.sh`
