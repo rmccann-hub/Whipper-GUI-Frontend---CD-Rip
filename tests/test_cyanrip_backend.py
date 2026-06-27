@@ -151,7 +151,17 @@ def test_rip_argv_no_metadata_omits_tag_flags() -> None:
 
 
 def test_meta_value_escaping_makes_separators_safe() -> None:
-    assert _escape_meta_value("Live: At The Met") == "Live\\: At The Met"
+    # A colon CANNOT be backslash-escaped for cyanrip: its append_missing_keys()
+    # preprocessor splits on ':' naively (ignoring '\') and injects spurious
+    # keys, which corrupted "Every Breath You Take: The Classics" into a folder
+    # named "...∶album_artist= The Classics" (real-user bug, 2026-06-27). So the
+    # colon is substituted with the U+2236 lookalike (the real ':' is restored
+    # in the FLAC tags post-rip). No backslash, no spurious split.
+    assert _escape_meta_value("Live: At The Met") == "Live∶ At The Met"
+    assert "\\" not in _escape_meta_value("Every Breath You Take: The Classics")
+    assert ":" not in _escape_meta_value("a:b:c")  # every colon substituted
+    # The other tokenizer-special chars still get a backslash (av_get_token
+    # honors them; append_missing_keys never splits on them).
     assert _escape_meta_value("a=b") == "a\\=b"
     assert _escape_meta_value("back\\slash") == "back\\\\slash"
     assert _escape_meta_value("It's") == "It\\'s"

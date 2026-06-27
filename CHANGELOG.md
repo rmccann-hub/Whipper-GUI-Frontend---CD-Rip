@@ -11,6 +11,26 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.3.7] — 2026-06-27
+
+### Fixed
+- **Albums with a colon in the title no longer produce a corrupted folder name
+  on the cyanrip backend.** "Every Breath You Take: The Classics" was coming out
+  as a folder named `Every Breath You Take∶album_artist= The Classics` (and the
+  rip failed). Cause: cyanrip's command-line metadata parser splits on `:`
+  *before* honoring backslash-escaping, so any colon inside a value got
+  mis-parsed and injected a spurious key. The colon is now substituted with the
+  identical-looking `∶` (U+2236 — the same character cyanrip uses when putting a
+  colon in a path), so folders are clean and the parser can't choke. *(Restoring
+  the literal `:` in the FLAC tags themselves is a follow-up.)*
+
+### Changed
+- **The post-update relaunch is now logged.** After an in-app update, the log
+  records when the app spawns the new version, and a spawn that fails now tells
+  you (instead of silently closing) so you're never left with no window. The new
+  AppImage cold-extracts on first launch, so the new window can take 20-30s to
+  appear — that delay is normal, not a failure.
+
 ## [0.3.6] — 2026-06-27
 
 ### Added
@@ -831,6 +851,7 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.3.7]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.3...v0.3.4

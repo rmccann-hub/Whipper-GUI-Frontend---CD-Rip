@@ -268,17 +268,39 @@ def _read_sysfs(path: Path) -> str:
 # --- Metadata feed (-a / -t) -------------------------------------------------
 
 
-def _escape_meta_value(value: str) -> str:
-    """Escape a tag value for cyanrip's ``key=value:key=value`` strings.
+# cyanrip turns ':' into this RATIO lookalike (U+2236) when it sanitizes a tag
+# value for a path — so using it ourselves for the *value* keeps the folder name
+# identical to what cyanrip would produce, just without tripping its parser.
+_COLON_SUBSTITUTE: str = "∶"  # ∶
 
-    cyanrip parses -a/-t with FFmpeg's ``av_dict_parse_string(.., "=", ":")``,
-    whose tokenizer treats ``\\`` as an escape and ``'`` as a quote char —
-    so backslash-escaping ``\\ : = '`` makes any title safe (e.g.
-    "Live: At The Met").
+
+def _escape_meta_value(value: str) -> str:
+    """Make a tag value safe for cyanrip's ``key=value:key=value`` strings.
+
+    The real parser is FFmpeg's ``av_dict_parse_string(.., "=", ":")`` (which
+    honors ``\\`` and ``'``), BUT cyanrip first runs the string through
+    ``append_missing_keys()``, which splits on ``:`` with ``av_strtok`` —
+    **naively, ignoring backslash and quotes** — and *injects* a spurious key
+    (``album=``/``album_artist=``/``title=``/``artist=``) in front of any ``:``
+    that lands inside a value. So a backslash-escaped colon does NOT survive:
+    "Every Breath You Take: The Classics" came out as the folder
+    "Every Breath You Take∶album_artist= The Classics" (real-user bug,
+    2026-06-27, confirmed against cyanrip's source).
+
+    Because a literal ``:`` can't be passed safely at all, substitute the
+    visually-identical U+2236 (the same character cyanrip uses when sanitizing a
+    colon for a path) — folders and the cyanrip-written tag stay clean, and the
+    parser can't choke. The GUI restores the real ``:`` in the FLAC tags in a
+    post-rip metaflac pass. Other tokenizer-special chars (``\\ = '``) still get
+    a backslash, which av_get_token honors and ``append_missing_keys`` ignores
+    (it only ever splits on ``:``).
     """
     out: list[str] = []
     for ch in value:
-        if ch in "\\:='":
+        if ch == ":":
+            out.append(_COLON_SUBSTITUTE)
+            continue
+        if ch in "\\='":
             out.append("\\")
         out.append(ch)
     return "".join(out)

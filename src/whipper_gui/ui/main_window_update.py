@@ -251,7 +251,25 @@ class UpdateMixin:
         if choice == QMessageBox.StandardButton.Yes:
             import subprocess
 
-            subprocess.Popen(  # noqa: S603 — our own verified binary
-                [str(new_path)], start_new_session=True
-            )
+            # Log the relaunch explicitly. The new AppImage cold-extracts on its
+            # first run (a 230 MB file → the window can take 20-30s to appear),
+            # which reads as "it didn't reopen." Logging the spawn here makes the
+            # log unambiguous about whether WE relaunched it vs. the user did
+            # (real-user question, 2026-06-27), and lets us catch a spawn that
+            # fails instead of silently closing into nothing.
+            log.info("relaunching into the new version: %s", new_path)
+            try:
+                subprocess.Popen(  # noqa: S603 — our own verified binary
+                    [str(new_path)], start_new_session=True
+                )
+            except OSError as exc:
+                log.exception("relaunch failed")
+                QMessageBox.information(
+                    self,
+                    "Update installed",
+                    "The update is installed, but I couldn't relaunch the app "
+                    f"automatically ({exc}). Please reopen Whipper GUI from your "
+                    "menu or ~/Applications.",
+                )
+                return  # leave this window open so the user isn't left with nothing
             self.close()
