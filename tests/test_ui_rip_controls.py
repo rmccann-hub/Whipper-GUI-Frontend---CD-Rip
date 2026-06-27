@@ -295,6 +295,19 @@ def test_force_stop_button_enabled_only_during_rip(qapp: QApplication) -> None:
     assert controls._force_stop_button.isEnabled() is False
 
 
+def test_force_stop_button_enabled_during_scan(qapp: QApplication) -> None:
+    """A disc scan can wedge the drive too, so Force-stop is available during a
+    scan (even with no rip running) — but Start/Cancel stay rip-governed."""
+    controls = RipControls(Config(output_dir="/music"))
+    assert controls._force_stop_button.isEnabled() is False
+    controls.set_scan_active(True)
+    assert controls._force_stop_button.isEnabled() is True
+    # A scan doesn't enable Cancel (there's no rip to cancel).
+    assert controls._cancel_button.isEnabled() is False
+    controls.set_scan_active(False)
+    assert controls._force_stop_button.isEnabled() is False
+
+
 def test_force_stop_button_emits_signal(qapp: QApplication) -> None:
     controls = RipControls(Config(output_dir="/music"))
     controls.set_rip_active(True)

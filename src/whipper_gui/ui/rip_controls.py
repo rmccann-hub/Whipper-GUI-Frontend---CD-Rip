@@ -42,6 +42,7 @@ class RipControls(QWidget):
         self._release_id: str = ""
         self._unknown_mode: bool = False
         self._rip_active: bool = False
+        self._scan_active: bool = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -49,12 +50,15 @@ class RipControls(QWidget):
 
         self._start_button: QPushButton = QPushButton("Start rip", self)
         self._cancel_button: QPushButton = QPushButton("Cancel", self)
-        # Force stop is the drastic escalation: eject + kill the in-container
-        # reader, for when Cancel leaves the drive spinning. Enabled only
-        # during a rip, same as Cancel.
+        # Force stop is the drastic escalation: kill the in-container reader for
+        # when the drive keeps spinning. Enabled during a rip (Cancel left it
+        # spinning → eject + kill) AND during a disc scan (a stuck TOC read
+        # wedges the drive too → free it without ejecting, so the disc stays in
+        # for a Rescan).
         self._force_stop_button: QPushButton = QPushButton("Force stop", self)
         self._force_stop_button.setToolTip(
-            "Eject and kill the reader if the drive keeps spinning after Cancel."
+            "Stop the drive if it keeps spinning — after Cancel during a rip, "
+            "or if a disc scan gets stuck."
         )
 
         self._start_button.clicked.connect(self._on_start)
@@ -100,6 +104,17 @@ class RipControls(QWidget):
         self._rip_active = bool(active)
         self._refresh_button_state()
 
+    def set_scan_active(self, active: bool) -> None:
+        """Toggle Force-stop availability during a disc scan.
+
+        A stuck disc scan can wedge the drive too (the in-container TOC reader
+        keeps the device open), but Start/Cancel don't apply to a scan — only
+        Force-stop does. So a scan enables JUST Force-stop, leaving Start and
+        Cancel governed by the rip state.
+        """
+        self._scan_active = bool(active)
+        self._refresh_button_state()
+
     # --- Read-back ----------------------------------------------------------
 
     def can_start(self) -> bool:
@@ -122,7 +137,9 @@ class RipControls(QWidget):
             (not self._rip_active) and self._has_minimum_state()
         )
         self._cancel_button.setEnabled(self._rip_active)
-        self._force_stop_button.setEnabled(self._rip_active)
+        # Force-stop is available whenever something is holding the drive — an
+        # active rip, or a disc scan that may have wedged the TOC reader.
+        self._force_stop_button.setEnabled(self._rip_active or self._scan_active)
 
     def _has_minimum_state(self) -> bool:
         if not self._drive:

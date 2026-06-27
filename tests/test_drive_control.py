@@ -142,3 +142,27 @@ def test_force_stop_kills_before_ejecting() -> None:
     drive_control.force_stop_drive("/dev/sr0", runner=rec)
     order = [os.path.basename(c[0]) for c in rec.calls]
     assert order.index("pkill") < order.index("eject")
+
+
+# --- free_drive (scan-stall recovery: kill the reader, do NOT eject) ------
+
+
+def test_free_drive_kills_but_never_ejects() -> None:
+    """A wedged disc *scan* frees the drive without ejecting, so the disc stays
+    in for a Rescan — the kill sequence runs but `eject` never does."""
+    rec = _Recorder(returncode=0)
+    msg = drive_control.free_drive("/dev/sr0", runner=rec)
+    cmds = [os.path.basename(c[0]) for c in rec.calls]
+    assert "eject" not in cmds
+    assert cmds == ["pkill", "pkill", "fuser"]
+    assert "free" in msg.lower()
+
+
+def test_free_drive_falls_back_to_container_when_host_misses() -> None:
+    # rc 1 everywhere → host pkills + fuser match nothing → distrobox fallback,
+    # still without any eject.
+    rec = _Recorder(returncode=1)
+    drive_control.free_drive("/dev/sr0", runner=rec)
+    cmds = [os.path.basename(c[0]) for c in rec.calls]
+    assert cmds == ["pkill", "pkill", "fuser", "distrobox", "distrobox"]
+    assert "eject" not in cmds

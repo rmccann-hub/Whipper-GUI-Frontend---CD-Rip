@@ -53,3 +53,10 @@ WHIPPER_BINARY_DEFAULT: Path = Path.home() / ".local" / "bin" / "whipper"
 # runs `distrobox-export` inside the `ripping` container, which drops a
 # wrapper here.
 CYANRIP_BINARY_DEFAULT: Path = Path.home() / ".local" / "bin" / "cyanrip"
+
+# Default location of the host-exported `flac` decoder. The setup wizard
+# installs the `flac` package in the container (for metaflac too) and is
+# supposed to export this so `flac --test` can verify rips that the backend
+# didn't self-verify (cyanrip) and the CTDB audio cross-check can decode.
+# Same `distrobox-export` route as whipper/cyanrip.
+FLAC_BINARY_DEFAULT: Path = Path.home() / ".local" / "bin" / "flac"

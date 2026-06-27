@@ -32,7 +32,11 @@ from whipper_gui.deps.step_engine import (
     StepResult,
     StepStatus,
 )
-from whipper_gui.paths import CYANRIP_BINARY_DEFAULT, WHIPPER_BINARY_DEFAULT
+from whipper_gui.paths import (
+    CYANRIP_BINARY_DEFAULT,
+    FLAC_BINARY_DEFAULT,
+    WHIPPER_BINARY_DEFAULT,
+)
 
 log = logging.getLogger(__name__)
 
@@ -146,6 +150,7 @@ class HostSetup:
     os_release: Path = _OS_RELEASE
     whipper_path: Path = WHIPPER_BINARY_DEFAULT
     cyanrip_path: Path = CYANRIP_BINARY_DEFAULT
+    flac_path: Path = FLAC_BINARY_DEFAULT
     # Privilege escalation for host-root installs. "pkexec" (the default)
     # shows a graphical polkit prompt — correct for a GUI with no TTY. On
     # Bazzite/Silverblue distrobox+podman are preinstalled, so these steps
@@ -205,9 +210,21 @@ class HostSetup:
     def cyanrip_exported(self) -> bool:
         return self.runner.exists(self.cyanrip_path)
 
+    def flac_exported(self) -> bool:
+        return self.runner.exists(self.flac_path)
+
     def _export_done(self) -> bool:
-        """The export step is satisfied when every requested binary is on host."""
+        """The export step is satisfied when every requested binary is on host.
+
+        `flac` is checked alongside whipper because the tools step installs it
+        (titled "whipper + flac") and `flac --test` needs it on the host to
+        verify rips a backend didn't self-verify (cyanrip) and to decode for
+        the CTDB cross-check. It was historically installed-but-not-exported,
+        so checking it here makes a wizard re-run repair an existing setup.
+        """
         if not self.whipper_exported():
+            return False
+        if not self.flac_exported():
             return False
         return (not self.include_cyanrip) or self.cyanrip_exported()
 
@@ -283,7 +300,10 @@ class HostSetup:
         if step_id == "export":
             # distrobox-export is idempotent (re-exporting overwrites the
             # wrapper), so re-running already-exported binaries is harmless.
-            binaries = ["/usr/bin/whipper", "/usr/bin/metaflac"]
+            # flac (the decoder) must be exported too — the tools step installs
+            # it but a past version forgot to export it, leaving `flac --test`
+            # verification and the CTDB audio check unable to find it.
+            binaries = ["/usr/bin/whipper", "/usr/bin/metaflac", "/usr/bin/flac"]
             if self.include_cyanrip:
                 binaries.append("/usr/bin/cyanrip")
             return [

@@ -50,6 +50,7 @@ def _setup(tmp_path: Path, runner: _FakeRunner) -> HostSetup:
         runner=runner,
         os_release=_fedora(tmp_path),
         whipper_path=tmp_path / "whipper",
+        flac_path=tmp_path / "flac",
     )
 
 
@@ -120,7 +121,7 @@ def test_checking_ping_precedes_slow_probe_even_when_done(tmp_path: Path) -> Non
     never lands in the returned results."""
     runner = _FakeRunner()
     runner.present = {"distrobox", "podman"}
-    runner.paths = {tmp_path / "whipper"}
+    runner.paths = {tmp_path / "whipper", tmp_path / "flac"}
     runner.results[("distrobox", "list")] = (0, "ripping\n")
     runner.results[
         ("distrobox", "enter", "ripping", "--", "command", "-v", "whipper")
@@ -145,7 +146,7 @@ def test_checking_ping_precedes_slow_probe_even_when_done(tmp_path: Path) -> Non
 def test_fully_set_up_system_is_all_done(tmp_path: Path) -> None:
     runner = _FakeRunner()
     runner.present = {"distrobox", "podman"}
-    runner.paths = {tmp_path / "whipper"}
+    runner.paths = {tmp_path / "whipper", tmp_path / "flac"}
     runner.results[("distrobox", "list")] = (0, "ID | ripping | Created\n")
     runner.results[
         ("distrobox", "enter", "ripping", "--", "command", "-v", "whipper")
@@ -184,6 +185,10 @@ def test_only_export_runs_when_container_ready_but_not_exported(
     flat = [" ".join(c) for c in runner.calls]
     assert any("distrobox-export --bin /usr/bin/whipper" in c for c in flat)
     assert any("distrobox-export --bin /usr/bin/metaflac" in c for c in flat)
+    # Regression (2026-06-27): the tools step installs flac (titled "whipper +
+    # flac") but the export step used to omit it, so `flac --test` verification
+    # and the CTDB audio check couldn't find it on the host. It must export now.
+    assert any("distrobox-export --bin /usr/bin/flac" in c for c in flat)
 
 
 # --- Edge / failure: a step fails → pipeline stops -----------------------
@@ -267,6 +272,8 @@ def test_is_ready_reflects_exported_whipper(tmp_path: Path) -> None:
     setup = _setup(tmp_path, runner)
     assert setup.is_ready() is False
     runner.paths = {tmp_path / "whipper"}
+    assert setup.is_ready() is False  # whipper alone isn't enough — flac too
+    runner.paths = {tmp_path / "whipper", tmp_path / "flac"}
     assert setup.is_ready() is True
 
 
@@ -279,6 +286,7 @@ def _setup_cyanrip(tmp_path: Path, runner: _FakeRunner) -> HostSetup:
         os_release=_fedora(tmp_path),
         whipper_path=tmp_path / "whipper",
         cyanrip_path=tmp_path / "cyanrip",
+        flac_path=tmp_path / "flac",
         include_cyanrip=True,
     )
 
@@ -365,7 +373,7 @@ def test_cyanrip_already_installed_and_exported_is_all_done(tmp_path: Path) -> N
     runner.results[
         ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
     ] = (0, "/usr/bin/cyanrip")
-    runner.paths = {tmp_path / "whipper", tmp_path / "cyanrip"}
+    runner.paths = {tmp_path / "whipper", tmp_path / "cyanrip", tmp_path / "flac"}
 
     results = _setup_cyanrip(tmp_path, runner).run()
 
@@ -382,7 +390,8 @@ def test_export_reruns_when_cyanrip_not_yet_exported(tmp_path: Path) -> None:
     runner.results[
         ("distrobox", "enter", "ripping", "--", "command", "-v", "cyanrip")
     ] = (0, "/usr/bin/cyanrip")
-    runner.paths = {tmp_path / "whipper"}  # cyanrip missing on host
+    # whipper + flac exported, cyanrip missing → export reruns solely for cyanrip.
+    runner.paths = {tmp_path / "whipper", tmp_path / "flac"}
 
     results = _setup_cyanrip(tmp_path, runner).run()
 
@@ -395,7 +404,7 @@ def test_export_reruns_when_cyanrip_not_yet_exported(tmp_path: Path) -> None:
 
 def test_is_ready_requires_cyanrip_only_when_included(tmp_path: Path) -> None:
     runner = _FakeRunner()
-    runner.paths = {tmp_path / "whipper"}
+    runner.paths = {tmp_path / "whipper", tmp_path / "flac"}
     assert _setup(tmp_path, runner).is_ready() is True
     assert _setup_cyanrip(tmp_path, runner).is_ready() is False
     runner.paths.add(tmp_path / "cyanrip")

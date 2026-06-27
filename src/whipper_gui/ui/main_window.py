@@ -193,6 +193,11 @@ class MainWindow(
         # the window. Joined in closeEvent.
         self._disc_info_worker: object | None = None
         self._disc_info_thread: QThread | None = None
+        # Set when the user Force-stops a *scan* (a stuck TOC read wedged the
+        # drive). The kill makes the scan subprocess fail, so `_on_disc_info_failed`
+        # reads this to show a clean "drive freed" message instead of the raw
+        # error, and to avoid auto-freeing again.
+        self._scan_force_stopped: bool = False
         # Launch-time drive listing (whipper `drive list` enters the container);
         # run off-thread so it can't freeze the just-shown window. Joined in
         # closeEvent. (The Refresh button stays synchronous — user-initiated.)
@@ -429,6 +434,8 @@ class MainWindow(
         guide_action.triggered.connect(self._on_show_help)
         update_action = help_menu.addAction("Check for &updates…")
         update_action.triggered.connect(self._on_check_updates)
+        logs_action = help_menu.addAction("Open &logs folder…")
+        logs_action.triggered.connect(self._on_open_logs_folder)
         help_menu.addSeparator()
         about_action = help_menu.addAction("&About Whipper GUI…")
         about_action.triggered.connect(self._on_show_about)
@@ -486,6 +493,10 @@ class MainWindow(
             self._disc_info_thread.quit()
             self._disc_info_thread.wait(2000)
 
+        # A scan can wedge the drive (a stuck in-container TOC reader), so make
+        # Force-stop available for the duration and clear any prior stop flag.
+        self._scan_force_stopped = False
+        self._rip_controls.set_scan_active(True)
         self._disc_info_worker = DiscInfoWorker(self._backend, device)
         self._disc_info_thread = QThread(self)
         self._disc_info_worker.finished.connect(self._on_disc_info_ready)
@@ -503,6 +514,7 @@ class MainWindow(
             return
         self._disc_info_worker = None
         self._disc_info_thread = None
+        self._rip_controls.set_scan_active(False)
         self._disc_info_panel.set_disc_info(info)
         # Remember the disc's track count so we can show numbered blank
         # rows if MusicBrainz turns up nothing.
@@ -521,11 +533,30 @@ class MainWindow(
             self._handle_no_mb_match()
 
     def _on_disc_info_failed(self, device: str, message: str) -> None:
-        """Disc probe failed — show a friendly, actionable error."""
+        """Disc probe failed — show a friendly, actionable error.
+
+        Two special cases beyond the friendly message:
+          * the user just Force-stopped the scan — the kill is *why* it failed,
+            so show a clean "drive freed" message, not the raw kill error;
+          * a timeout — the in-container reader can still be holding the drive
+            (podman doesn't forward the host-side kill), so free it in the
+            background so the drive doesn't stay wedged.
+        """
         if self._is_stale_disc_result(device):
             return
         self._disc_info_worker = None
         self._disc_info_thread = None
+        self._rip_controls.set_scan_active(False)
+        if self._scan_force_stopped:
+            self._scan_force_stopped = False
+            self._disc_info_panel.set_disc_info_error(
+                "Stopped the scan and freed the drive. Click “Rescan disc” to try "
+                "again, or switch to the cyanrip backend in Settings."
+            )
+            return
+        if "timed out" in message:
+            # The reader may still be wedged inside the container — free it.
+            self._free_drive_for_scan("auto")
         self._disc_info_panel.set_disc_info_error(_friendly_disc_scan_error(message))
 
     def _is_stale_disc_result(self, device: str) -> bool:
@@ -611,6 +642,36 @@ class MainWindow(
         from whipper_gui.ui.help_dialogs import AboutDialog
 
         AboutDialog(whipper_path=self._config.whipper_path, parent=self).exec()
+
+    def _on_open_logs_folder(self) -> None:
+        """Help → Open logs folder: reveal the app's log directory.
+
+        Opens the folder (not the file) so the user can grab `log.txt` and any
+        rotated logs to share when reporting a problem — no terminal needed.
+        Hands off to the desktop's file manager via QDesktopServices (which is
+        non-blocking: it spawns the file manager and returns). Falls back to a
+        dialog showing the path if no file manager is wired up.
+        """
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from whipper_gui.paths import LOG_DIR
+
+        # The dir may not exist yet if nothing has been logged — create it so the
+        # file manager has something to open (cheap: one mkdir, GUI-thread safe).
+        try:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            log.warning("could not create log dir %s: %s", LOG_DIR, exc)
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(LOG_DIR)))
+        if not opened:
+            QMessageBox.information(
+                self,
+                "Logs folder",
+                f"Your logs are here:\n{LOG_DIR}\n\n"
+                "(Couldn't open a file manager automatically — copy the path "
+                "above into Files/Dolphin.)",
+            )
 
     def _on_open_settings(self) -> None:
         dialog = SettingsDialog(self._config, self)

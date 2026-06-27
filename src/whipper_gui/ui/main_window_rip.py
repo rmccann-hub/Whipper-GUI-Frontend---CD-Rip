@@ -249,9 +249,23 @@ class RipMixin:
         self._do_force_stop("auto")
 
     def _on_force_stop_button(self) -> None:
-        """User pressed Force stop — escalate immediately."""
+        """User pressed Force stop — escalate immediately.
+
+        Force-stop is enabled during a rip AND during a disc scan. With a rip
+        in flight it's the rip escalation (kill + eject). With only a scan in
+        flight (no rip), it's a stuck TOC read holding the drive — free it
+        WITHOUT ejecting, so the disc stays in for a Rescan.
+        """
         self._force_stop_timer.stop()
-        self._do_force_stop("manual")
+        rip_in_flight = self._rip_thread is not None
+        scan_in_flight = (
+            self._disc_info_thread is not None and self._disc_info_thread.isRunning()
+        )
+        if scan_in_flight and not rip_in_flight:
+            self._scan_force_stopped = True
+            self._free_drive_for_scan("manual")
+        else:
+            self._do_force_stop("manual")
 
     def _do_force_stop(self, trigger: str) -> None:
         """Eject + kill the in-container reader so the drive stops spinning.
@@ -273,6 +287,31 @@ class RipMixin:
         )
         thread = threading.Thread(
             target=drive_control.force_stop_drive,
+            kwargs={"device": device},
+            daemon=True,
+        )
+        self._force_stop_thread = thread
+        thread.start()
+
+    def _free_drive_for_scan(self, trigger: str) -> None:
+        """Free a drive wedged by a stuck disc scan: kill the reader, no eject.
+
+        Runs on a daemon thread because the kill + `distrobox enter` fallback
+        can each block for their timeout — we never touch widgets from the
+        thread. Unlike `_do_force_stop` it does NOT eject: the disc stays in so
+        the user can Rescan. Used by the Force-stop button during a scan and
+        automatically on a scan timeout (the in-container reader can keep
+        holding the drive after the host-side subprocess gives up). See
+        drive_control.free_drive for the user-approved Rule #3 exception.
+        """
+        device = self._drive_picker.current_device() or ""
+        log.info(
+            "freeing drive after scan (%s trigger), device=%s",
+            trigger,
+            device or "(default)",
+        )
+        thread = threading.Thread(
+            target=drive_control.free_drive,
             kwargs={"device": device},
             daemon=True,
         )

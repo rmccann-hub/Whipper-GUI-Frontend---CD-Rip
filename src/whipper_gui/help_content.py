@@ -56,6 +56,10 @@ named from the album artist/title you type.
   container, the drive can take a moment to spin down.
 - If the drive keeps spinning, **Force stop** ejects and kills the reader. After
   Cancel the GUI also auto-escalates to a force-stop after a few seconds.
+- **A disc *scan* can get stuck too** (a slow drive's table-of-contents read
+  holding the drive). **Force stop** is available during a scan as well — it
+  frees the drive without ejecting, so the disc stays in for a **Rescan disc**.
+  A scan that times out frees the drive on its own.
 
 ## Settings (Tools → Settings)
 
@@ -120,13 +124,15 @@ backed up first if it's touched). Do this once per drive.
 - **No drive found** → *Tools → Diagnose drive access*. If it's a permissions
   problem it will tell you the exact `usermod` command to run (then log out and
   back in).
-- **Drive keeps spinning after Cancel** → click **Force stop**.
+- **Drive keeps spinning after Cancel (or during a stuck scan)** → click
+  **Force stop**.
 - **Disc not identified** → check your network; you can still rip via *Rip as
   Unknown Album* and tag later.
-- **Something else** → the log at `~/.local/share/whipper-gui/log.txt` has the
-  details; please attach it when reporting an issue. For a *verbose* log, turn
-  on **Debug logging** in Settings, reproduce the problem, then attach that
-  file — it records every step (off by default to keep the log light).
+- **Something else** → the log has the details; please attach it when reporting
+  an issue. The quickest way to find it is **Help → Open logs folder…**, which
+  opens the folder containing `log.txt` in your file manager. For a *verbose*
+  log, turn on **Debug logging** in Settings, reproduce the problem, then attach
+  that file — it records every step (off by default to keep the log light).
 
 ## More
 

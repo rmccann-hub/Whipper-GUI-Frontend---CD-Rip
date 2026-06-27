@@ -214,3 +214,33 @@ def force_stop_drive(
     if ejected:
         return "Ejected the disc — the drive should stop."
     return "Tried to force-stop the drive (kill + eject)."
+
+
+def free_drive(
+    device: str = "",
+    container: str = DEFAULT_CONTAINER,
+    runner: Runner | None = None,
+) -> str:
+    """Free a drive wedged by a runaway reader, WITHOUT ejecting the disc.
+
+    Same kill sequence as :func:`force_stop_drive` (host pkill → fuser → the
+    in-container fallback) but it deliberately does NOT eject. Used when a
+    *disc scan* gets stuck: `whipper cd info` enters the container and runs
+    cdrdao to read the TOC, and on some drives cdrdao stalls and keeps the
+    device open — even after the host-side subprocess times out, because podman
+    doesn't forward the kill signal into the container. Killing the reader
+    releases the device; leaving the disc in place lets the user immediately
+    Rescan (or switch backends) without re-inserting it.
+
+    Synchronous and best-effort; run it off the GUI thread.
+    """
+    run = runner or _default_runner
+    killed = kill_reader_on_host(runner=run)
+    if free_device_holders(device, runner=run):
+        killed = True
+    if not killed:
+        killed = force_stop_in_container(container, runner=run)
+    log.info("free_drive: killed=%s", killed)
+    if killed:
+        return "Freed the drive — it should spin down. Click Rescan disc to try again."
+    return "Tried to free the drive (stopped the reader)."

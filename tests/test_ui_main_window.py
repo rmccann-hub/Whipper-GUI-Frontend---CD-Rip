@@ -1969,6 +1969,16 @@ def _join_force_stop(window) -> None:
         window._force_stop_thread.join(timeout=2)
 
 
+def _patch_free_drive(monkeypatch) -> list[dict]:
+    """Record `drive_control.free_drive` calls (the scan-stall recovery that
+    kills the reader without ejecting), like `_patch_force_stop` does for rips."""
+    from whipper_gui import drive_control
+
+    calls: list[dict] = []
+    monkeypatch.setattr(drive_control, "free_drive", lambda **kw: calls.append(kw))
+    return calls
+
+
 def test_help_menu_has_about_and_user_guide(teardown_threads) -> None:
     from PySide6.QtWidgets import QMenu
 
@@ -1979,6 +1989,102 @@ def test_help_menu_has_about_and_user_guide(teardown_threads) -> None:
     labels = [a.text() for a in help_menus[0].actions()]
     assert any("About" in lbl for lbl in labels)
     assert any("User Guide" in lbl for lbl in labels)
+
+
+def test_help_menu_has_open_logs_folder(teardown_threads) -> None:
+    from PySide6.QtWidgets import QMenu
+
+    window = teardown_threads()
+    help_menu = next(
+        m for m in window.menuBar().findChildren(QMenu) if m.title() == "&Help"
+    )
+    labels = [a.text() for a in help_menu.actions()]
+    assert any("logs folder" in lbl.lower() for lbl in labels)
+
+
+def test_open_logs_folder_opens_the_log_dir(teardown_threads, monkeypatch) -> None:
+    """Help → Open logs folder hands the LOG_DIR path to the file manager."""
+    from PySide6.QtGui import QDesktopServices
+
+    from whipper_gui.paths import LOG_DIR
+
+    opened: list[str] = []
+    monkeypatch.setattr(
+        QDesktopServices,
+        "openUrl",
+        lambda url: (opened.append(url.toLocalFile()), True)[1],
+    )
+    window = teardown_threads()
+    window._on_open_logs_folder()
+    assert opened == [str(LOG_DIR)]
+
+
+def test_force_stop_during_scan_frees_without_eject(
+    teardown_threads, monkeypatch
+) -> None:
+    """Force-stop while a scan is in flight (no rip) frees the drive via the
+    no-eject path, NOT the rip eject+kill path, and flags the stop so the
+    resulting scan failure shows a clean message."""
+    free_calls = _patch_free_drive(monkeypatch)
+    stop_calls = _patch_force_stop(monkeypatch)
+    window = teardown_threads()
+    window._rip_thread = None
+    # A fake "running" scan thread; quit/wait are no-ops for the fixture teardown.
+    window._disc_info_thread = SimpleNamespace(
+        isRunning=lambda: True, quit=lambda: None, wait=lambda ms=0: True
+    )
+    window._on_force_stop_button()
+    _join_force_stop(window)
+    assert len(free_calls) == 1
+    assert stop_calls == []
+    assert window._scan_force_stopped is True
+
+
+def test_force_stop_during_rip_uses_eject_path(teardown_threads, monkeypatch) -> None:
+    """With a rip in flight, Force-stop is the rip escalation (eject + kill),
+    not the scan free-drive path."""
+    free_calls = _patch_free_drive(monkeypatch)
+    stop_calls = _patch_force_stop(monkeypatch)
+    window = teardown_threads()
+    window._rip_thread = SimpleNamespace()  # a rip is in flight
+    window._on_force_stop_button()
+    _join_force_stop(window)
+    assert len(stop_calls) == 1
+    assert free_calls == []
+
+
+def test_scan_timeout_auto_frees_drive(teardown_threads, monkeypatch) -> None:
+    """A scan timeout auto-frees the drive (the in-container reader can stay
+    wedged after the host subprocess gives up)."""
+    free_calls = _patch_free_drive(monkeypatch)
+    window = teardown_threads()
+    device = window._drive_picker.current_device() or ""
+    window._on_disc_info_failed(device, "whipper timed out after 120s")
+    _join_force_stop(window)
+    assert len(free_calls) == 1
+
+
+def test_scan_non_timeout_failure_does_not_free(teardown_threads, monkeypatch) -> None:
+    """An ordinary (non-timeout) scan failure leaves the drive alone — nothing
+    is wedged, so freeing/ejecting would be gratuitous."""
+    free_calls = _patch_free_drive(monkeypatch)
+    window = teardown_threads()
+    device = window._drive_picker.current_device() or ""
+    window._on_disc_info_failed(device, "whipper failed: not in MusicBrainz")
+    assert free_calls == []
+
+
+def test_scan_force_stopped_shows_clean_message(teardown_threads, monkeypatch) -> None:
+    """After a manual scan Force-stop, the resulting failure is shown as a clean
+    'freed the drive' message, and it does NOT auto-free again."""
+    free_calls = _patch_free_drive(monkeypatch)
+    window = teardown_threads()
+    window._scan_force_stopped = True
+    device = window._drive_picker.current_device() or ""
+    window._on_disc_info_failed(device, "whipper timed out after 120s")
+    assert window._scan_force_stopped is False
+    assert free_calls == []  # the flag short-circuits before the auto-free
+    assert "freed" in window._disc_info_panel._mb_match_value.text().lower()
 
 
 def test_cancel_arms_force_stop_timer(teardown_threads) -> None:

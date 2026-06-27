@@ -11,6 +11,28 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-06-27
+
+### Fixed
+- **The setup now installs the `flac` decoder where the app can find it.** The
+  setup wizard installed `flac` in the container (the "whipper + flac" step) but
+  never exported it to `~/.local/bin`, so it showed as "optional, not installed"
+  and `flac --test` integrity verification (used for rips a backend doesn't
+  self-verify, i.e. cyanrip) and the CTDB audio cross-check couldn't run. The
+  export step now exports `flac`, and re-running **Tools → Set up Whipper GUI…**
+  repairs an existing install.
+
+### Added
+- **Force stop now works during a stuck disc *scan*, not just a rip.** A slow
+  drive's table-of-contents read can hold the drive open (the in-container
+  reader keeps spinning even after the scan times out, because the kill signal
+  doesn't cross into the container). Force stop is now enabled during a scan and
+  frees the drive **without ejecting**, so the disc stays in for a Rescan; a scan
+  that times out frees the drive automatically. No more dropping to a terminal
+  to recover a wedged drive.
+- **Help → Open logs folder…** opens the folder containing `log.txt` in your
+  file manager — one click to grab logs when reporting a problem, no terminal.
+
 ## [0.3.4] — 2026-06-27
 
 ### Fixed
@@ -799,6 +821,7 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.3.5]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.1...v0.3.2
