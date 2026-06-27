@@ -205,7 +205,20 @@ The GUI shells out constantly (whipper, flatpak, eject, pkill):
   falls back through common absolute locations; do the same for any tool a
   desktop-launched process must reach.
 - **Always set a `timeout`** (install commands cap at 300 s; force-stop probes
-  at 20 s) — a wedged child must not hang forever.
+  at 20 s) — a wedged child must not hang forever. **But budget container-
+  entering commands for the cold-start.** The *first* `whipper`/`cyanrip` call of
+  a session starts the Distrobox `ripping` container (podman cold-start), which
+  routinely takes tens of seconds on first use after a boot. A timeout calibrated
+  for a *warm* system turns that legitimately-slow first call into a false
+  failure — it shipped as "whipper timed out after 30s" on the first disc scan
+  and as a *missing*-whipper verdict at launch (real-user report, 2026-06-27).
+  The info/probe timeouts (`_INFO_TIMEOUT_S`, `_PROBE_TIMEOUT_S`) are deliberately
+  ≥60–120 s for this reason; they're a wedged-process backstop, **not** a latency
+  target (the warm case returns in a second or two regardless), and they run off
+  the GUI thread so the window stays responsive while they wait. A useful side
+  effect: a launch probe that waits for the container *warms* it, so the disc
+  scan that follows is fast. Pin the values with a regression test so a future
+  contributor doesn't "optimize" them back down.
 - **Capture output, then `log` it** — don't stream to a console the user can't
   see. Surface the *last* error line; keep the full output in the log file.
 - **Catch specific exceptions:** `FileNotFoundError`,

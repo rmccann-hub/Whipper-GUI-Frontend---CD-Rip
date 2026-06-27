@@ -23,10 +23,18 @@ from whipper_gui.deps.version import parse_version
 
 log = logging.getLogger(__name__)
 
-# Probes that shell out should never hang the GUI. 10s is generous —
-# `--version` typically returns in milliseconds; a value this large just
-# guards against a wedged binary.
-_PROBE_TIMEOUT_S: float = 10.0
+# Probes that shell out should never hang the GUI (they run off-thread, but a
+# tight cap also forces a wrong answer). `whipper --version` / `cyanrip --version`
+# return in milliseconds once warm — but the FIRST one of a session must start
+# the Distrobox `ripping` container (podman cold-start), which routinely takes
+# tens of seconds on first use after a boot. A 10s cap made a cold container
+# look like a MISSING whipper at launch, AND left it cold for the disc scan that
+# followed (real-user report, Bazzite + BDR-209D, 2026-06-27). Budget for the
+# cold start: now the launch probe actually waits for the container to come up,
+# which WARMS it as a side effect — so the disc scan that follows runs warm and
+# fast. Native-binary probes (metaflac, flac on the host) return in ms regardless,
+# so the larger ceiling only ever bites a container cold-start or a wedged binary.
+_PROBE_TIMEOUT_S: float = 60.0
 
 
 @dataclass(frozen=True)

@@ -11,6 +11,20 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-06-27
+
+### Fixed
+- **The first disc scan of a session no longer fails with "whipper timed out
+  after 30s."** The first `whipper` call has to start the Distrobox `ripping`
+  container (podman cold-start), which on first use after a boot routinely takes
+  longer than the old 30s scan / 10s launch-probe caps — both were calibrated
+  for a *warm* system. They now budget for a cold container (120s scan, 60s
+  launch probe), so the launch probe waits for the container to come up — which
+  **warms it** — and the disc scan that follows runs warm and fast. If a scan
+  still times out, it now shows a plain-language message pointing at **Rescan
+  disc** (a retry against the now-warm container almost always succeeds) instead
+  of the raw timeout line. (Real-user report, Bazzite + Pioneer BDR-209D.)
+
 ## [0.3.3] — 2026-06-27
 
 ### Fixed
@@ -785,6 +799,7 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.3.4]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.0...v0.3.1

@@ -2186,6 +2186,18 @@ def test_friendly_disc_scan_error_for_cdrdao_toc_flake() -> None:
     )
 
 
+def test_friendly_disc_scan_error_for_cold_container_timeout() -> None:
+    """A whipper info timeout (cold-container start on the first scan of a
+    session) becomes plain language pointing at the Rescan disc button rather
+    than the raw "timed out after 120s" line (real-user report, 2026-06-27)."""
+    from whipper_gui.ui.main_window import _friendly_disc_scan_error
+
+    friendly = _friendly_disc_scan_error("whipper timed out after 120s")
+    assert "Rescan disc" in friendly
+    assert "container" in friendly
+    assert "timed out" not in friendly  # raw wording replaced with plain language
+
+
 def test_integration_offer_relocates_then_integrates(
     teardown_threads, monkeypatch, tmp_path
 ) -> None:

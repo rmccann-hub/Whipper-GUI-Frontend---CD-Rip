@@ -29,10 +29,18 @@ from whipper_gui.paths import WHIPPER_CONFIG_PATH
 
 log = logging.getLogger(__name__)
 
-# Generous timeout for one-shot info commands. `whipper drive list` and
-# `whipper cd info` return within seconds on a healthy system; the cap
-# guards against a hung subprocess.
-_INFO_TIMEOUT_S: float = 30.0
+# Timeout for one-shot info commands (`whipper drive list`, `whipper cd info`).
+# On a WARM system these return in a second or two — but the very first whipper
+# call of a session pays the Distrobox container cold-start: `~/.local/bin/whipper`
+# enters the `ripping` container, and if podman has it stopped (e.g. first use
+# after a boot) it must start and enter it, which routinely runs 30-60s. A 30s
+# cap tripped that legitimately-slow first scan with "whipper timed out after
+# 30s" (real-user report, Bazzite + Pioneer BDR-209D, 2026-06-27). Budget for
+# the cold container: this is a backstop against a genuinely wedged subprocess,
+# NOT a latency target — the warm case (every scan after the first) returns as
+# soon as whipper does, far under this ceiling, and the probe runs off the GUI
+# thread so the window stays responsive while it waits.
+_INFO_TIMEOUT_S: float = 120.0
 
 # Drive-calibration commands take much longer: `drive analyze` spins the
 # disc, and `offset find` tries many candidate offsets against AccurateRip.

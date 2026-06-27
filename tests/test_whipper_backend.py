@@ -142,6 +142,19 @@ def test_list_drives_raises_on_timeout(
     assert "timed out" in str(info.value)
 
 
+def test_info_timeout_budgets_for_cold_container() -> None:
+    """The one-shot info timeout must tolerate a Distrobox container cold-start.
+
+    Regression guard (real-user report, Bazzite + BDR-209D, 2026-06-27): the
+    first `whipper cd info` of a session can spend tens of seconds just starting
+    the `ripping` container. The old 30s cap tripped that legitimately-slow
+    first scan. Don't quietly shrink it back below a cold-container budget — the
+    warm case returns in a second or two regardless, so a high ceiling costs
+    nothing but a wedged-process backstop.
+    """
+    assert whipper_backend._INFO_TIMEOUT_S >= 90.0
+
+
 # --- disc_info ------------------------------------------------------------
 
 

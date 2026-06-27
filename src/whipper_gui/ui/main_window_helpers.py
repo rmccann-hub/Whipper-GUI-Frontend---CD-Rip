@@ -51,6 +51,17 @@ def friendly_disc_scan_error(error_text: str) -> str:
             "usually means the disc wasn't ready yet (still spinning up). "
             "Click “Rescan disc” to try again."
         )
+    # Cold-container start (real-user report, 2026-06-27): the FIRST whipper
+    # call of a session has to start the Distrobox container, which can take
+    # longer than the timeout. The timeouts were raised to budget for it, but
+    # if one is still hit a retry runs against the now-warm container and
+    # almost always succeeds — so point at Rescan rather than the raw text.
+    if "timed out" in error_text:
+        return (
+            "Reading the disc took too long — the first scan after opening "
+            "the app has to start the ripping container, which can be slow. "
+            "Click “Rescan disc” to try again (it’s much faster the second time)."
+        )
     return error_text
 
 

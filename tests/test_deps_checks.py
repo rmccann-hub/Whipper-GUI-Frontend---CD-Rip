@@ -75,6 +75,20 @@ def test_check_whipper_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert probe.version is None
 
 
+def test_probe_timeout_budgets_for_cold_container() -> None:
+    """The launch probe timeout must tolerate a Distrobox container cold-start.
+
+    Regression guard (real-user report, Bazzite + BDR-209D, 2026-06-27): the
+    first `whipper --version` of a session starts the `ripping` container, which
+    can take tens of seconds. The old 10s cap made a cold container look like a
+    MISSING whipper at launch and left it cold for the disc scan. Keep this
+    high enough that the launch probe waits for the container to come up (which
+    also warms it for the scan that follows). Native-binary probes return in ms
+    regardless, so the larger ceiling only bites a cold-start or a wedged tool.
+    """
+    assert checks._PROBE_TIMEOUT_S >= 45.0
+
+
 # --- check_metaflac ---
 
 
