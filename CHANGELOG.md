@@ -11,6 +11,20 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.3.10] — 2026-06-27
+
+### Fixed
+- **A colon in an album/track title now ends up as a real `:` in the FLAC tags
+  (cyanrip backend).** cyanrip's command line can't carry a literal colon, so the
+  app feeds it a look-alike (`∶`) to keep the rip working and the folder name
+  clean; a post-rip step now rewrites the *tags* back to a real `:` (e.g. the
+  album tag reads "Every Breath You Take: The Classics", not "…∶ The Classics").
+  It only runs when a name actually contains a colon, and only the affected tags
+  are rewritten — everything cyanrip set (genre, MusicBrainz ID, ISRC, cover art)
+  is left untouched. The folder name keeps the `∶` (a real colon in a path is
+  best avoided across tools). To fix tags on an album you ripped before this
+  release, re-rip it, or run `metaflac` to set the album tag by hand.
+
 ## [0.3.9] — 2026-06-27
 
 ### Fixed
@@ -886,6 +900,7 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.3.10]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/rmccann-hub/Whipper-GUI-Frontend---CD-Rip/compare/v0.3.6...v0.3.7

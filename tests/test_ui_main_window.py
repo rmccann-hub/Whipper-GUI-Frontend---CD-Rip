@@ -2211,6 +2211,20 @@ def test_host_setup_finished_refreshes_drives_on_first_setup(
     assert refreshed == [True]  # no drive yet → first-time setup refreshes
 
 
+def test_metadata_has_colon_detects_album_colon(teardown_threads) -> None:
+    """The cyanrip colon-restore only fires when a name actually has a ':'."""
+    window = teardown_threads()
+    window._track_table._album_title_edit.setText("Every Breath You Take: The Classics")
+    assert window._metadata_has_colon() is True
+
+
+def test_metadata_has_colon_false_for_clean_names(teardown_threads) -> None:
+    window = teardown_threads()
+    window._track_table._album_title_edit.setText("Synchronicity")
+    window._track_table._album_artist_edit.setText("The Police")
+    assert window._metadata_has_colon() is False
+
+
 def test_repaint_belt_timer_idle_until_rip(teardown_threads) -> None:
     """The Wayland repaint belt is a ~2 Hz full-window redraw that runs ONLY
     during a rip (idle the rest of the time, so it costs nothing)."""

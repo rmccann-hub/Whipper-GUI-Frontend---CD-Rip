@@ -306,6 +306,45 @@ def _escape_meta_value(value: str) -> str:
     return "".join(out)
 
 
+def restore_substituted_colons(metaflac: object, flac_files: list[Path]) -> int:
+    """Put the real ``:`` back into FLAC tags that `_escape_meta_value` had to
+    write as the U+2236 lookalike for cyanrip's parser.
+
+    cyanrip can't accept a literal ``:`` in ``-a``/``-t`` (its
+    ``append_missing_keys`` splits on ``:`` before honoring escapes — see
+    `_escape_meta_value`), so we feed it ``∶`` and the *written tags* come out
+    with ``∶`` too. This reverses that in the tags afterward, so a player shows
+    "Album: Subtitle" with a real colon. The folder name keeps cyanrip's own
+    ``∶`` path-sanitization — a filesystem path is a separate concern.
+
+    Reads each file and rewrites ONLY the tags that actually contain the
+    substitute, so it's a no-op for the (common) colon-free album. Best-effort
+    and never raises — it matches the rest of the post-rip pipeline. ``metaflac``
+    is the :class:`~whipper_gui.adapters.metaflac.MetaflacAdapter` (duck-typed
+    here so the backend doesn't hard-depend on it). Returns how many files were
+    rewritten.
+    """
+    from whipper_gui.adapters.metaflac import MetaflacError
+
+    changed = 0
+    for path in flac_files:
+        try:
+            tags = metaflac.read_tags(path)
+            fixes = {
+                key: value.replace(_COLON_SUBSTITUTE, ":")
+                for key, value in tags.items()
+                if _COLON_SUBSTITUTE in value
+            }
+            if fixes:
+                metaflac.write_tags(path, fixes)
+                changed += 1
+        except MetaflacError:
+            log.warning("colon-restore: metaflac failed on %s", path)
+        except Exception:  # noqa: BLE001 — a post-rip step must never crash the GUI
+            log.exception("colon-restore: unexpected failure on %s", path)
+    return changed
+
+
 def _metadata_args(metadata: RipMetadata | None, release_id: str) -> list[str]:
     """Build the ``-a``/``-t`` arguments from the GUI's metadata.
 

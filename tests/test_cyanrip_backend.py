@@ -15,9 +15,43 @@ from whipper_gui.adapters.cyanrip_backend import (
     CyanripImpl,
     _escape_meta_value,
     _metadata_args,
+    restore_substituted_colons,
     scheme_from_template,
 )
 from whipper_gui.adapters.whipper_backend import RipMetadata, TrackTag, WhipperError
+
+
+class _FakeMetaflac:
+    """Records tag reads/writes for the colon-restore tests."""
+
+    def __init__(self, tags: dict[str, str]) -> None:
+        self._tags = tags
+        self.writes: list[dict[str, str]] = []
+
+    def read_tags(self, path: Path) -> dict[str, str]:
+        return dict(self._tags)
+
+    def write_tags(self, path: Path, tags: dict[str, str]) -> None:
+        self.writes.append(dict(tags))
+
+
+def test_restore_substituted_colons_reverses_the_lookalike() -> None:
+    """The ∶ (U+2236) fed to cyanrip is turned back into a real ':' in the tags
+    — and only the affected key is rewritten (others left alone)."""
+    mf = _FakeMetaflac(
+        {"album": "Every Breath You Take∶ The Classics", "artist": "The Police"}
+    )
+    changed = restore_substituted_colons(mf, [Path("/x/01.flac")])
+    assert changed == 1
+    assert mf.writes == [{"album": "Every Breath You Take: The Classics"}]
+
+
+def test_restore_substituted_colons_noop_without_lookalike() -> None:
+    """A colon-free album is left completely untouched — no writes at all."""
+    mf = _FakeMetaflac({"album": "Synchronicity", "artist": "The Police"})
+    changed = restore_substituted_colons(mf, [Path("/x/01.flac"), Path("/x/02.flac")])
+    assert changed == 0
+    assert mf.writes == []
 
 
 def _patch_run(monkeypatch, *, stdout: str = "", stderr: str = "", raises=None):

@@ -481,7 +481,22 @@ class RipMixin:
                 self._config.recompress_flac_after_rip
                 and not self._backend.produces_max_compression_flac()
             )
-            if tag or embed or save_file or recompress or transcode_fmt:
+            # cyanrip can't take a literal ':' in its tag args, so we fed it the
+            # ∶ lookalike; restore the real ':' in the written tags afterward
+            # (KDD-22 colon handling). Only on the cyanrip path, and only when
+            # the metadata actually contains a colon — so a colon-free album
+            # (the common case) doesn't spin up the post-rip thread for nothing.
+            restore_colons = (
+                self._config.ripper_backend == "cyanrip" and self._metadata_has_colon()
+            )
+            if (
+                tag
+                or embed
+                or save_file
+                or recompress
+                or transcode_fmt
+                or restore_colons
+            ):
                 rip_dir = Path(log_path).parent if log_path else params.output_dir
                 self._start_post_rip_processing(
                     rip_dir,
@@ -493,6 +508,7 @@ class RipMixin:
                     recompress=recompress,
                     transcode_fmt=transcode_fmt,
                     mp3_vbr_quality=self._config.mp3_vbr_quality,
+                    restore_colons=restore_colons,
                 )
                 post_rip_thread = self._post_rip_thread
             else:
@@ -602,6 +618,21 @@ class RipMixin:
         if launch_picard and flac_files:
             launch_picard_for(rip_output_dir)
 
+    def _metadata_has_colon(self) -> bool:
+        """True if the album or any track's name contains a ``:``.
+
+        Drives the cyanrip colon-restore (KDD-22): only worth a post-rip metaflac
+        pass when a colon was actually substituted. Reads the current track table
+        (the names the user saw/edited), so it's accurate for known discs.
+        """
+        album = self._track_table.album_metadata()
+        if ":" in (album.title or "") or ":" in (album.artist or ""):
+            return True
+        return any(
+            ":" in (track.title or "") or ":" in (track.artist_credit or "")
+            for track in self._track_table.tracks()
+        )
+
     # --- Post-rip processing: tagging + cover art (one off-GUI thread) -------
 
     def _start_post_rip_processing(
@@ -616,6 +647,7 @@ class RipMixin:
         recompress: bool = False,
         transcode_fmt: str = "",
         mp3_vbr_quality: int = 0,
+        restore_colons: bool = False,
     ) -> None:
         """Run unknown-mode tagging, then cover art, then FLAC re-compress, then
         an optional transcode, on ONE daemon thread.
@@ -655,7 +687,21 @@ class RipMixin:
         """
 
         def work() -> None:
-            # 1) Tagging first. run_unknown_post_processing is the synchronous
+            # 0) Restore the real ':' in cyanrip's tags (it was fed the ∶
+            #    lookalike because its parser can't take a literal colon). Runs
+            #    FIRST so cover-art and the transcode see the corrected tags.
+            #    Never raises; a no-op for colon-free albums.
+            if restore_colons:
+                from whipper_gui.adapters.cyanrip_backend import (
+                    restore_substituted_colons,
+                )
+
+                fixed = restore_substituted_colons(
+                    self._metaflac, sorted(rip_dir.rglob("*.flac"))
+                )
+                if fixed:
+                    log.info("colon-restore: fixed tags in %d file(s)", fixed)
+            # 1) Tagging next. run_unknown_post_processing is the synchronous
             #    worker body (tests call it directly); we just invoke it here,
             #    off the GUI thread, instead of inline in _on_rip_finished.
             if tag:
