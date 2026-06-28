@@ -87,6 +87,11 @@ named from the album artist/title you type.
 
 ## Settings (Tools → Settings)
 
+- **Goal** — pick what you want the rip to be and the format/verification/quality
+  options snap to good values for it: *Fast verified* (lossless, AccurateRip-
+  checked — the recommended default), *Archival exact* (also CTDB-verify and
+  smallest lossless files), or *Portable* (an MP3 copy for phones). You can still
+  tweak any individual option below — that switches the Goal to *Custom*.
 - **Output folder** and **file-name templates** (separate templates for known
   and unknown discs).
 - **Continue on CD-R** — needed to rip home-burned discs.

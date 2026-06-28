@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from platterpus import offset_config
+from platterpus import goal_presets, offset_config
 from platterpus.config import Config
 
 # Read offset range. AccurateRip's per-drive offsets are typically in
@@ -54,6 +54,24 @@ class SettingsDialog(QDialog):
 
         root = QVBoxLayout(self)
         form = QFormLayout()
+
+        # --- Goal preset (anchors the rest of the settings to intent) ---
+        # First row on purpose: pick a goal and the format/verification/quality
+        # controls below snap to sensible values for it (they stay editable —
+        # editing one flips this to "Custom"). See goal_presets.py.
+        # Guard so applying a preset (which sets the widgets) doesn't recursively
+        # flip the combo back to Custom.
+        self._applying_preset: bool = False
+        self._goal_combo: QComboBox = QComboBox(self)
+        for key, label in goal_presets.GOAL_LABELS:
+            self._goal_combo.addItem(label, key)
+        self._goal_combo.addItem("Custom (hand-tuned below)", goal_presets.GOAL_CUSTOM)
+        self._goal_combo.setToolTip(
+            "Pick what you want this rip to be and the format, verification, and "
+            "quality options below snap to good values for it. You can still "
+            "tweak any of them — that switches this to Custom."
+        )
+        form.addRow("Goal:", self._goal_combo)
 
         # --- Path rows (QLineEdit + Browse button) ---
         self._output_dir_edit, output_row = self._build_dir_row(config.output_dir)
@@ -443,6 +461,9 @@ class SettingsDialog(QDialog):
         )
         self._apply_backend_capabilities()
 
+        # --- Goal preset wiring (after all dependent widgets exist) ---
+        self._wire_goal_presets()
+
         # --- Check dependencies action ---
         # This sits between the form and the OK/Cancel row so it's
         # visually associated with the settings (which is where the
@@ -494,6 +515,7 @@ class SettingsDialog(QDialog):
             recompress_flac_after_rip=self._recompress_flac_check.isChecked(),
             ripper_backend=self._backend_combo.currentData(),
             output_format=self._format_combo.currentData(),
+            rip_goal=self._goal_combo.currentData(),
             # MP3 quality isn't exposed yet (fixed at the best-practice -V0);
             # preserve the stored value so saving Settings never resets it.
             mp3_vbr_quality=self._config.mp3_vbr_quality,
@@ -512,6 +534,61 @@ class SettingsDialog(QDialog):
     def _update_wav_warning(self) -> None:
         """Show the no-tags/art warning only when WAV is the selected format."""
         self._wav_warning_label.setVisible(self._format_combo.currentData() == "wav")
+
+    # --- Goal presets ------------------------------------------------------
+
+    # The controls a goal preset drives — editing any of them flips the goal to
+    # "Custom" (their changed-signals are wired to _on_dependent_changed).
+    def _goal_driven_widgets(self) -> list[QWidget]:
+        return [
+            self._format_combo,
+            self._ctdb_verify_check,
+            self._recompress_flac_check,
+            self._secure_rerip_spin,
+        ]
+
+    def _wire_goal_presets(self) -> None:
+        """Show the goal matching the incoming config, then keep combo and
+        controls in sync: picking a goal sets the controls; editing a control
+        flips the goal to Custom."""
+        detected = goal_presets.detect_goal(self._config)
+        index = self._goal_combo.findData(detected)
+        self._goal_combo.setCurrentIndex(index if index >= 0 else 0)
+        self._goal_combo.currentIndexChanged.connect(self._on_goal_changed)
+        # A control changing means the user hand-tuned away from the preset.
+        self._format_combo.currentIndexChanged.connect(self._on_dependent_changed)
+        self._ctdb_verify_check.toggled.connect(self._on_dependent_changed)
+        self._recompress_flac_check.toggled.connect(self._on_dependent_changed)
+        self._secure_rerip_spin.valueChanged.connect(self._on_dependent_changed)
+
+    def _on_goal_changed(self) -> None:
+        """Apply the selected preset to the dependent controls."""
+        goal = self._goal_combo.currentData()
+        if goal == goal_presets.GOAL_CUSTOM:
+            return  # Custom doesn't impose values
+        preset = goal_presets.PRESETS.get(goal)
+        if preset is None:
+            return
+        # Guard so the setValue/setChecked calls below don't re-enter
+        # _on_dependent_changed and bounce the combo to Custom.
+        self._applying_preset = True
+        try:
+            fmt_index = self._format_combo.findData(preset.output_format)
+            if fmt_index >= 0:
+                self._format_combo.setCurrentIndex(fmt_index)
+            self._ctdb_verify_check.setChecked(preset.ctdb_verify_after_rip)
+            self._recompress_flac_check.setChecked(preset.recompress_flac_after_rip)
+            self._secure_rerip_spin.setValue(preset.secure_rerip_matches)
+        finally:
+            self._applying_preset = False
+
+    def _on_dependent_changed(self) -> None:
+        """A goal-driven control was edited by the user → switch to Custom."""
+        if self._applying_preset:
+            return  # we're the ones setting it, not the user
+        custom_index = self._goal_combo.findData(goal_presets.GOAL_CUSTOM)
+        if custom_index >= 0 and self._goal_combo.currentIndex() != custom_index:
+            self._goal_combo.setCurrentIndex(custom_index)
 
     def _apply_backend_capabilities(self) -> None:
         """Enable/disable per-backend options to match the selected backend.

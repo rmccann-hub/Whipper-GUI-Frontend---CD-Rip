@@ -12,6 +12,13 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 ## [Unreleased]
 
 ### Added
+- **Settings → Goal presets.** A single "Goal" choice at the top of Settings
+  anchors the rest to your intent: *Fast verified* (lossless, AccurateRip-checked
+  — the recommended default), *Archival exact* (also CTDB-verify + smallest
+  lossless files), or *Portable* (an MP3 copy). Picking one snaps the
+  format/verification/quality controls to good values; editing any of them
+  switches the Goal to *Custom*. The default matches the previous behaviour, so
+  nothing changes unless you choose a different goal.
 - **Accessibility pass on the rip screen.** Screen readers now announce every
   status surface by name (the two progress bars, rip status, log output, the
   verification verdict banner, the per-track AccurateRip table, the CTDB result,

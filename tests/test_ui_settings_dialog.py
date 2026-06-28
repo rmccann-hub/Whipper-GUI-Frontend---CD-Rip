@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication, QDialogButtonBox
 
 from platterpus.config import SCHEMA_VERSION, Config
+from platterpus.goal_presets import GOAL_ARCHIVAL, GOAL_CUSTOM, GOAL_FAST
 from platterpus.ui.settings_dialog import SettingsDialog
 
 # --- Construction --------------------------------------------------------
@@ -192,6 +193,41 @@ def test_secure_rerip_greyed_for_whipper_editable_for_cyanrip(
     # …and editable on cyanrip.
     dialog2 = SettingsDialog(Config(ripper_backend="cyanrip"))
     assert dialog2._secure_rerip_spin.isEnabled() is True
+
+
+def test_goal_combo_reflects_the_incoming_config(qapp: QApplication) -> None:
+    # Default config == Fast-verified preset.
+    assert SettingsDialog(Config())._goal_combo.currentData() == GOAL_FAST
+    # An archival-shaped config shows Archival.
+    archival = Config(
+        output_format="flac",
+        ctdb_verify_after_rip=True,
+        recompress_flac_after_rip=True,
+    )
+    assert SettingsDialog(archival)._goal_combo.currentData() == GOAL_ARCHIVAL
+
+
+def test_selecting_goal_applies_the_preset_to_controls(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())  # starts Fast-verified (ctdb off)
+    idx = dialog._goal_combo.findData(GOAL_ARCHIVAL)
+    dialog._goal_combo.setCurrentIndex(idx)
+    # The dependent controls snapped to the archival bundle…
+    assert dialog._ctdb_verify_check.isChecked() is True
+    assert dialog._recompress_flac_check.isChecked() is True
+    assert dialog._format_combo.currentData() == "flac"
+    # …and to_config carries the goal + the applied fields.
+    out = dialog.to_config()
+    assert out.rip_goal == GOAL_ARCHIVAL
+    assert out.ctdb_verify_after_rip is True
+
+
+def test_editing_a_control_flips_goal_to_custom(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())
+    assert dialog._goal_combo.currentData() == GOAL_FAST
+    # User hand-toggles CTDB on → no preset matches → Custom.
+    dialog._ctdb_verify_check.setChecked(True)
+    assert dialog._goal_combo.currentData() == GOAL_CUSTOM
+    assert dialog.to_config().rip_goal == GOAL_CUSTOM
 
 
 def test_to_config_preserves_schema_version(qapp: QApplication) -> None:

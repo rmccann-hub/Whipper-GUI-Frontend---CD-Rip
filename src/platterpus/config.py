@@ -232,6 +232,13 @@ class Config:
     # unaffected (docs/mp3-wav-support.md §3). Ignored unless MP3 is selected.
     mp3_vbr_quality: int = 0
 
+    # --- Goal preset (Settings → Goal) ---
+    # Which goal preset the rip settings correspond to: "fast_verified"
+    # (default; == the shipping field defaults), "archival", "portable", or
+    # "custom" (hand-tuned). It's a convenience anchor — the rip reads the
+    # individual fields, not this. See goal_presets.py.
+    rip_goal: str = "fast_verified"
+
     # --- Schema bookkeeping ---
     schema_version: int = SCHEMA_VERSION
 
