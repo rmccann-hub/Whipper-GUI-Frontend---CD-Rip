@@ -308,6 +308,14 @@ count, starts sharing the file.)
 5. Gate any backend-specific Settings widgets in `settings_dialog.py`
    (`_apply_backend_capabilities`) — grey out, explain, never lose values.
 
+A **backend-specific rip parameter** (one backend has a flag another lacks)
+threads through one fixed path: `Config` field → `RipParameters` (frozen) →
+the `WhipperBackend.rip()` ABC signature → each adapter's argv builder. A
+backend with no equivalent **accepts and ignores** it (`del param`), and its
+Settings widget is greyed out for that backend. `secure_rerip_matches` (cyanrip
+`-Z N` "re-rip until N reads match", for marginal discs; whipper has no
+equivalent) is the worked example — copy its shape for the next one.
+
 ### Add an output format
 WavPack, MP3, and WAV already ship (KDD-22); FLAC is the always-produced lossless
 **master** and other formats are *derived* from it by a post-rip transcode
@@ -328,6 +336,27 @@ Register it in `deps/registry.py` with its probe and install tiers. Mark it
 New module in `parsers/`, named-group regex, return a dataclass, never raise,
 add a property test. If it feeds a verdict, extend `fidelity_summary` in
 `main_window_helpers.py`.
+
+### Verification & parity (the "prove it" surfaces)
+"Is this track AccurateRip-verified?" has **one** definition for the whole app:
+`parsers/rip_log.accuraterip_is_match` / `track_accuraterip_verified`
+(**confidence ≥ 1** — a real match always has it; "not present" has `None`/`0`).
+It can only ever under-claim, never fabricate a match. Every trust surface routes
+through it — the colour-coded **verdict banner** above the results table
+(`ui/rip_progress.accuraterip_verdict`), the disc-info panel, the status-line
+`fidelity_summary`, and the EAC-style log renderer — so they can never disagree
+(a past bug had the disc panel string-match "exact match", which silently
+under-counted cyanrip rips). Don't re-derive "verified" anywhere else; call the
+shared helper.
+
+**Parity vs EAC** is measured, not claimed: `whipper_gui.parity` /
+`scripts/eac_parity.py` compare a rip log's per-track Copy CRC against the
+committed EAC baseline in `output_reference/` (format auto-detected, EAC's UTF-16
+handled). `tests/test_parity.py` pins the committed cyanrip-vs-EAC result (12/14;
+T3+T5 differ) as a no-hardware regression guard. `scripts/render_eac_log.py`
+renders our rip into an EAC *layout* (clearly attributed, **never signed** — an
+EAC-signed log would be provenance forgery) so the two can be eyeballed
+side-by-side.
 
 ### Add a metadata or art source
 New adapter behind a small interface (mirror `MusicBrainzClient` /

@@ -495,11 +495,25 @@ failure whipper's >587-offset cd-paranoia bug causes on the BDR-209D.
          the rip still finishes and reports success.
 5. **Parity:** compare its per-track **EAC CRC32** to the baseline table in
    **Part B** (and to a whipper rip of the same disc where both succeeded).
-6. Record cyanrip's `.log` filename + a copy of its contents — it feeds the
+   The committed baseline state is 12/14 (T3 + T5 differ) — pinned by
+   `tests/test_parity.py`; use `scripts/eac_parity.py <eac.log> <cyanrip.log>`.
+6. **`-Z N` marginal-disc convergence (the new EAC-parity lever).** If a track
+   is a near-miss (e.g. T3 against the AccurateRip consensus), set Settings →
+   **Re-rip until reads match → 2**, re-rip, and re-run `scripts/eac_parity.py`.
+   - [ ] The `-Z 2` rip's argv includes `-Z 2` (visible in the log/`--debug`).
+   - [ ] T3 converges to the consensus CRC (matches Part B) — **the thing to
+         prove**. (T5 is a physical disc defect; EAC fails it too — not expected
+         to converge.)
+   - [ ] Confirm the verdict banner turns green (or "13/14") accordingly.
+7. Record cyanrip's `.log` filename + a copy of its contents — it feeds the
    fidelity-verdict parser.
+8. **Verification UX:** confirm the **verdict banner** (green/amber/grey) and the
+   disc-panel "AccurateRip" line **agree** on the verified count (one shared
+   `confidence ≥ 1` rule), and that the status line matches.
 
-**Record:** cyanrip version `____`; track 3 verified? `____`; CRCs match the
-Part B baseline? `____`; whipper? `____`; log file name `____`.
+**Record:** cyanrip version `____`; track 3 verified? `____`; `-Z 2` converged
+T3? `____`; CRCs match the Part B baseline? `____`; whipper? `____`; banner =
+panel count? `____`; log file name `____`.
 
 ## Test 9 — [ ] In-app uninstaller: deep no-terminal run
 
