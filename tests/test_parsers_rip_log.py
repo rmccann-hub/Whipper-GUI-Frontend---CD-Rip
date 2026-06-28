@@ -17,7 +17,9 @@ from whipper_gui.parsers.rip_log import (
     AccurateRipResult,
     RippingInfo,
     TrackResult,
+    accuraterip_is_match,
     parse_rip_log,
+    track_accuraterip_verified,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -203,3 +205,39 @@ def test_accuraterip_result_is_frozen() -> None:
     ar = AccurateRipResult(version=1)
     with pytest.raises(FrozenInstanceError):
         ar.confidence = 5  # type: ignore[misc]
+
+
+# --- The shared "is verified?" rule (one source of truth for every surface) --
+
+
+def test_accuraterip_is_match_requires_confidence_at_least_one() -> None:
+    # A real match (confidence >= 1) — whichever wording the backend used.
+    assert accuraterip_is_match(
+        AccurateRipResult(version=1, result="Found, exact match", confidence=12)
+    )
+    assert accuraterip_is_match(
+        AccurateRipResult(
+            version=2, result="accurately ripped, confidence 3", confidence=3
+        )
+    )
+    # Not a match: None, 0, or absent — these can never read as verified.
+    assert not accuraterip_is_match(None)
+    assert not accuraterip_is_match(AccurateRipResult(version=1, confidence=None))
+    assert not accuraterip_is_match(
+        AccurateRipResult(version=1, result="Found, exact match", confidence=0)
+    )
+
+
+def test_track_accuraterip_verified_uses_either_version() -> None:
+    # Verified if EITHER v1 or v2 is a match…
+    v2_only = TrackResult(
+        number=1, accuraterip_v2=AccurateRipResult(version=2, confidence=5)
+    )
+    assert track_accuraterip_verified(v2_only)
+    # …and not verified when neither is.
+    neither = TrackResult(
+        number=2,
+        copy_crc="ABCD1234",
+        accuraterip_v1=AccurateRipResult(version=1, confidence=0),
+    )
+    assert not track_accuraterip_verified(neither)

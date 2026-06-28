@@ -35,7 +35,10 @@ from PySide6.QtWidgets import (
 )
 
 from whipper_gui.ctdb.verify import CtdbVerifyResult, Verdict
-from whipper_gui.parsers.rip_log import RipLog
+from whipper_gui.parsers.rip_log import (
+    RipLog,
+    track_accuraterip_verified,
+)
 
 log = logging.getLogger(__name__)
 
@@ -288,21 +291,6 @@ def ctdb_verdict_level(result: CtdbVerifyResult) -> str:
     return "neutral"
 
 
-def _is_ar_match(ar: object) -> bool:
-    """True when an AccurateRipResult is a positive database match.
-
-    AccurateRip's *confidence* is how many submitted rips share this track's
-    CRC — a genuine match is always ≥ 1. A "not present"/"no match" track has
-    confidence ``None`` (or, in some logs, 0), so ``confidence >= 1`` is the
-    format-agnostic "this track is verified" signal that can only ever
-    under-claim, never fabricate a match (the honesty rule for the banner).
-    """
-    if ar is None:
-        return False
-    confidence = getattr(ar, "confidence", None)
-    return confidence is not None and confidence >= 1
-
-
 def accuraterip_verdict(rip_log: object) -> tuple[str, str]:
     """At-a-glance AccurateRip verdict: ``(message, level)``.
 
@@ -322,20 +310,13 @@ def accuraterip_verdict(rip_log: object) -> tuple[str, str]:
         t
         for t in tracks
         if getattr(t, "copy_crc", "")
-        or _is_ar_match(getattr(t, "accuraterip_v1", None))
-        or _is_ar_match(getattr(t, "accuraterip_v2", None))
         or getattr(t, "accuraterip_v1", None) is not None
         or getattr(t, "accuraterip_v2", None) is not None
     ]
     total = len(audio)
     if total == 0:
         return "", "neutral"
-    verified = sum(
-        1
-        for t in audio
-        if _is_ar_match(getattr(t, "accuraterip_v1", None))
-        or _is_ar_match(getattr(t, "accuraterip_v2", None))
-    )
+    verified = sum(1 for t in audio if track_accuraterip_verified(t))
     if verified == total:
         confidences = [
             conf

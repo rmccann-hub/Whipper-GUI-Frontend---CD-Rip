@@ -11,6 +11,17 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Fixed
+- **The "AccurateRip" line in the disc panel now agrees with the results-pane
+  verdict — and correctly counts cyanrip verifications.** It previously decided a
+  track was verified by looking for the words "exact match" in the log, with no
+  confidence check. That meant (a) it could disagree with the new verdict banner
+  on the same screen, and (b) — because cyanrip writes "accurately ripped,
+  confidence N" with no "exact match" wording — it showed "not in database" for a
+  disc cyanrip had *fully verified*. Both surfaces now use one shared rule
+  (AccurateRip confidence ≥ 1), so the panel and the banner can never contradict
+  each other and a cyanrip rip's verification is reported honestly.
+
 ### Added
 - **At-a-glance verification verdict banner above the results table.** A single
   bold, colour-coded headline now summarises whether the rip is trustworthy

@@ -27,26 +27,10 @@ from PySide6.QtWidgets import QFormLayout, QLabel, QWidget
 
 from whipper_gui.adapters.musicbrainz_client import ReleaseSummary
 from whipper_gui.parsers.cd_info import DiscInfo
+from whipper_gui.parsers.rip_log import track_accuraterip_verified
 
 # Placeholder shown in fields we don't have data for yet.
 _PLACEHOLDER: str = "—"
-
-
-def _ar_track_matched(track: object) -> bool:
-    """True if either AccurateRip check confirmed this track (exact match).
-
-    whipper writes "Found, exact match" for a confirmed track and
-    "Track not present in AccurateRip database" otherwise; we treat only an
-    exact match as a verification. Duck-typed (no dataclass import) to match
-    the rest of this pure-view widget.
-    """
-    for result in (
-        getattr(track, "accuraterip_v1", None),
-        getattr(track, "accuraterip_v2", None),
-    ):
-        if "exact match" in (getattr(result, "result", "") or "").lower():
-            return True
-    return False
 
 
 class DiscInfoPanel(QWidget):
@@ -102,13 +86,19 @@ class DiscInfoPanel(QWidget):
         the database. For a CD-R — or any disc nobody has submitted — every
         track comes back "not present", which is NOT a verification. We report
         what actually happened instead of a blanket "verified".
+
+        "Verified" uses the one shared rule (``track_accuraterip_verified``,
+        confidence ≥ 1) that the results-pane verdict banner uses, so the two
+        surfaces never disagree about how many tracks matched — a string check
+        here would silently miss every cyanrip match ("accurately ripped,
+        confidence N" has no "exact match" substring).
         """
         tracks = getattr(rip_log, "tracks", ()) or ()
         total = len(tracks)
         if total == 0:
             self._accuraterip_value.setText(_PLACEHOLDER)
             return
-        matched = sum(1 for track in tracks if _ar_track_matched(track))
+        matched = sum(1 for track in tracks if track_accuraterip_verified(track))
         if matched == 0:
             self._accuraterip_value.setText("not in database")
         elif matched == total:

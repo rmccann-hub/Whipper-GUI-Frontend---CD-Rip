@@ -11,14 +11,19 @@ from whipper_gui.ui.disc_info_panel import DiscInfoPanel
 
 
 def _track(number: int, *, matched: bool) -> TrackResult:
-    """A TrackResult whose AccurateRip v1 either matched or wasn't in the DB."""
-    result = (
-        "Found, exact match" if matched else "Track not present in AccurateRip database"
-    )
-    return TrackResult(
-        number=number,
-        accuraterip_v1=AccurateRipResult(version=1, result=result),
-    )
+    """A TrackResult whose AccurateRip v1 either matched or wasn't in the DB.
+
+    A real match always carries a confidence ≥ 1 (how many submitted rips
+    share the CRC); a "not present" track has no confidence — mirror that so
+    the fixture exercises the real confidence-based verification rule.
+    """
+    if matched:
+        ar = AccurateRipResult(version=1, result="Found, exact match", confidence=12)
+    else:
+        ar = AccurateRipResult(
+            version=1, result="Track not present in AccurateRip database"
+        )
+    return TrackResult(number=number, accuraterip_v1=ar)
 
 
 def _release(
@@ -218,6 +223,50 @@ def test_accuraterip_no_tracks_stays_placeholder(qapp: QApplication) -> None:
     panel = DiscInfoPanel()
     panel.set_accuraterip_result(RipLog(tracks=()))
     assert panel._accuraterip_value.text() == "—"
+
+
+def test_accuraterip_confidence_zero_exact_match_is_not_verified(
+    qapp: QApplication,
+) -> None:
+    """Regression: a confidence-0 'exact match' must NOT read as verified.
+
+    The old string-only check ("exact match" in result) counted this as a
+    match while the results-pane banner did not — two surfaces disagreeing on
+    the same screen. Both now share the confidence ≥ 1 rule.
+    """
+    panel = DiscInfoPanel()
+    rip_log = RipLog(
+        tracks=(
+            TrackResult(
+                number=1,
+                copy_crc="ABCD1234",
+                accuraterip_v1=AccurateRipResult(
+                    version=1, result="Found, exact match", confidence=0
+                ),
+            ),
+        )
+    )
+    panel.set_accuraterip_result(rip_log)
+    assert panel._accuraterip_value.text() == "not in database"
+
+
+def test_accuraterip_counts_cyanrip_style_match(qapp: QApplication) -> None:
+    """Regression: cyanrip writes 'accurately ripped, confidence N' — no
+    'exact match' substring — so the old string check missed EVERY cyanrip
+    verification. The confidence-based rule counts it correctly."""
+    panel = DiscInfoPanel()
+    rip_log = RipLog(
+        tracks=(
+            TrackResult(
+                number=1,
+                accuraterip_v1=AccurateRipResult(
+                    version=1, result="accurately ripped, confidence 3", confidence=3
+                ),
+            ),
+        )
+    )
+    panel.set_accuraterip_result(rip_log)
+    assert "verified" in panel._accuraterip_value.text()
 
 
 def test_set_drive_clears_accuraterip_result(qapp: QApplication) -> None:

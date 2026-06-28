@@ -133,6 +133,41 @@ class RipLog:
     sha256_hash: str = ""
 
 
+# --- AccurateRip "is this track verified?" — the ONE shared definition -------
+#
+# Every UI surface that reports trust (the verdict banner, the disc-info panel,
+# the status-line fidelity summary) MUST agree on what "verified" means, or two
+# panes on the same screen can contradict each other — which destroys the
+# "prove it" promise. These two pure, Qt-free helpers are that single source of
+# truth; they live here because this module owns the AR dataclasses.
+
+
+def accuraterip_is_match(ar: object) -> bool:
+    """True when one AccurateRip result is a positive database match.
+
+    AccurateRip *confidence* is how many submitted rips share this track's CRC,
+    so a genuine match is always ``>= 1``; a "not present"/"no match" track has
+    confidence ``None`` (or, in some logs, ``0``). Keying on ``confidence >= 1``
+    is therefore **format-agnostic and honest**: it counts whipper's
+    "Found, exact match" and cyanrip's "accurately ripped, confidence N" the
+    same way (cyanrip's text has no "exact match" substring — a string check
+    would silently miss every cyanrip verification), and it can only ever
+    under-claim, never fabricate a match. Reads via ``getattr`` so it accepts
+    any AR-result shape and never raises.
+    """
+    if ar is None:
+        return False
+    confidence = getattr(ar, "confidence", None)
+    return confidence is not None and confidence >= 1
+
+
+def track_accuraterip_verified(track: object) -> bool:
+    """True when either of a track's AccurateRip checks is a positive match."""
+    return accuraterip_is_match(
+        getattr(track, "accuraterip_v1", None)
+    ) or accuraterip_is_match(getattr(track, "accuraterip_v2", None))
+
+
 # --- Line-level regexes -----------------------------------------------------
 
 # Top-level section line, e.g. "Tracks:" or "Conclusive status report:".
