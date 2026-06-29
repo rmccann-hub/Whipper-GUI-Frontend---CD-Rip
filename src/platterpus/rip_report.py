@@ -107,6 +107,14 @@ def _ar(ar: object) -> dict | None:
     }
 
 
+def _hex_crc(value: object) -> str | None:
+    """Render a CTDB integer CRC as 8-digit uppercase hex (matches the
+    AccurateRip CRC style elsewhere in the report); None passes through."""
+    if isinstance(value, int):
+        return f"{value:08X}"
+    return None
+
+
 def _ctdb(result: object | None) -> dict | None:
     if result is None:
         return None
@@ -116,12 +124,25 @@ def _ctdb(result: object | None) -> dict | None:
         "confidence": getattr(result, "confidence", None),
         "trustworthy": getattr(result, "trustworthy", None),
         "crc_validated": getattr(result, "crc_validated", None),
+        # Include the CRCs + message so a consumer can audit a match, not just
+        # see the verdict (hex to match the per-track AccurateRip CRC style).
+        "our_crc": _hex_crc(getattr(result, "our_crc", None)),
+        "matched_crc": _hex_crc(getattr(result, "matched_crc", None)),
+        "message": getattr(result, "message", "") or None,
     }
 
 
 def report_to_json(report: dict) -> str:
-    """Serialize a report dict to pretty UTF-8 JSON (trailing newline)."""
-    return json.dumps(report, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+    """Serialize a report dict to pretty UTF-8 JSON (trailing newline).
+
+    ``default=str`` is a belt for the never-raises contract: any stray
+    non-JSON-native value (a Path/enum a future field might carry) degrades to
+    its string form instead of raising ``TypeError`` mid-rip.
+    """
+    return (
+        json.dumps(report, indent=2, ensure_ascii=False, sort_keys=False, default=str)
+        + "\n"
+    )
 
 
 def report_path_for(log_file: Path) -> Path:
@@ -147,8 +168,12 @@ def write_report(
         report = build_report(
             rip_log, ctdb_result=ctdb_result, generated_at=generated_at
         )
+        # Catch serialization errors (TypeError/ValueError from json.dumps on an
+        # exotic future value) as well as write errors (OSError) — the report is
+        # best-effort and must never break the post-rip flow. report_to_json
+        # also uses default=str as a second line of defence.
         target.write_text(report_to_json(report), encoding="utf-8")
         return target
-    except OSError:
+    except (OSError, TypeError, ValueError):
         log.warning("could not write rip report to %s", target, exc_info=True)
         return None

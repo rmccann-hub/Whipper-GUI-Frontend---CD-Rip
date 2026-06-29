@@ -96,6 +96,30 @@ def test_every_verdict_level_has_a_non_color_symbol() -> None:
     assert neutral.startswith("ⓘ")
 
 
+def test_verdict_confidence_floor_ignores_non_matching_zero() -> None:
+    # Each track is verified via v2 (conf >= 1) while v1 is "present, no match"
+    # at confidence 0. The "(confidence X+)" floor must reflect only the real
+    # matches (min of 200, 50 = 50), never the misleading 0.
+    log = RipLog(
+        tracks=(
+            TrackResult(
+                1,
+                accuraterip_v1=AccurateRipResult(1, confidence=0),
+                accuraterip_v2=AccurateRipResult(2, confidence=200),
+            ),
+            TrackResult(
+                2,
+                accuraterip_v1=AccurateRipResult(1, confidence=0),
+                accuraterip_v2=AccurateRipResult(2, confidence=50),
+            ),
+        )
+    )
+    message, level = accuraterip_verdict(log)
+    assert level == "ok"
+    assert "confidence 50+" in message
+    assert "confidence 0+" not in message
+
+
 # --- Log streaming -------------------------------------------------------
 
 

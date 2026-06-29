@@ -23,7 +23,10 @@ from platterpus.rip_report import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CYANRIP_REFERENCE = (
-    _REPO_ROOT / "output_reference" / "cyanrip_flac" / "cyanrip_flac_police_classics.log"
+    _REPO_ROOT
+    / "output_reference"
+    / "cyanrip_flac"
+    / "cyanrip_flac_police_classics.log"
 )
 
 
@@ -44,7 +47,9 @@ def _sample_log() -> RipLog:
                 copy_crc="B0D122E7",
                 status="ripped successfully",
                 accuraterip_v2=AccurateRipResult(
-                    version=2, result="accurately ripped", confidence=200,
+                    version=2,
+                    result="accurately ripped",
+                    confidence=200,
                     local_crc="22B9924D",
                 ),
             ),
@@ -79,14 +84,39 @@ def test_per_track_fields_use_shared_verified_rule() -> None:
 
 
 def test_ctdb_section_serialized_when_present() -> None:
-    result = CtdbVerifyResult(Verdict.MATCH, confidence=8, crc_validated=False)
+    result = CtdbVerifyResult(
+        Verdict.MATCH,
+        confidence=8,
+        our_crc=0x22B9924D,
+        matched_crc=0x22B9924D,
+        message="verified against CTDB (confidence 8)",
+        crc_validated=False,
+    )
     report = build_report(_sample_log(), ctdb_result=result)
     assert report["ctdb"]["verdict"] == "match"
     assert report["ctdb"]["confidence"] == 8
     # An unvalidated match is honestly NOT trustworthy yet (KDD-16).
     assert report["ctdb"]["trustworthy"] is False
+    # CRCs are auditable (hex, matching the per-track AccurateRip CRC style).
+    assert report["ctdb"]["our_crc"] == "22B9924D"
+    assert report["ctdb"]["matched_crc"] == "22B9924D"
+    assert "confidence 8" in report["ctdb"]["message"]
     # Absent CTDB → null section.
     assert build_report(_sample_log())["ctdb"] is None
+
+
+def test_rewrite_adds_ctdb_section_to_same_file(tmp_path: Path) -> None:
+    # Mirrors the GUI: write the report at rip-finish (no CTDB), then re-write
+    # the SAME file once the async CTDB verify lands. The final file carries it.
+    log_file = tmp_path / "Album.log"
+    log_file.write_text("(human log)")
+    out = write_report(_sample_log(), log_file)
+    assert json.loads(out.read_text())["ctdb"] is None
+
+    result = CtdbVerifyResult(Verdict.MATCH, confidence=8)
+    again = write_report(_sample_log(), log_file, ctdb_result=result)
+    assert again == out  # same path, overwritten
+    assert json.loads(out.read_text())["ctdb"]["verdict"] == "match"
 
 
 def test_report_is_valid_json_roundtrip() -> None:
@@ -98,7 +128,9 @@ def test_report_is_valid_json_roundtrip() -> None:
 
 def test_build_never_raises_on_empty_or_garbage() -> None:
     assert build_report(RipLog())["schema_version"] == REPORT_SCHEMA_VERSION
-    assert build_report(object())["schema_version"] == REPORT_SCHEMA_VERSION  # any shape
+    assert (
+        build_report(object())["schema_version"] == REPORT_SCHEMA_VERSION
+    )  # any shape
 
 
 def test_build_returns_minimal_envelope_if_internals_raise(monkeypatch) -> None:
@@ -156,3 +188,17 @@ def test_cli_emits_json_for_committed_cyanrip_log(capsys) -> None:
 def test_cli_missing_file_returns_2(tmp_path: Path) -> None:
     cli = _load_cli()
     assert cli.main([str(tmp_path / "nope.log")]) == 2
+
+
+def test_cli_refuses_an_eac_log(tmp_path: Path, capsys) -> None:
+    # An EAC log fed here would otherwise parse to an empty whipper RipLog and
+    # silently emit a 0-track report with exit 0 — refuse with a clear message.
+    cli = _load_cli()
+    eac = tmp_path / "eac.log"
+    eac.write_text(
+        "Exact Audio Copy V1.8\n\nTrack  1\n\n     Copy CRC B0D122E7\n",
+        encoding="utf-8",
+    )
+    rc = cli.main([str(eac)])
+    assert rc == 2
+    assert "EAC log" in capsys.readouterr().err

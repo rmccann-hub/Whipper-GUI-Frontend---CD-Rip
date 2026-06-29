@@ -24,6 +24,7 @@ from pathlib import Path
 from platterpus import rip_report
 from platterpus.parity import decode_log_bytes
 from platterpus.parsers.cyanrip_log import looks_like_cyanrip_log, parse_cyanrip_log
+from platterpus.parsers.eac_log import looks_like_eac_log
 from platterpus.parsers.rip_log import RipLog, parse_rip_log
 
 
@@ -48,6 +49,17 @@ def main(argv: list[str] | None = None) -> int:
         text = decode_log_bytes(args.rip_log.read_bytes())
     except OSError as exc:
         print(f"cannot read {args.rip_log}: {exc}", file=sys.stderr)
+        return 2
+
+    # This report is built from a cyanrip/whipper RipLog. An EAC log only yields
+    # per-track Copy CRCs through our minimal EAC parser (not a full RipLog), so
+    # feeding one here would silently produce an empty report — refuse instead.
+    if looks_like_eac_log(text):
+        print(
+            f"{args.rip_log} is an EAC log; this tool reports on cyanrip/whipper "
+            "rips. (EAC logs aren't parsed into a full report.)",
+            file=sys.stderr,
+        )
         return 2
 
     report = rip_report.build_report(_parse_to_rip_log(text))

@@ -141,6 +141,10 @@ class RipMixin:
         # Cleared here, set in _on_rip_cancel — so the finish handler can
         # say "cancelled" instead of "failed".
         self._rip_cancelled = False
+        # Drop the previous rip's parsed-log/report state, so a CTDB verify that
+        # finishes late can never re-write THIS rip's report against the old one.
+        self._last_rip_log = None
+        self._last_rip_log_file = None
         # Allow exactly one auto-heal retry (rip-as-unknown) per Start, so a
         # persistent failure can't loop.
         self._auto_retry_done = False

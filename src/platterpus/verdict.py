@@ -44,6 +44,10 @@ def accuraterip_verdict(rip_log: object) -> tuple[str, str]:
         return "", "neutral"
     verified = sum(1 for t in audio if track_accuraterip_verified(t))
     if verified == total:
+        # Only count confidences of ACTUAL matches (>= 1, same as
+        # accuraterip_is_match). A track can be verified on its v2 while its v1
+        # is "present, no match" with confidence 0 — including that 0 would
+        # render a misleading "confidence 0+" floor.
         confidences = [
             conf
             for t in audio
@@ -51,7 +55,7 @@ def accuraterip_verdict(rip_log: object) -> tuple[str, str]:
                 getattr(getattr(t, "accuraterip_v1", None), "confidence", None),
                 getattr(getattr(t, "accuraterip_v2", None), "confidence", None),
             )
-            if conf is not None
+            if conf is not None and conf >= 1
         ]
         tail = f" (confidence {min(confidences)}+)" if confidences else ""
         return (
