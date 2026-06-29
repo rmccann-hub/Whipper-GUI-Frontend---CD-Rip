@@ -45,7 +45,10 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   an existing `~/.config/whipper-gui` into `~/.config/platterpus` if the new dir
   doesn't exist yet. The `whipper` (and `cyanrip`) *backend* is unchanged — only
   the front-end was renamed. Added a project logo (`assets/platterpus-logo.svg`),
-  now used as the window/app icon.
+  now used as the window/app icon. The rasterized icon bitmaps are now committed
+  too — the 512px `build/python-appimage/io.github.rmccann_hub.Platterpus.png`
+  the AppImage bundles, and the hicolor/favicon set under `assets/icons/`
+  (16–512px), all regenerated from the SVG by `build/make_icon.py`.
 
 ### Added
 - **`scripts/render_eac_log.py` — render a rip log into an EAC-*layout*
