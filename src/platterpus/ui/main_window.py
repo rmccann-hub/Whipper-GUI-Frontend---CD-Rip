@@ -426,7 +426,9 @@ class MainWindow(
         # it's intentionally not joined here — it dies with the process and
         # guards its own emit. Joining it would risk blocking close on a long
         # decode; that's exactly why it isn't a QThread (§3.2).
-        # Cancel any in-progress rip before the window goes away.
+        # Quitting during a rip force-stops it: cancel() kills the reader
+        # process group (cdparanoia/cyanrip), so the drive isn't left spinning
+        # after the window is gone. This is the "exit = force stop" contract.
         if self._rip_worker is not None:
             self._rip_worker.cancel()
         super().closeEvent(event)  # type: ignore[arg-type]
@@ -446,10 +448,10 @@ class MainWindow(
         settings_action = tools_menu.addAction("&Settings…")
         settings_action.triggered.connect(self._on_open_settings)
 
-        # Host bootstrap (installs the whipper container stack) — the no-terminal
-        # replacement for setup-host.sh. Listed first: without it there's nothing
-        # to rip with.
-        host_setup_action = tools_menu.addAction("Set up Whipper &GUI…")
+        # Host bootstrap (installs the whipper/cyanrip container stack) — the
+        # no-terminal replacement for setup-host.sh. Listed first: without it
+        # there's nothing to rip with.
+        host_setup_action = tools_menu.addAction("Set up &Platterpus…")
         host_setup_action.triggered.connect(self.open_host_setup_dialog)
 
         # Re-runnable menu/desktop integration (the first-run offer is one-shot;
@@ -477,11 +479,43 @@ class MainWindow(
         guide_action.triggered.connect(self._on_show_help)
         update_action = help_menu.addAction("Check for &updates…")
         update_action.triggered.connect(self._on_check_updates)
+
+        # Actions that would conflict with an in-flight rip (change settings,
+        # spin the drive, install/uninstall, swap the AppImage out from under a
+        # running rip). `_set_rip_lock` greys these while a rip runs; Quit, the
+        # User Guide, the logs folder, and About stay available (Quit force-stops
+        # the rip on the way out — see closeEvent).
+        self._rip_locked_actions = [
+            unknown_action,
+            settings_action,
+            host_setup_action,
+            shortcut_action,
+            drive_setup_action,
+            diagnose_action,
+            uninstall_action,
+            update_action,
+        ]
         logs_action = help_menu.addAction("Open &logs folder…")
         logs_action.triggered.connect(self._on_open_logs_folder)
         help_menu.addSeparator()
         about_action = help_menu.addAction("&About Platterpus…")
         about_action.triggered.connect(self._on_show_about)
+
+    def _set_rip_lock(self, active: bool) -> None:
+        """Lock the UI down to Cancel / Force stop / Quit while a rip runs.
+
+        Greys out everything that would conflict with an in-flight rip — the
+        drive selector (combo + Refresh/Rescan/Eject), the editable track list,
+        and the conflicting menu actions — so the only things you can do mid-rip
+        are watch progress, Cancel, Force stop, or Quit (which force-stops the
+        rip on the way out). Re-enables it all when the rip ends. Paired with
+        ``RipControls.set_rip_active`` so the button row and the lock share one
+        lifecycle. Idempotent.
+        """
+        self._drive_picker.setEnabled(not active)
+        self._track_table.setEnabled(not active)
+        for action in self._rip_locked_actions:
+            action.setEnabled(not active)
 
     # --- Signal wiring ------------------------------------------------------
 

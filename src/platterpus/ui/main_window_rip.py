@@ -211,6 +211,7 @@ class RipMixin:
             ),
         )
         self._rip_controls.set_rip_active(True)
+        self._set_rip_lock(True)  # grey out everything that would conflict mid-rip
         # Keep the window repainting during the rip (Plasma 6 Wayland black-window
         # belt — see MainWindow.__init__ / app.py XWayland preference).
         self._repaint_timer.start()
@@ -383,6 +384,7 @@ class RipMixin:
             return
 
         self._rip_controls.set_rip_active(False)
+        self._set_rip_lock(False)  # rip over — re-enable the locked-down UI
         self._repaint_timer.stop()  # rip over — stop the Wayland repaint belt
         # Default status; replaced with a fidelity summary below if the
         # rip succeeded and we can parse its log. Distinguish a user

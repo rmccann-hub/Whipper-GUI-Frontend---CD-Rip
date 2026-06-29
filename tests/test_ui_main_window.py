@@ -535,6 +535,26 @@ def _pin_pioneer(window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def test_rip_lock_greys_conflicting_ui(teardown_threads) -> None:
+    """During a rip the drive picker, track table, and conflicting menu actions
+    grey out; Quit stays available (it force-stops on exit). Unlock restores."""
+    window = teardown_threads()
+    # Everything usable before a rip.
+    assert window._drive_picker.isEnabled()
+    assert window._track_table.isEnabled()
+    assert all(a.isEnabled() for a in window._rip_locked_actions)
+
+    window._set_rip_lock(True)
+    assert not window._drive_picker.isEnabled()
+    assert not window._track_table.isEnabled()
+    assert all(not a.isEnabled() for a in window._rip_locked_actions)
+
+    window._set_rip_lock(False)
+    assert window._drive_picker.isEnabled()
+    assert window._track_table.isEnabled()
+    assert all(a.isEnabled() for a in window._rip_locked_actions)
+
+
 def test_auto_apply_records_accuraterip_provenance(
     teardown_threads, monkeypatch: pytest.MonkeyPatch
 ) -> None:

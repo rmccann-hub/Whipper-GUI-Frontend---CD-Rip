@@ -11,6 +11,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **The UI locks down during a rip.** While a rip is running, the drive
+  selector (and its Refresh/Rescan/Eject), the editable track list, and the
+  conflicting menu actions (Settings, Set up drive/Platterpus, Rip as Unknown,
+  Check for updates, Uninstall, …) grey out — so nothing can be changed
+  mid-rip. Only Cancel, Force stop, and Quit stay available; **quitting during a
+  rip force-stops it** (kills the reader so the drive isn't left spinning).
+
+### Fixed
+- **The Tools menu said "Set up Whipper GUI…"** — a leftover from before the
+  rename. It's now "Set up Platterpus…".
+
 ### Changed
 - **The main window's panels are now resizable.** The disc-info panel, track
   list, and the controls + progress/log block sit in a vertical splitter — drag
