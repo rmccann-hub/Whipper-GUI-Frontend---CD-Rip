@@ -16,11 +16,12 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
     QMessageBox,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -285,11 +286,33 @@ class MainWindow(
         self._rip_controls: RipControls = RipControls(config, self)
         self._rip_progress: RipProgress = RipProgress(self)
 
+        # The drive selector stays a fixed top bar; everything below it lives in
+        # a vertical splitter so the user can drag the boundaries to give more
+        # room to the track list or the progress/log — in both normal and
+        # maximized states (a cramped default was reported, 2026-06-29). The
+        # Start/Cancel buttons are glued to the top of the progress block (so the
+        # splitter handle never lands on the thin button bar).
         root.addWidget(self._drive_picker)
-        root.addWidget(self._disc_info_panel)
-        root.addWidget(self._track_table, stretch=2)
-        root.addWidget(self._rip_controls)
-        root.addWidget(self._rip_progress, stretch=2)
+
+        rip_section = QWidget(central)
+        rip_layout = QVBoxLayout(rip_section)
+        rip_layout.setContentsMargins(0, 0, 0, 0)
+        rip_layout.setSpacing(8)
+        rip_layout.addWidget(self._rip_controls)
+        rip_layout.addWidget(self._rip_progress, stretch=1)
+
+        self._content_splitter: QSplitter = QSplitter(Qt.Orientation.Vertical, central)
+        # Don't let a pane be dragged shut to nothing — each stays usable.
+        self._content_splitter.setChildrenCollapsible(False)
+        self._content_splitter.addWidget(self._disc_info_panel)
+        self._content_splitter.addWidget(self._track_table)
+        self._content_splitter.addWidget(rip_section)
+        # Initial proportions: the disc-info panel takes its compact natural
+        # size; the track list and the progress/log block share the rest.
+        self._content_splitter.setStretchFactor(0, 0)  # disc info
+        self._content_splitter.setStretchFactor(1, 2)  # track table
+        self._content_splitter.setStretchFactor(2, 3)  # controls + progress/log
+        root.addWidget(self._content_splitter, stretch=1)
 
         # Cover-art outcome lands in the rip log view (not the status line —
         # that's showing the fidelity verdict by then, which matters more).

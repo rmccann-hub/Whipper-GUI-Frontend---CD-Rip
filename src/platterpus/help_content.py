@@ -131,10 +131,11 @@ named from the album artist/title you type.
 - **Eject after a successful rip** — automatically eject the disc when a rip
   finishes (off by default). You can always eject by hand with the **Eject**
   button next to the drive picker.
-- **Ripping backend** — *whipper* (default) or *cyanrip* (experimental).
-  cyanrip avoids a whipper bug that can fail tracks on drives with a read
-  offset over 587 samples. Picking cyanrip offers to install it for you;
-  restart the app after switching. Options one backend doesn't support grey
+- **Ripping backend** — *whipper* (default) or *cyanrip*. cyanrip avoids a
+  whipper bug that can fail tracks on drives with a read offset over 587
+  samples, so it's the better choice on affected drives (e.g. the Pioneer
+  BDR-209D). Picking cyanrip offers to install it for you; restart the app
+  after switching. Options one backend doesn't support grey
   out with a tooltip explaining why — your values are kept, and switching
   back re-enables them. The rest of the app works the same either way.
 

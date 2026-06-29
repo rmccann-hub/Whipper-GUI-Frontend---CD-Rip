@@ -11,6 +11,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Changed
+- **The main window's panels are now resizable.** The disc-info panel, track
+  list, and the controls + progress/log block sit in a vertical splitter — drag
+  the dividers to give more room to the track list or the log, in both normal
+  and maximized windows.
+- **cyanrip is no longer labelled "experimental."** It's the hardware-validated
+  backend (and the recommended one for drives with a read offset over 587, like
+  the Pioneer BDR-209D, where whipper has a known bug). The Settings entry and
+  help now drop the tag and keep only the real caveats (install it in the
+  container; restart after switching). CTDB verification stays *experimental*
+  until its CRC algorithm is hardware-validated (KDD-16) — that one is accurate.
+
 ## [0.4.1a1] — 2026-06-29
 
 ### Fixed

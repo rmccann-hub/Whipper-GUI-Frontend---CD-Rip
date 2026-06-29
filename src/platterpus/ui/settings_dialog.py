@@ -175,7 +175,7 @@ class SettingsDialog(QDialog):
         self._backend_combo: QComboBox = QComboBox(self)
         for label, value in (
             ("whipper (default)", "whipper"),
-            ("cyanrip (experimental)", "cyanrip"),
+            ("cyanrip", "cyanrip"),
         ):
             self._backend_combo.addItem(label, value)
         backend_index = self._backend_combo.findData(config.ripper_backend)
@@ -183,8 +183,9 @@ class SettingsDialog(QDialog):
         self._backend_combo.setToolTip(
             "Which ripping tool to drive. cyanrip applies the read offset with "
             "its own paranoia, avoiding whipper's known bug at offsets over 587 "
-            "(e.g. the Pioneer BDR-209D's +667). cyanrip must be installed in "
-            "the container and is experimental — restart the app after changing."
+            "(e.g. the Pioneer BDR-209D's +667), so it's the better choice on "
+            "affected drives. It must be installed in the ripping container "
+            "(Tools → Set up Platterpus…) — restart the app after switching."
         )
         form.addRow("Ripping backend:", self._backend_combo)
 
