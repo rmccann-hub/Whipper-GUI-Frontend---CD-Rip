@@ -11,6 +11,8 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-29
+
 ### Added
 - **A machine-readable JSON rip report is now saved beside every rip log**
   (`<name>.platterpus.json`). It captures the drive/rip settings, each track's
@@ -1033,6 +1035,9 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
+[0.3.10]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.9...v0.3.10
+[0.3.9]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.8...v0.3.9
+[0.4.0]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.10...v0.4.0
 [0.3.10]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.7...v0.3.8
