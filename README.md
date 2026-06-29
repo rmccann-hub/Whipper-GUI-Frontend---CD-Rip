@@ -6,7 +6,7 @@
 
 **A secure, EAC-style CD ripper for Linux (FLAC, WAV, WavPack, MP3).** Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage. It drives the [`whipper`](https://github.com/whipper-team/whipper) and [`cyanrip`](https://github.com/cyanreg/cyanrip) ripping backends and verifies every rip against AccurateRip and CTDB.
 
-> **Status: v0.2.x — public pre-release.** Implemented end-to-end with 1,000+ tests (including a full-pipeline end-to-end test) at ~92% branch coverage, and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Highlights since v0.1.0: **no-terminal first-run setup** (the AppImage adds itself to your menu; a guided wizard installs the ripping stack), **read-offset auto-detect** from the bundled AccurateRip drive list (no disc needed), a selectable **cyanrip backend** alongside whipper, **true in-app updates** (download → checksum-verify → self-restart), and **backend-independent cover art** from the Cover Art Archive. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Platterpus/issues) for anything you hit.
+> **Status: v0.3.x — public pre-release.** Implemented end-to-end with 1,000+ tests (including a full-pipeline end-to-end test) at ~93% branch coverage, and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Highlights since v0.1.0: **no-terminal first-run setup** (the AppImage adds itself to your menu; a guided wizard installs the ripping stack), **read-offset auto-detect** from the bundled AccurateRip drive list (no disc needed), a selectable **cyanrip backend** alongside whipper, **multiple output formats** (FLAC is always the lossless master; WavPack/MP3/WAV are derived from it), **goal presets** (Fast verified / Archival exact / Portable) that anchor the settings to your intent, an at-a-glance **verification verdict** (AccurateRip + CTDB) with a machine-readable JSON rip report written beside the log, a per-drive **read-offset trust line** showing where the offset came from and how confident we are, **true in-app updates** (download → checksum-verify → self-restart), and **backend-independent cover art** from the Cover Art Archive. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Platterpus/issues) for anything you hit.
 
 ## At a glance
 
@@ -568,14 +568,17 @@ The widely-cited [Perfect CD Ripping to FLAC with Exact Audio Copy guide](https:
 - **A *tracker-accepted* EAC-signed log.** The EAC log checksum algorithm has been reverse-engineered, so a valid checksum is technically reproducible — but signing our log as if Exact Audio Copy produced it is **forging the rip's provenance** (a bannable "faked log" on gazelle trackers), and we won't do it. We rely on the open, tool-agnostic trust signals instead: AccurateRip + CTDB verification and an honest log. See [docs/eac-log-and-repair-feasibility.md](docs/eac-log-and-repair-feasibility.md).
 - **AccurateRip submission** (writing new entries to the database). Blocked by AccurateRip's operators, who accept submissions only from EAC and dBpoweramp. Verification (reading) works fine — see "AccurateRip" in the audit above.
 
-**Now in Settings** (EAC toggles whipper supports, surfaced in the Settings dialog — all shipped in the v0.1.x line):
+**Now in Settings** (surfaced in the Settings dialog):
 
+- **Goal** preset — *Fast verified* / *Archival exact* / *Portable* snaps the format/verification/quality controls to your intent; editing any of them switches the goal to *Custom*
+- **Output format** — FLAC (the lossless master, always produced), WavPack, MP3, or WAV
 - Cover art — fetch + embed in FLAC, save next to it, or both (defaults to *embed*)
 - Force overread into lead-out
 - Max retries per track (default 5)
 - Keep going on track failure
 - **Re-rip until reads match** — for damaged/marginal discs, re-read each track until N passes agree on the checksum (cyanrip's `-Z`; off by default). cyanrip-only — greyed out under whipper, which has no equivalent.
 - Verify with CTDB after a rip (a second, whole-disc verification path alongside AccurateRip; experimental until the CRC is hardware-validated)
+- Verify FLACs after a rip, and optionally re-compress them to `-8`
 - Continue ripping CD-Rs
 - Auto-eject after a successful rip, plus read-offset calibration via the drive-setup wizard
 
