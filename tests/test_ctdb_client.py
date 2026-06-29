@@ -18,7 +18,9 @@ _TOC = DiscToc(track_offsets=(150, 18172), leadout=295716)
 
 def test_build_url_has_expected_params() -> None:
     url = CtdbHttpImpl().build_url(_TOC)
-    assert url.startswith("https://db.cuetools.net/lookup2.php?")
+    # HTTP, not HTTPS: the host has no valid TLS cert and the reference client
+    # uses http:// (see CTDB_SCHEME note in ctdb_client). KDD-16 / hardware.
+    assert url.startswith("http://db.cuetools.net/lookup2.php?")
     assert "version=3" in url
     assert "ctdb=1" in url
     assert "toc=150%3A18172%3A295716" in url  # ':' is URL-encoded
@@ -70,7 +72,7 @@ def test_lookup_uses_injected_fetcher() -> None:
 
     client = CtdbHttpImpl(fetcher=fake_fetch)
     result = client.lookup(_TOC)
-    assert seen and seen[0].startswith("https://db.cuetools.net/")
+    assert seen and seen[0].startswith("http://db.cuetools.net/")
     assert result.entries[0].crc == 1
     assert result.entries[0].confidence == 2
 

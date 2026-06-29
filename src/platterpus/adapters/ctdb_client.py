@@ -30,6 +30,13 @@ from platterpus.ctdb.toc import DiscToc
 
 log = logging.getLogger(__name__)
 
+# CTDB is queried over plain HTTP. The reference CUETools client uses
+# `http://db.cuetools.net` (CUETools.CTDB/CUEToolsDB.cs: `urlbase = "http://" +
+# server`), and the host serves no valid HTTPS certificate — `https://` fails
+# with a hostname-mismatch (confirmed on real hardware, KDD-16). HTTP is correct
+# here: this is a read-only public CRC lookup, and a rip's trust comes from
+# comparing the returned CRC to our locally-computed one, not from the transport.
+CTDB_SCHEME: str = "http"
 CTDB_HOST: str = "db.cuetools.net"
 LOOKUP_PATH: str = "/lookup2.php"
 # A descriptive User-Agent is the MusicBrainz/CTDB community convention.
@@ -111,7 +118,7 @@ class CtdbHttpImpl(CTDBClient):
                 "toc": toc.toc_string(),
             }
         )
-        return f"https://{CTDB_HOST}{LOOKUP_PATH}?{query}"
+        return f"{CTDB_SCHEME}://{CTDB_HOST}{LOOKUP_PATH}?{query}"
 
     def lookup(self, toc: DiscToc) -> CtdbLookupResult:
         url = self.build_url(toc)
