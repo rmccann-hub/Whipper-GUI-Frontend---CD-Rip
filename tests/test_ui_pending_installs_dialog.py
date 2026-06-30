@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 from PySide6.QtWidgets import QApplication
 
 from platterpus.deps.checks import ProbeResult
@@ -12,22 +10,19 @@ from platterpus.deps.resolvers import InstallResult, MissingItem
 from platterpus.ui.dialogs.pending_installs import PendingInstallsDialog
 
 
-def _run_install(
-    dialog: PendingInstallsDialog, qapp: QApplication, timeout: float = 5.0
-) -> None:
-    """Click Install and pump the event loop until the off-thread loop finishes.
+def _run_install(dialog: PendingInstallsDialog, process_until) -> None:
+    """Click Install and pump (via the shared `process_until` fixture) until the
+    off-thread install loop finishes.
 
-    The install now runs on a worker thread (so it can't freeze the GUI — the
-    0.4.2 bug), so its per-item signals and the final results are delivered to
-    the GUI thread via the event loop. We pump it (bounded) until Close appears,
-    which is the signal the loop is done and results() is populated.
+    The install runs on a worker thread (so it can't freeze the GUI — the 0.4.2
+    bug); its per-item signals and final results arrive on the GUI thread via the
+    event loop. Close appearing is the signal the loop is done and results() is
+    populated.
     """
     dialog._install_button.click()
-    deadline = time.monotonic() + timeout
-    while dialog._close_button is None and time.monotonic() < deadline:
-        qapp.processEvents()
-        time.sleep(0.005)
-    assert dialog._close_button is not None, "install loop did not finish in time"
+    assert process_until(lambda: dialog._close_button is not None), (
+        "install loop did not finish in time"
+    )
 
 
 # --- Spec / item factories ------------------------------------------------
@@ -273,15 +268,13 @@ def _fail(item: MissingItem) -> InstallResult:
     return InstallResult(spec=item.spec, success=False, message="boom: network down")
 
 
-def test_install_one_mode_drives_loop_and_updates_rows(
-    qapp: QApplication,
-) -> None:
+def test_install_one_mode_drives_loop_and_updates_rows(process_until) -> None:
     """With install_one, clicking Install installs each ticked item, updates
     its row, records a result, and swaps in the Close button."""
     items = [_item("a"), _item("b")]
     dialog = PendingInstallsDialog(items, install_one=_ok)
 
-    _run_install(dialog, qapp)
+    _run_install(dialog, process_until)
 
     assert dialog._status_labels["a"].text() == "OK"
     assert dialog._status_labels["b"].text() == "OK"
@@ -292,10 +285,10 @@ def test_install_one_mode_drives_loop_and_updates_rows(
     assert dialog._close_button is not None  # ready to dismiss
 
 
-def test_install_one_mode_records_failures(qapp: QApplication) -> None:
+def test_install_one_mode_records_failures(process_until) -> None:
     dialog = PendingInstallsDialog([_item("a")], install_one=_fail)
 
-    _run_install(dialog, qapp)
+    _run_install(dialog, process_until)
 
     result = dialog.results()[0]
     assert result.success is False
@@ -303,9 +296,7 @@ def test_install_one_mode_records_failures(qapp: QApplication) -> None:
     assert dialog._status_labels["a"].text().startswith("FAILED")
 
 
-def test_install_one_mode_skips_unticked_as_declined(
-    qapp: QApplication,
-) -> None:
+def test_install_one_mode_skips_unticked_as_declined(process_until) -> None:
     """Unticked items are not installed; they come back as user_declined so
     the manager won't cascade them to the next tier."""
     items = [_item("a"), _item("b")]
@@ -318,7 +309,7 @@ def test_install_one_mode_skips_unticked_as_declined(
     dialog = PendingInstallsDialog(items, install_one=install_one)
     dialog._checkboxes["b"].setChecked(False)
 
-    _run_install(dialog, qapp)
+    _run_install(dialog, process_until)
 
     assert installed == ["a"]  # b was never installed
     by_id = {r.spec.dep_id: r for r in dialog.results()}
@@ -326,7 +317,7 @@ def test_install_one_mode_skips_unticked_as_declined(
     assert by_id["b"].user_declined is True
 
 
-def test_install_runs_off_the_gui_thread(qapp: QApplication) -> None:
+def test_install_runs_off_the_gui_thread(process_until) -> None:
     """Regression guard for the 0.4.2 freeze: the install MUST run on a worker
     thread, not the GUI thread. We assert install_one is called on a different
     thread than the one that built the dialog (the GUI thread)."""
@@ -340,14 +331,14 @@ def test_install_runs_off_the_gui_thread(qapp: QApplication) -> None:
         return _ok(item)
 
     dialog = PendingInstallsDialog([_item("a")], install_one=install_one)
-    _run_install(dialog, qapp)
+    _run_install(dialog, process_until)
 
     # It must have run, and NOT on the GUI thread (the 0.4.2 freeze).
     assert install_thread_ids, "install_one was never called"
     assert install_thread_ids[0] != gui_thread_id
 
 
-def test_event_loop_stays_alive_during_a_slow_install(qapp: QApplication) -> None:
+def test_event_loop_stays_alive_during_a_slow_install(qapp, process_until) -> None:
     """Heartbeat guard (complements the thread-identity check): while a slow
     install runs, a main-thread QTimer must keep firing — proving the event loop
     kept turning and the window didn't freeze. If the install ran on the GUI
@@ -371,21 +362,18 @@ def test_event_loop_stays_alive_during_a_slow_install(qapp: QApplication) -> Non
 
     dialog = PendingInstallsDialog([_item("a")], install_one=slow_install)
     dialog._install_button.click()
-    deadline = time.monotonic() + 5.0
-    while dialog._close_button is None and time.monotonic() < deadline:
-        qapp.processEvents()
-        time.sleep(0.005)
+    finished = process_until(lambda: dialog._close_button is not None)
     release.set()
     heartbeat.stop()
 
-    assert dialog._close_button is not None, "install never finished"
+    assert finished, "install never finished"
     assert ticks["n"] >= 5, (
         f"event loop was starved ({ticks['n']} ticks) — the install blocked the "
         "GUI thread"
     )
 
 
-def test_cannot_dismiss_while_install_in_flight(qapp: QApplication) -> None:
+def test_cannot_dismiss_while_install_in_flight(process_until) -> None:
     """While the install is running, reject() (Cancel / the window-manager ✕)
     is a no-op — the dialog stays up so the worker can't touch a destroyed
     dialog and the user can't half-dismiss a running install."""
@@ -400,21 +388,13 @@ def test_cannot_dismiss_while_install_in_flight(qapp: QApplication) -> None:
     dialog = PendingInstallsDialog([_item("a")], install_one=slow_install)
     dialog._install_button.click()
     # Let the worker start and flip the install-active flag.
-    deadline = time.monotonic() + 2.0
-    while not dialog._install_active and time.monotonic() < deadline:
-        qapp.processEvents()
-        time.sleep(0.005)
-    assert dialog._install_active is True
+    assert process_until(lambda: dialog._install_active, timeout=2.0)
 
     dialog.reject()  # must be ignored mid-install
     assert dialog.isVisible() or dialog.result() == 0  # not accepted/closed-out
 
     release.set()  # let the worker finish, then drain
-    end = time.monotonic() + 5.0
-    while dialog._close_button is None and time.monotonic() < end:
-        qapp.processEvents()
-        time.sleep(0.005)
-    assert dialog._close_button is not None
+    assert process_until(lambda: dialog._close_button is not None)
 
 
 def test_cancel_in_install_one_mode_declines_all(qapp: QApplication) -> None:

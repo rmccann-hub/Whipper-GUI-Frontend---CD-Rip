@@ -101,9 +101,22 @@ tiers. "I added a happy-path test" is not done.
     the GUI thread *deadlocks*: the worker's `finished → thread.quit()` is a
     queued connection *to the GUI thread* (the `QThread` object lives there), so
     a blocked GUI thread never delivers `quit()` and the thread never ends.
-    Instead, **poll** `qApp.processEvents()` with a wall-clock deadline until the
-    terminal signal fires. (`QEventLoop.exec()`/`QSignalSpy.wait()` are also
-    unreliable to *terminate* under the headless `offscreen` platform.)
+    Instead, **poll** with a wall-clock deadline until the terminal signal fires
+    — use the shared **`process_until(predicate, timeout=…)`** fixture
+    (`conftest.py`), the one canonical bounded pump (it also flushes posted
+    events so queued cross-thread signals deliver). Never a bare
+    `while True`; never `QThread.wait()` on the GUI thread.
+    (`QEventLoop.exec()`/`QSignalSpy.wait()` are also unreliable to *terminate*
+    under the headless `offscreen` platform.) This deadlock is real and was hit
+    in-suite: `test_rip_not_blocked_when_drive_offset_is_known` used `wait()` and
+    left a thread running into teardown.
+  - **A leaked worker thread aborts the whole suite.** Destroying a running
+    `QThread` is a hard `SIGABRT`, so a test that starts a worker but returns
+    before it finishes can take down *every* test, not just itself. An autouse
+    `conftest` fixture (`_join_leaked_qthreads`) tracks `QThread.start()` and
+    joins any still-running at teardown as a backstop (warning, not failing) —
+    but the *fix* is to drive the worker to completion with `process_until`. Run
+    `pytest -W error::UserWarning` locally to surface any leaker as a failure.
   - **Suppress first-run offers before pumping events.** `processEvents()` will
     fire any pending `QTimer.singleShot` — including `_maybe_offer_first_run_setup`,
     whose `QMessageBox.exec()` **blocks forever headless**. Construct the window
@@ -114,11 +127,28 @@ tiers. "I added a happy-path test" is not done.
   property* rather than a single behaviour. We enforce the "never block the GUI
   thread" rule this way: `test_gui_thread_discipline.py` AST-parses every
   `ui/` module and fails if any makes a synchronous blocking call
-  (`subprocess.run`, `urlopen`, `time.sleep`) — so the freeze bug class can't
-  silently return. It ships with a meta-test proving the guard detects a
-  planted offender (a fitness test that can't fail is worthless). Reach for
-  this pattern whenever a rule is easy to violate and expensive to catch by
-  eye. Portable to any sibling project.
+  (`subprocess.run`/`check_output`/…, `os.system`, `urlopen`, a call on
+  `requests`, `time.sleep`) — so the freeze bug class can't silently return. It
+  **resolves import aliases first** (`import subprocess as sp; sp.run(...)` and
+  `from subprocess import run` both count) and ships with meta-tests proving the
+  guard detects a planted offender *and* its aliased spellings (a fitness test
+  that can't fail is worthless). **Known limit — and why it's not enough alone:**
+  the AST guard only sees `ui/`; it cannot follow a `ui/` slot that synchronously
+  calls a blocking function defined in `deps/`/`adapters/` (a callable passed in).
+  That exact gap shipped the 0.4.2 install freeze. The complement is a **runtime
+  guard** (next bullet). Reach for fitness tests whenever a rule is easy to
+  violate and expensive to catch by eye; portable to any sibling project.
+- **Runtime "didn't block the GUI thread" guards.** Because the AST guard can't
+  follow cross-module calls, any path that does blocking work behind a callable
+  also gets a *runtime* check. Two complementary forms (both in
+  `test_ui_pending_installs_dialog.py`): (1) **thread-identity** — record
+  `threading.get_ident()` on the GUI thread, have the injected work record it
+  too, and assert they differ (`test_install_runs_off_the_gui_thread`); (2)
+  **heartbeat** — a main-thread `QTimer` must keep ticking while the work runs
+  (`test_event_loop_stays_alive_during_a_slow_install`); if the work ran on the
+  GUI thread, `processEvents()` would block inside it and the timer would stall.
+  Identity is the zero-flake primary; heartbeat catches blockers identity can't
+  see (a slow pure-Python loop, a C-extension call).
 - **Mutation testing** (periodic, not in CI). Run `mutmut` occasionally on the
   parsers/adapters to measure whether tests actually *catch* bugs rather than
   just execute lines — coverage says a line ran, mutation says a test fails when
@@ -139,7 +169,7 @@ tiers. "I added a happy-path test" is not done.
    (dialog / placeholder). Tests assert the surfacing, not just the absence of a
    crash.
 4. **Coverage gate.** CI runs branch coverage with `--cov-fail-under` (currently
-   **91%**, TOTAL ~92.5%). The gate **ratchets up, never down** — raise it when
+   **91%**, TOTAL ~93%). The gate **ratchets up, never down** — raise it when
    TOTAL comfortably clears it; never lower it to make a build green.
 5. **Version matrix.** CI runs the suite on every supported Python (3.11–3.13).
    Add a version when users move to it; we've been bitten by version-specific
@@ -172,6 +202,15 @@ tiers. "I added a happy-path test" is not done.
    If a test truly needs real PCM, generate a synthetic tone or use a CC0/
    public-domain clip — never a commercial track. `.gitignore` denies audio
    extensions as a backstop.
+10. **Off-thread work gets a runtime guard that it ran off the GUI thread.** The
+    freeze bug class (now seen three times — see CLAUDE.md) is only caught if a
+    test *proves* the blocking work (install, rip, probe, decode) ran on a
+    worker, not the GUI thread — the AST guard structurally can't follow a
+    callable into `deps/`/`adapters/`. For any path that does blocking work
+    behind a callable, add a thread-identity assertion (and, for slow work, a
+    heartbeat) — see §4 "Runtime guards" and
+    `test_install_runs_off_the_gui_thread`. This is the regression guard that
+    keeps the 0.4.2 install freeze from silently returning.
 
 ## 6. Definition of Done (testing) — paste into every PR
 

@@ -32,6 +32,34 @@ def qapp() -> QApplication:
     return app  # type: ignore[return-value]
 
 
+@pytest.fixture
+def process_until(qapp: QApplication):
+    """Canonical bounded event-loop pump for worker-thread / queued-signal flows.
+
+    We don't use pytest-qt, so this is how a test drives a flow that does work on
+    a worker thread (a dialog's install loop, a window's rip/probe) and reports
+    back via queued signals: pump the GUI event loop until a predicate holds (or
+    a timeout), delivering those queued slots on the GUI thread. It is always
+    BOUNDED — never a bare ``while True``.
+
+    Returns ``pump(predicate, timeout=5.0, step=0.005) -> bool`` (the predicate's
+    final value). Use it instead of ``QThread.wait()`` on the GUI thread: a bare
+    ``wait()`` blocks the loop, so a queued ``finished``/``quit`` can never be
+    delivered — a deadlock (see docs/testing.md and architecture.md §3.2).
+    """
+    import time
+
+    def pump(predicate, timeout: float = 5.0, step: float = 0.005) -> bool:
+        deadline = time.monotonic() + timeout
+        while not predicate() and time.monotonic() < deadline:
+            qapp.processEvents()
+            qapp.sendPostedEvents()  # flush queued cross-thread signals too
+            time.sleep(step)
+        return predicate()
+
+    return pump
+
+
 @pytest.fixture(autouse=True)
 def _isolate_drive_profiles(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the drive-profile ledger out of the real user config dir.
