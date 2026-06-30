@@ -11,6 +11,8 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-06-30
+
 ### Added
 - **The rip report is now a self-contained debug record.** The
   `.platterpus.json` beside the FLACs now embeds this session's log — everything
@@ -1159,7 +1161,8 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
-[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.10...v0.4.0
 [0.3.10]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.9...v0.3.10
