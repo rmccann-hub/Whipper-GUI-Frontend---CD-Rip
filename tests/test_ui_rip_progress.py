@@ -62,6 +62,19 @@ def test_default_state(qapp: QApplication) -> None:
     assert widget._view_log_button.isEnabled() is False
 
 
+def test_scroll_areas_have_small_minimum_height_for_splitter(
+    qapp: QApplication,
+) -> None:
+    # The vertical splitter in the main window can only redistribute space if
+    # its panes can shrink. The log view and AccurateRip table are the big
+    # scrollable areas; they keep a small (≤120px) minimum so the splitter has
+    # drag slack at the default window size (0.4.x resize fix: the handles
+    # showed the resize cursor but wouldn't move until the window was maximized).
+    widget = RipProgress()
+    assert 0 < widget._log_view.minimumHeight() <= 120
+    assert 0 < widget._ar_table.minimumHeight() <= 120
+
+
 def test_status_surfaces_have_accessible_names(qapp: QApplication) -> None:
     # Screen readers need a name on every status surface (a11y, principle #10).
     widget = RipProgress()

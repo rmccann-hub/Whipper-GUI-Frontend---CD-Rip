@@ -11,6 +11,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Fixed
+- **The main-window splitter is draggable at the normal window size, not only
+  when maximized.** The three stacked panes' minimum heights summed to nearly
+  the whole default window, so the splitter handles showed the resize cursor but
+  had no slack to move (real-user report on 0.4.4). The scrollable areas (track
+  list, rip log, AccurateRip table) now keep a small minimum height, so the
+  splitter can always redistribute space. (The default window size is unchanged
+  — making it taller would overflow 1366×768 laptops.)
+
 ## [0.4.4] — 2026-06-30
 
 ### Added

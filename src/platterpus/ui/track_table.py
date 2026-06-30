@@ -208,6 +208,11 @@ class TrackTable(QWidget):
         # Track table.
         self._model: TrackTableModel = TrackTableModel(self)
         self._view: QTableView = QTableView(self)
+        # A small minimum so the vertical splitter in the main window can shrink
+        # the track list to give room to other panes (it scrolls). Without it
+        # the stacked panels' minimums fill the whole window and the splitter
+        # has no slack to redistribute at the default size (0.4.4 resize fix).
+        self._view.setMinimumHeight(64)
         self._view.setAccessibleName("Track list")
         self._view.setModel(self._model)
         self._view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

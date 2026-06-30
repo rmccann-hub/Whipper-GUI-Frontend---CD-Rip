@@ -113,6 +113,12 @@ class RipProgress(QWidget):
         # Cap at a reasonable scrollback so a long rip doesn't blow up
         # memory; the ripper emits thousands of lines per rip.
         self._log_view.setMaximumBlockCount(10_000)
+        # A small minimum so this scroll area can be dragged down by the
+        # splitter. Without it the panel's minimum height ≈ the whole window
+        # at the default size, leaving no slack to redistribute — the splitter
+        # handles showed the resize cursor but wouldn't move until the window
+        # was maximized (real-user report, 0.4.4). It scrolls, so 64px is fine.
+        self._log_view.setMinimumHeight(64)
         root.addWidget(self._log_view, stretch=1)
 
         # --- Verification verdict banner (at-a-glance trust) ---
@@ -141,6 +147,9 @@ class RipProgress(QWidget):
         header.setSectionResizeMode(_AR_COL_TITLE, QHeaderView.ResizeMode.Stretch)
         for col in (_AR_COL_NUMBER, _AR_COL_STATUS, _AR_COL_V1, _AR_COL_V2):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        # Same reasoning as the log view: a small minimum so the splitter can
+        # shrink this table and free up drag slack at the default window size.
+        self._ar_table.setMinimumHeight(64)
         root.addWidget(self._ar_table, stretch=1)
 
         # --- CTDB verdict line (second, TOC-keyed verification path) ---
