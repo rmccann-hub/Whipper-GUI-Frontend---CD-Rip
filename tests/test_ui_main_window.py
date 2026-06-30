@@ -719,10 +719,20 @@ def test_rip_not_blocked_when_drive_offset_is_known(
     assert warned == []  # not blocked
     assert window._config.read_offset == 667  # auto-applied
     assert window._rip_worker is not None  # rip started
-    # Crucially, whipper actually receives the offset (regression for the
+    # Crucially, cyanrip actually receives the offset (regression for the
     # "drive offset unconfigured" bug — params were built before auto-apply).
-    if window._rip_thread is not None and window._rip_thread.isRunning():
-        window._rip_thread.wait(2000)
+    # Drive the worker to completion by PUMPING the event loop, not wait(): the
+    # worker's `finished → thread.quit` is a queued connection to the GUI
+    # thread, so a bare wait() here would block that delivery and deadlock (and
+    # leave the QThread running into teardown — see docs/testing.md).
+    import time as _time
+
+    from PySide6.QtWidgets import QApplication
+
+    deadline = _time.monotonic() + 3.0
+    while window._rip_worker is not None and _time.monotonic() < deadline:
+        QApplication.processEvents()
+        _time.sleep(0.005)
     assert rip_kwargs and rip_kwargs[0].get("read_offset_override") == 667
 
 
