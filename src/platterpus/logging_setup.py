@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from logging.handlers import RotatingFileHandler
 
+from platterpus.log_buffer import SessionLogBuffer, set_session_buffer
 from platterpus.paths import LOG_DIR, LOG_PATH
 
 # Rotation policy. Five backups of 1 MiB each keeps a useful history
@@ -37,6 +38,8 @@ _CONFIGURED_ATTR: str = "_platterpus_configured"
 # Tag the file handler so `set_debug_logging()` can find it again after
 # configure_logging() returns (handlers are otherwise anonymous).
 _FILE_HANDLER_ATTR: str = "_platterpus_file_handler"
+# Same idea for the in-memory session buffer (embedded in the rip report).
+_BUFFER_HANDLER_ATTR: str = "_platterpus_buffer_handler"
 
 
 def configure_logging(console_level: int = logging.INFO, debug: bool = False) -> None:
@@ -79,11 +82,23 @@ def configure_logging(console_level: int = logging.INFO, debug: bool = False) ->
     console_handler.setLevel(console_level)
     console_handler.setFormatter(formatter)
 
+    # In-memory session buffer: same format and level as the file handler, so
+    # the rip report's embedded log mirrors what log.txt records (and respects
+    # the Debug-logging toggle). It only lives in memory, so it doesn't add a
+    # second file on disk.
+    buffer_handler = SessionLogBuffer()
+    buffer_handler.setLevel(logging.DEBUG if debug else logging.INFO)
+    buffer_handler.setFormatter(formatter)
+
     root.addHandler(file_handler)
     root.addHandler(console_handler)
+    root.addHandler(buffer_handler)
 
-    # Remember the file handler so the runtime toggle can re-level it.
+    # Remember the file + buffer handlers so the runtime toggle can re-level
+    # both, and expose the buffer to the report builder.
     setattr(root, _FILE_HANDLER_ATTR, file_handler)
+    setattr(root, _BUFFER_HANDLER_ATTR, buffer_handler)
+    set_session_buffer(buffer_handler)
     # Mark configured so subsequent calls bail out early.
     setattr(root, _CONFIGURED_ATTR, True)
 
@@ -100,6 +115,11 @@ def set_debug_logging(enabled: bool) -> None:
     if file_handler is None:
         return
     file_handler.setLevel(logging.DEBUG if enabled else logging.INFO)
+    # Keep the in-memory buffer at the same verbosity, so the rip report's
+    # embedded log matches what log.txt is capturing.
+    buffer_handler = getattr(root, _BUFFER_HANDLER_ATTR, None)
+    if buffer_handler is not None:
+        buffer_handler.setLevel(logging.DEBUG if enabled else logging.INFO)
     logging.getLogger(__name__).info(
         "debug logging %s", "ENABLED" if enabled else "disabled"
     )

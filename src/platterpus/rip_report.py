@@ -36,16 +36,20 @@ def build_report(
     ctdb_result: object | None = None,
     generated_at: str = "",
     timing: dict | None = None,
+    debug_log: dict | None = None,
 ) -> dict:
     """Return a structured, versioned summary of a rip as a plain dict.
 
     ``generated_at`` is supplied by the caller (an ISO-8601 timestamp) so this
     stays pure and deterministic. ``ctdb_result`` is an optional
     :class:`~platterpus.ctdb.verify.CtdbVerifyResult`. ``timing`` is an optional
-    dict of wall-clock measurements (see :func:`build_timing`). Never raises.
+    dict of wall-clock measurements (see :func:`build_timing`). ``debug_log`` is
+    an optional ``{"scope", "truncated", "lines"}`` dict embedding this session's
+    log (see :func:`build_debug_log`) so the report is a self-contained debug
+    record. Never raises.
     """
     try:
-        return _build(rip_log, ctdb_result, generated_at, timing)
+        return _build(rip_log, ctdb_result, generated_at, timing, debug_log)
     except Exception:  # noqa: BLE001 — a report builder must never crash a rip
         log.exception("rip-report build failed; emitting minimal envelope")
         return {
@@ -90,11 +94,26 @@ def build_timing(
     return timing
 
 
+def build_debug_log(lines: list[str], *, truncated: bool = False) -> dict:
+    """Wrap captured session log lines for the report's ``debug`` section.
+
+    ``lines`` is this session's log (everything since launch) with other albums'
+    rips already filtered out by the caller; ``truncated`` is True if the
+    in-memory buffer dropped its oldest lines. Pure; never raises.
+    """
+    return {
+        "scope": "this session since launch, excluding other albums' rips",
+        "truncated": bool(truncated),
+        "lines": list(lines),
+    }
+
+
 def _build(
     rip_log: object,
     ctdb_result: object | None,
     generated_at: str,
     timing: dict | None = None,
+    debug_log: dict | None = None,
 ) -> dict:
     message, level = accuraterip_verdict(rip_log)
     info = getattr(rip_log, "ripping_info", None)
@@ -125,6 +144,9 @@ def _build(
         "sha256_hash": getattr(rip_log, "sha256_hash", "") or None,
         "tracks": [_track(t) for t in (getattr(rip_log, "tracks", ()) or ())],
         "ctdb": _ctdb(ctdb_result),
+        # Bulky, so it sits last: the embedded session log that makes this
+        # report a self-contained debug record (None when not captured).
+        "debug": debug_log,
     }
 
 
@@ -211,6 +233,7 @@ def write_report(
     ctdb_result: object | None = None,
     generated_at: str = "",
     timing: dict | None = None,
+    debug_log: dict | None = None,
 ) -> Path | None:
     """Build and write the JSON report beside ``log_file``. Best-effort.
 
@@ -225,6 +248,7 @@ def write_report(
             ctdb_result=ctdb_result,
             generated_at=generated_at,
             timing=timing,
+            debug_log=debug_log,
         )
         # Catch serialization errors (TypeError/ValueError from json.dumps on an
         # exotic future value) as well as write errors (OSError) — the report is

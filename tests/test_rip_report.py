@@ -15,6 +15,7 @@ from platterpus.parsers.rip_log import (
 )
 from platterpus.rip_report import (
     REPORT_SCHEMA_VERSION,
+    build_debug_log,
     build_report,
     build_timing,
     report_path_for,
@@ -124,6 +125,24 @@ def test_timing_handles_missing_elapsed() -> None:
     timing = build_timing(None)
     assert timing["elapsed_seconds"] is None
     assert timing["elapsed_human"] == "unknown"
+
+
+def test_debug_section_absent_by_default() -> None:
+    report = build_report(_sample_log())
+    assert report["debug"] is None
+
+
+def test_debug_section_embeds_session_log() -> None:
+    debug = build_debug_log(["line one", "line two"], truncated=False)
+    report = build_report(_sample_log(), debug_log=debug)
+    assert report["debug"]["lines"] == ["line one", "line two"]
+    assert report["debug"]["truncated"] is False
+    assert "excluding other albums" in report["debug"]["scope"]
+
+
+def test_debug_section_notes_truncation() -> None:
+    debug = build_debug_log(["kept"], truncated=True)
+    assert build_report(_sample_log(), debug_log=debug)["debug"]["truncated"] is True
 
 
 def test_ctdb_section_serialized_when_present() -> None:

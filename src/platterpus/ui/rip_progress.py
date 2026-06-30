@@ -74,6 +74,11 @@ class RipProgress(QWidget):
         # without launching a real viewer.
         self._open_url: _OpenUrlFn = open_url or QDesktopServices.openUrl
         self._log_path: Path | None = None
+        # The JSON report and the album folder, derived from the log path when a
+        # rip finishes (set in set_log_path) — back the "View report" / "Open
+        # rip folder" buttons.
+        self._report_path: Path | None = None
+        self._rip_dir: Path | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -102,11 +107,11 @@ class RipProgress(QWidget):
         self._progress_bar.setTextVisible(True)
         root.addWidget(self._progress_bar)
 
-        # --- Live whipper stdout ---
+        # --- Live rip-tool stdout ---
         self._log_view: QPlainTextEdit = QPlainTextEdit(self)
         self._log_view.setReadOnly(True)
         # Cap at a reasonable scrollback so a long rip doesn't blow up
-        # memory; whipper emits thousands of lines per rip.
+        # memory; the ripper emits thousands of lines per rip.
         self._log_view.setMaximumBlockCount(10_000)
         root.addWidget(self._log_view, stretch=1)
 
@@ -148,13 +153,27 @@ class RipProgress(QWidget):
         self._ctdb_label.setVisible(False)
         root.addWidget(self._ctdb_label)
 
-        # --- View log button ---
+        # --- Post-rip output buttons ---
+        # Three complementary outputs land beside the FLACs every rip (the
+        # "two outputs every time" principle, docs/ux-design-principles #2):
+        # cyanrip's human-readable .log, our machine-readable .platterpus.json
+        # report, and the album folder that holds both (+ the FLACs/.cue). All
+        # three buttons stay disabled until a rip finishes and a log path is
+        # known (set_log_path), then enable together.
         button_row = QHBoxLayout()
         button_row.addStretch(1)
         self._view_log_button: QPushButton = QPushButton("View log", self)
         self._view_log_button.setEnabled(False)
         self._view_log_button.clicked.connect(self._on_view_log_clicked)
         button_row.addWidget(self._view_log_button)
+        self._view_report_button: QPushButton = QPushButton("View report", self)
+        self._view_report_button.setEnabled(False)
+        self._view_report_button.clicked.connect(self._on_view_report_clicked)
+        button_row.addWidget(self._view_report_button)
+        self._open_folder_button: QPushButton = QPushButton("Open rip folder", self)
+        self._open_folder_button.setEnabled(False)
+        self._open_folder_button.clicked.connect(self._on_open_folder_clicked)
+        button_row.addWidget(self._open_folder_button)
         root.addLayout(button_row)
 
         # --- Accessibility (docs/ux-design-principles.md #10) ---
@@ -170,6 +189,10 @@ class RipProgress(QWidget):
         self._ar_table.setAccessibleName("Per-track AccurateRip results")
         self._ctdb_label.setAccessibleName("CTDB verification result")
         self._view_log_button.setAccessibleName("Open the rip log file")
+        self._view_report_button.setAccessibleName(
+            "Open the machine-readable rip report (JSON)"
+        )
+        self._open_folder_button.setAccessibleName("Open the folder containing the rip")
 
     # --- Public surface -----------------------------------------------------
 
@@ -185,7 +208,11 @@ class RipProgress(QWidget):
         self._ctdb_label.clear()
         self._ctdb_label.setVisible(False)
         self._view_log_button.setEnabled(False)
+        self._view_report_button.setEnabled(False)
+        self._open_folder_button.setEnabled(False)
         self._log_path = None
+        self._report_path = None
+        self._rip_dir = None
 
     def append_log_line(self, line: str) -> None:
         """Append one line of whipper output to the streaming log view."""
@@ -248,23 +275,48 @@ class RipProgress(QWidget):
         self._ctdb_label.setVisible(True)
 
     def set_log_path(self, path: Path | None) -> None:
-        """Enable the View Log button (when path is non-empty and exists)."""
+        """Enable the post-rip output buttons from the rip log's path.
+
+        The log path locates all three outputs: the ``.log`` itself, the
+        ``.platterpus.json`` report beside it, and their parent album folder.
+        Passing None (or "") disables all three (used when no log was written).
+        """
+        from platterpus.rip_report import report_path_for
+
         if path is None or str(path) == "":
             self._log_path = None
+            self._report_path = None
+            self._rip_dir = None
             self._view_log_button.setEnabled(False)
+            self._view_report_button.setEnabled(False)
+            self._open_folder_button.setEnabled(False)
             return
         self._log_path = path
-        # Don't gate on .exists() — the file may be reachable by
-        # xdg-open even if a Path test fails (e.g., relative path).
+        self._report_path = report_path_for(path)
+        self._rip_dir = path.parent
+        # Don't gate on .exists() — the files may be reachable by xdg-open even
+        # if a Path test fails, and the JSON report is written immediately after
+        # this call (by the finish handler), so it'll be there on click.
         self._view_log_button.setEnabled(True)
+        self._view_report_button.setEnabled(True)
+        self._open_folder_button.setEnabled(True)
 
     # --- Internals ----------------------------------------------------------
 
     def _on_view_log_clicked(self) -> None:
         if self._log_path is None:
             return
-        url = QUrl.fromLocalFile(str(self._log_path))
-        self._open_url(url)
+        self._open_url(QUrl.fromLocalFile(str(self._log_path)))
+
+    def _on_view_report_clicked(self) -> None:
+        if self._report_path is None:
+            return
+        self._open_url(QUrl.fromLocalFile(str(self._report_path)))
+
+    def _on_open_folder_clicked(self) -> None:
+        if self._rip_dir is None:
+            return
+        self._open_url(QUrl.fromLocalFile(str(self._rip_dir)))
 
 
 def ctdb_verdict_line(result: CtdbVerifyResult) -> str:

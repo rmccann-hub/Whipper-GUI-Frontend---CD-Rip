@@ -11,6 +11,21 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **The rip report is now a self-contained debug record.** The
+  `.platterpus.json` beside the FLACs now embeds this session's log — everything
+  since the app launched (setup, dependency probes, the MusicBrainz lookup, the
+  read offset, the rip itself) — with **other albums' rips filtered out**, so a
+  single file has the full picture for *that* album without the noise of others
+  ripped in the same session. The on-disk `log.txt` is unchanged (it stays the
+  always-on rolling log, including every rip — the catch-all for problems that
+  happen with no rip to attach to, like a failed setup or a crash before any rip
+  completes).
+- **Two new post-rip buttons** in the results pane, beside "View log": **"View
+  report"** opens the `.platterpus.json`, and **"Open rip folder"** reveals the
+  album folder (FLACs + `.log` + `.json` + `.cue`). All three stay greyed out
+  until a rip finishes.
+
 ## [0.4.1] — 2026-06-30
 
 ### Removed

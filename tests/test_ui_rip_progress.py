@@ -207,7 +207,9 @@ def test_set_rip_log_empty_tracks_clears_table(qapp: QApplication) -> None:
 # --- View log button -----------------------------------------------------
 
 
-def test_set_log_path_enables_button(qapp: QApplication, tmp_path: Path) -> None:
+def test_set_log_path_enables_all_three_output_buttons(
+    qapp: QApplication, tmp_path: Path
+) -> None:
     widget = RipProgress()
     log_file = tmp_path / "rip.log"
     log_file.write_text("dummy")
@@ -215,13 +217,45 @@ def test_set_log_path_enables_button(qapp: QApplication, tmp_path: Path) -> None
     widget.set_log_path(log_file)
 
     assert widget._view_log_button.isEnabled() is True
+    assert widget._view_report_button.isEnabled() is True
+    assert widget._open_folder_button.isEnabled() is True
 
 
-def test_set_log_path_none_disables_button(qapp: QApplication) -> None:
+def test_set_log_path_none_disables_all_three(qapp: QApplication) -> None:
     widget = RipProgress()
     widget.set_log_path(Path("/tmp/x"))  # enable
     widget.set_log_path(None)
     assert widget._view_log_button.isEnabled() is False
+    assert widget._view_report_button.isEnabled() is False
+    assert widget._open_folder_button.isEnabled() is False
+
+
+def test_view_report_opens_the_json_beside_the_log(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    spy = _OpenUrlSpy()
+    widget = RipProgress(open_url=spy)
+    log_file = tmp_path / "Album.log"
+    widget.set_log_path(log_file)
+
+    widget._view_report_button.click()
+
+    assert len(spy.calls) == 1
+    assert spy.calls[0].toLocalFile() == str(tmp_path / "Album.platterpus.json")
+
+
+def test_open_folder_opens_the_album_directory(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    spy = _OpenUrlSpy()
+    widget = RipProgress(open_url=spy)
+    log_file = tmp_path / "Album.log"
+    widget.set_log_path(log_file)
+
+    widget._open_folder_button.click()
+
+    assert len(spy.calls) == 1
+    assert spy.calls[0].toLocalFile() == str(tmp_path)
 
 
 def test_view_log_click_opens_url(qapp: QApplication, tmp_path: Path) -> None:

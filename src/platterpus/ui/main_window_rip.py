@@ -154,11 +154,15 @@ class RipMixin:
         self._rip_started_at = (
             _datetime.now().astimezone().isoformat(timespec="seconds")
         )
+        # Epoch start (wall time, comparable to LogRecord.created) bounds this
+        # rip's slice of the session log so other albums' reports can exclude it.
+        self._rip_epoch_start = _time.time()
         # Drop the previous rip's parsed-log/report state, so a CTDB verify that
         # finishes late can never re-write THIS rip's report against the old one.
         self._last_rip_log = None
         self._last_rip_log_file = None
         self._last_rip_timing = None
+        self._current_rip_window = None
         # Allow exactly one auto-heal retry (rip-as-unknown) per Start, so a
         # persistent failure can't loop.
         self._auto_retry_done = False
@@ -893,10 +897,43 @@ class RipMixin:
             )
         else:
             log.info("rip elapsed (actual): %s", format_duration(elapsed))
+        # Record this rip's epoch window for the debug-log filtering. It's kept
+        # in `_rip_windows` (so a LATER album's report excludes these lines) AND
+        # remembered as the current window (so THIS report never excludes its
+        # own lines — see _write_rip_report). The end is "now"; post-rip steps
+        # (CTDB/FLAC verify) that log a little later are this rip's own lines and
+        # stay included in this report anyway.
+        if self._rip_epoch_start is not None:
+            window = (self._rip_epoch_start, _time.time())
+            self._rip_windows.append(window)
+            self._current_rip_window = window
+            self._rip_epoch_start = None
         # The start clock is one-shot per rip — clear it so a stray later finish
         # can't reuse it.
         self._rip_started_monotonic = None
         return timing
+
+    def _build_rip_debug_log(self) -> dict | None:
+        """Capture this session's log for the report, minus other albums' rips.
+
+        Returns a ``{"scope", "truncated", "lines"}`` dict (see
+        ``rip_report.build_debug_log``) or None if no buffer is installed. The
+        excluded windows are every OTHER rip this session — the current rip's own
+        window is kept, so its lines (including the post-rip verify steps that
+        land after this is first called) are never filtered out of its own
+        report. Recomputed on each write so the CTDB re-write picks up the lines
+        logged since the first write.
+        """
+        from platterpus.log_buffer import get_session_buffer
+        from platterpus.rip_report import build_debug_log
+
+        buffer = get_session_buffer()
+        if buffer is None:
+            return None
+        others = [w for w in self._rip_windows if w is not self._current_rip_window]
+        return build_debug_log(
+            buffer.lines_excluding(others), truncated=buffer.truncated
+        )
 
     def _write_rip_report(
         self, rip_log: object, log_file: Path, *, ctdb_result: object | None = None
@@ -918,6 +955,7 @@ class RipMixin:
             ctdb_result=ctdb_result,
             generated_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             timing=self._last_rip_timing,
+            debug_log=self._build_rip_debug_log(),
         )
 
     # --- Post-rip FLAC encode-verify (opt-in, default on) -------------------

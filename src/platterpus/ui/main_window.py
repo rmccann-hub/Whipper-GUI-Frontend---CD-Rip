@@ -264,6 +264,14 @@ class MainWindow(
         self._rip_started_monotonic: float | None = None
         self._rip_started_at: str = ""
         self._last_rip_timing: dict | None = None
+        # Rip time-windows (epoch start, end) for every rip THIS session, used to
+        # strip *other* albums' rip lines out of each report's embedded debug log
+        # (the report stays a self-contained, single-album debug record). The
+        # current rip's own window is remembered separately so its lines are
+        # never filtered out of its own report.
+        self._rip_epoch_start: float | None = None
+        self._rip_windows: list[tuple[float, float]] = []
+        self._current_rip_window: tuple[float, float] | None = None
         # Whether the user asked to launch Picard after an unknown rip.
         self._pending_picard_launch: bool = False
         # Post-rip CTDB verify (KDD-14 Phase 1, opt-in). Runs the lookup +
