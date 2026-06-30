@@ -28,6 +28,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   PLANNING KDD-18, the user guide, the locked Critical Rules) were updated.
 
 ### Added
+- **The rip record now captures cyanrip's secure-rerip detail.** A `-Z N` rip of
+  a marginal disc writes information the parser previously dropped; it's now
+  surfaced in the `.platterpus.json` report (and, where it matters, on screen):
+  per-track **rip count** ("after N rips" — how many read passes a track
+  needed), the **+450-frame offset-variant** AccurateRip match (`offset_450`;
+  cyanrip's "partially accurately ripped" — recorded as data, never counted as a
+  plain exact match so the verdict can't over-claim), the **"Tracks ripped
+  partially accurately"** summary, the disc's **audio duration** ("Total time"),
+  and the **Paranoia status counts** (READ/VERIFY/FIXUP_ATOM/OVERLAP — the
+  error-correction activity that explains a slow rip). The status-line fidelity
+  summary now notes partially-accurate tracks, so a "12/14 verified" result
+  reads as a pressing-offset quirk rather than a bad rip.
 - **The rip record now shows actual elapsed time vs the ripper's estimate.**
   cyanrip's on-screen ETA is computed from the current read pass only, so it
   can't see secure re-read passes (`-Z N`) and badly under-estimates marginal

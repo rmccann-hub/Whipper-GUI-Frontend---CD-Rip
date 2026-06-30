@@ -116,6 +116,11 @@ def _build(
             "creation_date": getattr(rip_log, "creation_date", "") or None,
         },
         "accuraterip_summary": getattr(rip_log, "accuraterip_summary", "") or None,
+        "partially_accurate_summary": (
+            getattr(rip_log, "partially_accurate_summary", "") or None
+        ),
+        "disc_duration": getattr(rip_log, "disc_duration", "") or None,
+        "paranoia_counts": dict(getattr(rip_log, "paranoia_counts", {}) or {}) or None,
         "health_status": getattr(rip_log, "health_status", "") or None,
         "sha256_hash": getattr(rip_log, "sha256_hash", "") or None,
         "tracks": [_track(t) for t in (getattr(rip_log, "tracks", ()) or ())],
@@ -130,11 +135,17 @@ def _track(track: object) -> dict:
         "test_crc": getattr(track, "test_crc", "") or None,
         "copy_crc": getattr(track, "copy_crc", "") or None,
         "status": getattr(track, "status", "") or None,
+        # How many read passes cyanrip needed (its "(after N rips)"); None for
+        # whipper logs / a clean single-pass cyanrip track.
+        "rip_count": getattr(track, "rip_count", None),
         # The shared confidence>=1 rule — same as the banner and disc panel.
         "accuraterip_verified": track_accuraterip_verified(track),
         "accuraterip": {
             "v1": _ar(getattr(track, "accuraterip_v1", None)),
             "v2": _ar(getattr(track, "accuraterip_v2", None)),
+            # The +450-frame offset-pressing variant ("partially accurately
+            # ripped"). Surfaced as data; NOT counted as a plain verified match.
+            "offset_450": _ar(getattr(track, "accuraterip_offset", None)),
         },
     }
 

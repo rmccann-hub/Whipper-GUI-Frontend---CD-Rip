@@ -77,13 +77,97 @@ def test_full_log_parses_tracks() -> None:
     assert one.accuraterip_v2 is not None
     assert one.accuraterip_v2.confidence == 2
 
+    # A clean single-pass track records no explicit rip count.
+    assert one.rip_count is None
+    assert one.accuraterip_offset is None
+
     two = log.tracks[1]
     assert two.status == "ripped with errors"
     assert two.copy_crc == "00FF00FF"  # "(after N rips)" suffix tolerated
+    assert two.rip_count == 5  # ...and the count is captured from that suffix
     assert two.pre_emphasis is True
     assert two.accuraterip_v1 is not None
     assert two.accuraterip_v1.confidence is None  # not found → no confidence
     assert two.accuraterip_v2 is None
+
+
+# --- The -Z secure-rerip extras (offset variant, partial summary, …) ---------
+
+# A marginal-disc shape: a track that only matched the +450-frame offset
+# variant after several re-reads, plus the finish-report extras cyanrip writes
+# under -Z. Mirrors the real Police "Classics" rip (tracks 3 & 5).
+_MARGINAL_LOG = """\
+cyanrip 0.9.3 (release)
+Offset:         +667 samples
+Total time:     00:59:42.354
+
+Track 3 ripped and encoded successfully!
+  Preemphasis:   none detected
+  EAC CRC32:     7E50D2FA (after 5 rips)
+  Accurip:       found in database
+    Accurip 450: BF62B1DA (matches Accurip DB, confidence 200, track is partially accurately ripped)
+
+Tracks ripped accurately: 12/14
+Tracks ripped partially accurately: 2/2
+
+Paranoia status counts:
+  READ:          71948
+  VERIFY:        11098
+  FIXUP_ATOM:    193
+  OVERLAP:       1677
+
+Ripping errors: 0
+Ripping finished at 2026-06-29T21:36:39
+"""
+
+
+def test_disc_duration_captured_from_start_report() -> None:
+    log = parse_cyanrip_log(_MARGINAL_LOG)
+    # The disc's AUDIO length — not the rip wall-clock (that lives in the JSON
+    # report's timing section, measured by the GUI).
+    assert log.disc_duration == "00:59:42.354"
+
+
+def test_rip_count_captured_from_after_n_rips() -> None:
+    log = parse_cyanrip_log(_MARGINAL_LOG)
+    assert log.tracks[0].rip_count == 5
+
+
+def test_offset_variant_match_is_captured_but_not_a_plain_match() -> None:
+    log = parse_cyanrip_log(_MARGINAL_LOG)
+    track = log.tracks[0]
+    # The "Accurip 450" offset-pressing variant is recorded as data...
+    assert track.accuraterip_offset is not None
+    assert track.accuraterip_offset.version == 450
+    assert track.accuraterip_offset.confidence == 200
+    assert track.accuraterip_offset.local_crc == "BF62B1DA"
+    # ...but it is NOT a plain v1/v2 match, so the shared "verified" rule
+    # (confidence>=1 on v1/v2) does not over-claim it as accurately ripped.
+    from platterpus.parsers.rip_log import track_accuraterip_verified
+
+    assert track.accuraterip_v1 is None
+    assert track.accuraterip_v2 is None
+    assert track_accuraterip_verified(track) is False
+
+
+def test_partial_accurate_summary_and_paranoia_counts() -> None:
+    log = parse_cyanrip_log(_MARGINAL_LOG)
+    assert "2/2" in log.partially_accurate_summary
+    assert log.paranoia_counts == {
+        "READ": 71948,
+        "VERIFY": 11098,
+        "FIXUP_ATOM": 193,
+        "OVERLAP": 1677,
+    }
+
+
+def test_paranoia_block_ends_cleanly_before_finish_lines() -> None:
+    # The block must not swallow the "Ripping errors:" / "finished at" lines
+    # that follow it (they don't match the indented KEY: N shape, so the block
+    # closes). Health + date still parse.
+    log = parse_cyanrip_log(_MARGINAL_LOG)
+    assert log.health_status == "No errors occurred"
+    assert log.creation_date == "2026-06-29T21:36:39"
 
 
 # --- Medium: negative offset, zero errors normalize like whipper ------------

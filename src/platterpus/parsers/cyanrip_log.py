@@ -57,13 +57,25 @@ _TRACK_START = re.compile(
     r"^Track (?P<number>\d+) "
     r"(?P<what>ripped and encoded successfully!|ripped and encoded with errors\.|is data:)"
 )
+# "Total time:     00:59:42.354" — the disc's AUDIO duration (start report).
+_TOTAL_TIME = re.compile(r"^Total time:\s+(?P<time>\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)")
 _PREEMPHASIS = re.compile(r"^\s+Preemphasis:\s+(?P<text>.+?)\s*$")
-# "  EAC CRC32:     A1B2C3D4" with an optional "(after N rips)" suffix.
-_EAC_CRC = re.compile(r"^\s+EAC CRC32:\s+(?P<crc>[0-9A-Fa-f]{8})")
+# "  EAC CRC32:     A1B2C3D4" with an optional "(after N rips)" suffix — the
+# rip-pass count for the track (1 if absent; higher means -Z secure re-reads).
+_EAC_CRC = re.compile(
+    r"^\s+EAC CRC32:\s+(?P<crc>[0-9A-Fa-f]{8})"
+    r"(?:\s+\(after\s+(?P<rips>\d+)\s+rips?\))?"
+)
 # "    Accurip v1:  12345678 (accurately ripped, confidence 3)" — the
 # parenthetical varies ("not found, either a new pressing, or bad rip").
 _ACCURIP_TRACK = re.compile(
     r"^\s+Accurip v(?P<version>[12]):\s+(?P<crc>[0-9A-Fa-f]{8})"
+    r"(?:\s+\((?P<result>[^)]*)\))?"
+)
+# "    Accurip 450: BF62B1DA (matches Accurip DB, confidence 200, track is
+# partially accurately ripped)" — the +450-frame offset-pressing variant.
+_ACCURIP_OFFSET = re.compile(
+    r"^\s+Accurip 450:\s+(?P<crc>[0-9A-Fa-f]{8})"
     r"(?:\s+\((?P<result>[^)]*)\))?"
 )
 _ACCURIP_CONFIDENCE = re.compile(r"confidence\s+(?P<value>\d+)")
@@ -71,8 +83,15 @@ _ACCURIP_CONFIDENCE = re.compile(r"confidence\s+(?P<value>\d+)")
 _ACCURATE_TOTAL = re.compile(
     r"^Tracks ripped accurately:\s+(?P<hit>\d+)/(?P<total>\d+)"
 )
+# "Tracks ripped partially accurately: 2/2" — offset-variant matches.
+_PARTIAL_TOTAL = re.compile(
+    r"^Tracks ripped partially accurately:\s+(?P<hit>\d+)/(?P<total>\d+)"
+)
 _RIP_ERRORS = re.compile(r"^Ripping errors:\s+(?P<count>\d+)")
 _FINISHED_AT = re.compile(r"^Ripping finished at\s+(?P<when>.+?)\s*$")
+# The "Paranoia status counts:" block header, then indented "KEY:  N" lines.
+_PARANOIA_HEADER = re.compile(r"^Paranoia status counts:\s*$")
+_PARANOIA_LINE = re.compile(r"^\s+(?P<key>[A-Z][A-Z_]*):\s+(?P<count>\d+)\s*$")
 
 
 def looks_like_cyanrip_log(text: str) -> bool:
@@ -98,7 +117,11 @@ def parse_cyanrip_log(text: str) -> RipLog:
     drive = ""
     read_offset: int | None = None
     accuraterip_summary = ""
+    partially_accurate_summary = ""
+    disc_duration = ""
     health_status = ""
+    paranoia_counts: dict[str, int] = {}
+    in_paranoia = False
     tracks: list[TrackResult] = []
 
     # Mutable fields of the track block currently being read; flushed into
@@ -117,6 +140,8 @@ def parse_cyanrip_log(text: str) -> RipLog:
                 status=current["status"],
                 accuraterip_v1=current["v1"],
                 accuraterip_v2=current["v2"],
+                accuraterip_offset=current["offset"],
+                rip_count=current["rip_count"],
             )
         )
         current = None
@@ -138,6 +163,24 @@ def parse_cyanrip_log(text: str) -> RipLog:
             read_offset = -value if match.group("sign") == "-" else value
             continue
 
+        match = _TOTAL_TIME.match(line)
+        if match:
+            disc_duration = match.group("time")
+            continue
+
+        # The Paranoia status counts block: a header then indented "KEY: N"
+        # lines. Stay in the block only while lines keep matching, so a later
+        # finish line (e.g. "Ripping errors:") cleanly ends it.
+        if _PARANOIA_HEADER.match(line):
+            in_paranoia = True
+            continue
+        if in_paranoia:
+            match = _PARANOIA_LINE.match(line)
+            if match:
+                paranoia_counts[match.group("key")] = int(match.group("count"))
+                continue
+            in_paranoia = False  # block ended; fall through to other handlers
+
         match = _TRACK_START.match(line)
         if match:
             flush()
@@ -155,6 +198,8 @@ def parse_cyanrip_log(text: str) -> RipLog:
                 "status": status,
                 "v1": None,
                 "v2": None,
+                "offset": None,
+                "rip_count": None,
             }
             continue
 
@@ -167,6 +212,9 @@ def parse_cyanrip_log(text: str) -> RipLog:
             match = _EAC_CRC.match(line)
             if match:
                 current["copy_crc"] = match.group("crc").upper()
+                rips = match.group("rips")
+                if rips is not None:
+                    current["rip_count"] = int(rips)
                 continue
 
             match = _ACCURIP_TRACK.match(line)
@@ -182,11 +230,34 @@ def parse_cyanrip_log(text: str) -> RipLog:
                 current[f"v{ar.version}"] = ar
                 continue
 
+            match = _ACCURIP_OFFSET.match(line)
+            if match:
+                result_text = match.group("result") or ""
+                conf_match = _ACCURIP_CONFIDENCE.search(result_text)
+                # version=450 is a sentinel for "the +450-frame offset variant"
+                # — it isn't a real AccurateRip protocol version, just how
+                # cyanrip labels this pressing-offset match.
+                current["offset"] = AccurateRipResult(
+                    version=450,
+                    result=result_text,
+                    confidence=int(conf_match.group("value")) if conf_match else None,
+                    local_crc=match.group("crc").upper(),
+                )
+                continue
+
         match = _ACCURATE_TOTAL.match(line)
         if match:
             accuraterip_summary = (
                 f"{match.group('hit')}/{match.group('total')} tracks "
                 "ripped accurately (AccurateRip)"
+            )
+            continue
+
+        match = _PARTIAL_TOTAL.match(line)
+        if match:
+            partially_accurate_summary = (
+                f"{match.group('hit')}/{match.group('total')} tracks "
+                "ripped partially accurately (offset-variant match)"
             )
             continue
 
@@ -217,4 +288,7 @@ def parse_cyanrip_log(text: str) -> RipLog:
         tracks=tuple(tracks),
         accuraterip_summary=accuraterip_summary,
         health_status=health_status,
+        partially_accurate_summary=partially_accurate_summary,
+        disc_duration=disc_duration,
+        paranoia_counts=paranoia_counts,
     )

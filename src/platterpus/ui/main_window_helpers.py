@@ -108,7 +108,7 @@ def fidelity_summary(rip_log: object) -> str:
         if clause is None:  # no per-track AR data → legacy summary-string fallback
             ar = getattr(rip_log, "accuraterip_summary", "") or ""
             clause = f" AccurateRip: {ar}." if ar and not ar.startswith("0/") else ""
-        return summary + clause
+        return summary + clause + _partial_accurate_clause(rip_log)
     verified = sum(
         1
         for t in tracks
@@ -128,7 +128,26 @@ def fidelity_summary(rip_log: object) -> str:
         clause = (
             " AccurateRip confirmed." if "exact match" in ar or "found" in ar else ""
         )
-    return summary + clause
+    return summary + clause + _partial_accurate_clause(rip_log)
+
+
+def _partial_accurate_clause(rip_log: object) -> str:
+    """A short note when some tracks matched ONLY the +450-frame offset variant.
+
+    cyanrip reports these "partially accurately ripped": the audio is almost
+    certainly correct (it matches AccurateRip at the common pressing offset),
+    but it's honestly distinct from a plain exact match — so the user
+    understands why, say, "12/14 verified" isn't "14/14" without it reading as a
+    bad rip. Empty when there were none (the common case). Never raises.
+    """
+    count = 0
+    for track in getattr(rip_log, "tracks", ()) or ():
+        if getattr(track, "accuraterip_offset", None) is not None:
+            count += 1
+    if count == 0:
+        return ""
+    noun = "track" if count == 1 else "tracks"
+    return f" {count} {noun} partially accurate (offset-variant match)."
 
 
 def _accuraterip_clause(rip_log: object) -> str | None:

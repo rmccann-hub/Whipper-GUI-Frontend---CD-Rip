@@ -118,6 +118,16 @@ class TrackResult:
     status: str = ""
     accuraterip_v1: AccurateRipResult | None = None
     accuraterip_v2: AccurateRipResult | None = None
+    # cyanrip's offset-variant AccurateRip match ("Accurip 450:"). A pressing
+    # whose start is shifted by the common +450-frame offset still matches the
+    # database here — cyanrip reports the track "partially accurately ripped".
+    # It's surfaced as data (not folded into the verified rule) so the verdict
+    # never over-claims a plain match; see docs/architecture.md.
+    accuraterip_offset: AccurateRipResult | None = None
+    # How many read passes cyanrip needed for this track (its "(after N rips)"
+    # suffix). 1 = clean single pass; higher means secure re-reads (-Z N) were
+    # needed — the clearest per-track signal of a marginal read region.
+    rip_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -131,6 +141,16 @@ class RipLog:
     accuraterip_summary: str = ""
     health_status: str = ""
     sha256_hash: str = ""
+    # cyanrip-only finish-report extras (empty/absent for whipper logs):
+    # "Tracks ripped partially accurately: X/Y" — tracks that matched only the
+    # offset-variant (see TrackResult.accuraterip_offset).
+    partially_accurate_summary: str = ""
+    # "Total time: HH:MM:SS.mmm" from the start report — the disc's AUDIO length,
+    # not the rip's wall-clock (which only the GUI measures; see rip_timing).
+    disc_duration: str = ""
+    # cyanrip's "Paranoia status counts" block (READ/VERIFY/FIXUP_ATOM/OVERLAP/…)
+    # — error-correction activity. High counts explain a slow, re-read-heavy rip.
+    paranoia_counts: dict[str, int] = field(default_factory=dict)
 
 
 # --- AccurateRip "is this track verified?" — the ONE shared definition -------

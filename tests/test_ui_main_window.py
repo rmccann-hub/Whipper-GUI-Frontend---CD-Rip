@@ -1107,6 +1107,32 @@ def test_fidelity_summary_cyanrip_clean_rip() -> None:
     assert "CRCs match" not in summary  # never claim a check that didn't run
 
 
+def test_fidelity_summary_notes_partial_offset_variant_tracks() -> None:
+    """A track that only matched the +450-frame offset variant is called out as
+    'partially accurate' — so a 'verified' shortfall reads as a pressing-offset
+    quirk, not a bad rip (mirrors the real Police 'Classics' rip)."""
+    rip_log = RipLog(
+        log_creator="cyanrip 0.9.3",
+        tracks=(
+            TrackResult(
+                number=1,
+                copy_crc="AAAA",
+                status="ripped successfully",
+                accuraterip_v2=AccurateRipResult(version=2, confidence=120),
+            ),
+            TrackResult(
+                number=2,
+                copy_crc="BBBB",
+                status="ripped successfully",
+                accuraterip_offset=AccurateRipResult(version=450, confidence=200),
+            ),
+        ),
+        health_status="No errors occurred",
+    )
+    summary = _fidelity_summary(rip_log)
+    assert "1 track partially accurate (offset-variant match)." in summary
+
+
 def test_fidelity_summary_prefers_per_track_ar_over_summary_string() -> None:
     """When per-track AccurateRip data is present, the status line counts it with
     the SAME confidence>=1 rule as the verdict banner — not the summary string —
