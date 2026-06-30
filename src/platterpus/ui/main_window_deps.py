@@ -230,27 +230,67 @@ class DependencyMixin:
         install actually finishes (`set_install_phase_active` disables Cancel;
         `show_close_button` reveals Close at the end).
 
-        The install machinery is reused, not duplicated (Critical Rule #6): the
-        registry's metadata still decides each dep's action — `from_setup_wizard`
-        tools (whipper, cyanrip, flac, metaflac) install via the single setup
-        wizard; packaged deps (`install_command`, e.g. Picard) via the
-        AutoInstaller. Deps that genuinely can't be installed from here (a
-        missing bundled package → "reinstall the AppImage") fall back to the
-        per-item manual dialog afterwards. Outcomes land in
-        `report.install_results`, exactly as the old path produced.
+        The install machinery is reused, not duplicated (Critical Rule #6), but
+        it splits by *where the install has to run*:
+
+        * `from_setup_wizard` tools (cyanrip, flac, metaflac) install through the
+          host-setup wizard, which is a **GUI** dialog with its own gated,
+          off-thread progress — so it's opened here on the GUI thread, once (it
+          installs the whole container stack in one run), and each tool is then
+          re-probed for its result. These never go through the PendingInstalls
+          loop, because that loop now runs off the GUI thread and must not open
+          a dialog from a worker thread.
+        * packaged deps (`install_command`, e.g. Picard) are a plain subprocess
+          install, so they go through the `PendingInstallsDialog`, which runs the
+          install **off the GUI thread** (the fix for the 0.4.2 freeze where a
+          Picard Flatpak install on the GUI thread locked the whole window).
+
+        Deps that genuinely can't be installed from here (a missing bundled
+        package → "reinstall the AppImage") fall back to the per-item manual
+        dialog. Outcomes land in `report.install_results`.
         """
+        from platterpus.deps.version import meets_minimum
+
         missing = list(getattr(report, "missing", []))
-        installable = [
+        wizard_items = [
+            item for item in missing if getattr(item.spec, "from_setup_wizard", False)
+        ]
+        command_items = [
             item
             for item in missing
-            if getattr(item.spec, "from_setup_wizard", False)
-            or item.spec.install_command is not None
+            if item not in wizard_items and item.spec.install_command is not None
         ]
-        manual_only = [item for item in missing if item not in installable]
+        manual_only = [
+            item
+            for item in missing
+            if item not in wizard_items and item not in command_items
+        ]
 
-        if installable:
+        # 1. Container tools → the setup wizard (GUI thread, internally async).
+        #    Open it once; it installs them all, then probe each for its result.
+        if wizard_items:
+            self.open_host_setup_dialog()
+            for item in wizard_items:
+                probe = item.spec.probe()
+                ok = probe.present and meets_minimum(
+                    probe.version, item.spec.min_version
+                )
+                report.install_results.append(
+                    InstallResult(
+                        spec=item.spec,
+                        success=ok,
+                        message=(
+                            "installed via setup wizard"
+                            if ok
+                            else "still missing after setup — re-run the wizard"
+                        ),
+                    )
+                )
+
+        # 2. Packaged deps → the off-GUI-thread PendingInstallsDialog.
+        if command_items:
             dialog = PendingInstallsDialog(
-                installable, install_one=self._make_unified_install_one(), parent=self
+                command_items, install_one=self._make_install_one(), parent=self
             )
             dialog.exec()
             report.install_results.extend(dialog.results())
@@ -268,53 +308,6 @@ class DependencyMixin:
                     ),
                 )
             )
-
-    def _make_unified_install_one(self) -> Callable[[MissingItem], InstallResult]:
-        """The per-row installer the unified dialog drives.
-
-        Dispatches by the registry metadata: `from_setup_wizard` tools open the
-        one container setup wizard (which installs *all* of them in a single
-        run — whipper, cyanrip, flac, metaflac — so we only open it once, then
-        re-probe each row); packaged deps install via the AutoInstaller's
-        subprocess machinery (same code the auto/queued resolvers use).
-        """
-        from platterpus.deps.version import meets_minimum
-
-        auto = AutoInstaller(consent=lambda _: True)
-        # The setup wizard installs every container tool in one run, so open it
-        # at most once no matter how many wizard-provided rows are ticked.
-        state = {"wizard_ran": False}
-
-        def install_one(item: MissingItem) -> InstallResult:
-            spec = item.spec
-            if getattr(spec, "from_setup_wizard", False):
-                if not state["wizard_ran"]:
-                    # Blocks until the wizard dialog is closed; it has its own
-                    # gated progress UI and installs the whole container stack.
-                    self.open_host_setup_dialog()
-                    state["wizard_ran"] = True
-                probe = spec.probe()
-                ok = probe.present and meets_minimum(probe.version, spec.min_version)
-                return InstallResult(
-                    spec=spec,
-                    success=ok,
-                    message=(
-                        "installed via setup wizard"
-                        if ok
-                        else "still missing after setup — re-run the wizard"
-                    ),
-                )
-            if spec.install_command is not None:
-                results = auto.resolve([item])
-                if results:
-                    return results[0]
-            return InstallResult(
-                spec=spec,
-                success=False,
-                message=f"manual install required — search: {spec.search_string}",
-            )
-
-        return install_one
 
     def _gui_auto_consent(self, items: list[MissingItem]) -> bool:
         if not items:

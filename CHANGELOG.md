@@ -11,6 +11,18 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Fixed
+- **The app no longer freezes while installing a dependency.** Installing an
+  optional component (e.g. the Picard Flatpak) ran the install **on the UI
+  thread**, so the whole window locked up — unclickable, not repainting — until
+  the download finished (real-user report on 0.4.2). The install now runs on a
+  worker thread, so the dialog stays live and shows per-row progress; the window
+  never freezes. The dialog also refuses to close mid-install (the title-bar ✕
+  is gated too, not just Cancel) and is wider so its text no longer truncates.
+  Container tools still install through the setup wizard (which has always had
+  its own off-thread progress), and only that wizard — not the install loop —
+  ever opens on the UI thread.
+
 ## [0.4.2] — 2026-06-30
 
 ### Added

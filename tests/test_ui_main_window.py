@@ -2542,7 +2542,17 @@ def test_dialog_queued_resolver_returns_install_results(
         )
 
     def fake_exec(self: PendingInstallsDialog) -> int:
+        # The install now runs on a worker thread (the 0.4.2 freeze fix), so
+        # pump the event loop until it finishes — otherwise the dialog would be
+        # GC'd with its QThread still running (a hard abort), and results()
+        # would be read empty.
+        import time
+
         self._run_install_loop()
+        deadline = time.monotonic() + 5.0
+        while self._close_button is None and time.monotonic() < deadline:
+            qapp.processEvents()
+            time.sleep(0.005)
         return int(self.DialogCode.Accepted)
 
     monkeypatch.setattr(PendingInstallsDialog, "exec", fake_exec)
@@ -2567,12 +2577,13 @@ def test_dialog_queued_resolver_empty_items_is_noop(qapp) -> None:
 # --- Unified dependency dialog (items 2+6: one dialog, wizard once) --------
 
 
-def test_resolve_missing_unified_uses_one_dialog_and_opens_wizard_once(
+def test_resolve_missing_unified_opens_wizard_once_for_container_tools(
     teardown_threads, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """All installable missing deps resolve through ONE PendingInstallsDialog,
-    and the container setup wizard opens at most once even when several
-    `from_setup_wizard` tools are missing (it installs them all in one run)."""
+    """`from_setup_wizard` tools install via the host-setup wizard, opened once
+    (it installs them all in one run), then re-probed for their result. They do
+    NOT go through PendingInstallsDialog — that loop runs off the GUI thread and
+    must never open a dialog from a worker thread."""
     from platterpus.deps.checks import ProbeResult
     from platterpus.deps.manager import DependencyReport
     from platterpus.deps.registry import DependencySpec, Tier
@@ -2599,8 +2610,7 @@ def test_resolve_missing_unified_uses_one_dialog_and_opens_wizard_once(
             spec=spec, probe=ProbeResult(present=False, version=None, location=None)
         )
 
-    # Count how many dialogs get built (must be exactly one) and drive the
-    # install loop synchronously instead of blocking on a modal exec().
+    # No PendingInstallsDialog should be built for wizard-only tools.
     dialogs_built: list[PendingInstallsDialog] = []
     orig_init = PendingInstallsDialog.__init__
 
@@ -2609,11 +2619,6 @@ def test_resolve_missing_unified_uses_one_dialog_and_opens_wizard_once(
         dialogs_built.append(self)
 
     monkeypatch.setattr(PendingInstallsDialog, "__init__", counting_init)
-    monkeypatch.setattr(
-        PendingInstallsDialog,
-        "exec",
-        lambda self: (self._run_install_loop(), int(self.DialogCode.Accepted))[1],
-    )
 
     window = teardown_threads()
     wizard_opens: list[bool] = []
@@ -2625,14 +2630,14 @@ def test_resolve_missing_unified_uses_one_dialog_and_opens_wizard_once(
     monkeypatch.setattr(window, "open_host_setup_dialog", fake_wizard)
 
     report = DependencyReport(
-        missing=[_wizard_item("whipper"), _wizard_item("metaflac")]
+        missing=[_wizard_item("cyanrip"), _wizard_item("metaflac")]
     )
     window._resolve_missing_unified(report)
 
-    assert len(dialogs_built) == 1  # one dialog, not one-per-dep
-    assert wizard_opens == [True]  # wizard opened exactly once
+    assert dialogs_built == []  # wizard tools don't use the install dialog
+    assert wizard_opens == [True]  # wizard opened exactly once for both tools
     assert {r.spec.dep_id: r.success for r in report.install_results} == {
-        "whipper": True,
+        "cyanrip": True,
         "metaflac": True,
     }
 
