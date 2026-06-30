@@ -53,7 +53,9 @@ and important settings were scattered across many dialogs.
    ⚠️ partial — we surface per-track status; no timestamp-level playback (gap #3).
 6. **Two logs, always — and tamper-evident.** A human-readable narrative *and* a
    machine-readable structure. *Platterpus:* ✅ human log + the EAC-layout
-   renderer; ⚠️ no machine-readable (JSON) log yet (gap #2).
+   renderer, **plus** the per-rip `.platterpus.json` (the machine-readable log,
+   gap #2 — shipped 2026-06-28; it embeds this session's log so one file is a
+   self-contained debug record, 0.4.2).
 7. **Per-drive profiles, keyed by stable hardware identity.** Separate
    learned-once drive facts (offset, cache, C2) from per-disc session state, with
    *provenance + confidence* on each detection. *Platterpus:* ✅ a drive-profile
@@ -72,8 +74,13 @@ and important settings were scattered across many dialogs.
    happy path. *Platterpus:* ✅ in-app User Guide + tooltips.
 10. **Accessibility from the start.** Accessible names on every control, keyboard
     access to every action, status conveyed by **text/symbol, never colour
-    alone**, focus-safe live updates. *Platterpus:* ⚠️ the weakest dimension
-    (gap #4) — and the reports flag this as the most common modern miss.
+    alone**, focus-safe live updates. *Platterpus:* 🟡 much improved (gap #4,
+    pass shipped 0.4.4): the status/verdict surfaces, the metadata fields, and
+    the disc-info values all carry accessible names; trust is signalled by
+    text + symbol, never colour alone; menus have mnemonics and the everyday
+    actions (Quit/Settings/User Guide) have platform-standard shortcuts. Still
+    open: a full keyboard-reachability sweep of every control and focus-safe
+    *live* announcements as a rip progresses.
 
 ## Gap backlog (ranked) — tracked in [`TASKS.md`](../TASKS.md)
 
@@ -85,16 +92,19 @@ user impact ÷ effort:
 | 1 | **Goal presets** ("Fast verified" / "Archival exact" / "Portable") | Anchors all config to user *intent* instead of asking novices to reason about abstract toggles first (EAC's "accuracy vs speed" was this, bluntly). | M |
 | 2 | ✅ **Machine-readable (JSON) log** beside the human one (`platterpus.rip_report` → `<name>.platterpus.json`; 2026-06-28) | Powers QA, re-verification, repair tooling, support; "two outputs every time." | S–M |
 | 3 | **Timestamp-localized anomalies + one-click playback** of flagged regions | The single most "friendly to demanding users" EAC trait — review only where confidence broke, not the whole disc. | M (HW-gated) |
-| 4 | **Accessibility pass** | Accessible names, keyboard coverage, non-colour-only status, focus-safe live updates. Reports rank this the #1 modern gap. | S–M |
+| 4 | 🟡 **Accessibility pass** (names on status/metadata/disc-info surfaces, text+symbol status, menu mnemonics + standard shortcuts; 0.4.4) | Accessible names, keyboard coverage, non-colour-only status, focus-safe live updates. Reports rank this the #1 modern gap. *Remaining:* full keyboard-reachability sweep + focus-safe live announcements. | S–M |
 | 5 | ✅ **Outcome-oriented wording** across Settings/labels (overread + drive-setup cache verdict reworded effect-first; 2026-06-29) | Cuts the learning cost without removing the precise term. | S |
 | 6 | ✅ **Drive profiles keyed by stable fingerprint** + detection provenance/confidence (record/display/guard ledger shipped 2026-06-29; per-drive offset *application* deferred as hardware-gated — KDD-23) | Identical-drive collisions and silent wrong-offset rips are the classic *state* bugs (EAC hit exactly this in 2007). | M |
 
-**Status:** gaps #1, #2, #4, #5 shipped 2026-06-28; #6 shipped 2026-06-29 (the
+**Status:** gaps #1, #2, #5 shipped 2026-06-28; #6 shipped 2026-06-29 (the
 record/display/guard ledger; per-drive offset *application* deferred as
-hardware-gated). Only #3 (timestamp-localized anomalies + one-click playback)
-remains — it is hardware-gated (needs real anomaly-bearing rip output to write
-a position-level parser against, and a real FLAC + CC0 sample to validate
-playback).
+hardware-gated); #4 had its first substantive pass in 0.4.4 (🟡 — accessible
+names on the status/metadata/disc-info surfaces, text+symbol status, menu
+mnemonics + standard shortcuts; a full keyboard-reachability sweep and
+focus-safe live announcements remain). Only #3 (timestamp-localized anomalies +
+one-click playback) is untouched — it is hardware-gated (needs real
+anomaly-bearing rip output to write a position-level parser against, and a real
+FLAC + CC0 sample to validate playback).
 
 ## The bar for new features
 

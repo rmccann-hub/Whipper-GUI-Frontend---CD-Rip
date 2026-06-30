@@ -11,6 +11,8 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-06-30
+
 ### Added
 - **Accessibility pass.** Keyboard and screen-reader coverage of the everyday
   surfaces: the album artist/title/year fields and the disc-info values (drive,
@@ -1207,7 +1209,8 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
-[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.2...v0.4.4
 [0.4.2]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/rmccann-hub/Platterpus/compare/v0.3.10...v0.4.0
