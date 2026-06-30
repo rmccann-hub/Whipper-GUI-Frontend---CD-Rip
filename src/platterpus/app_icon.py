@@ -42,3 +42,22 @@ def app_icon() -> object | None:
     except Exception:  # noqa: BLE001 — a missing icon must never block startup
         log.debug("could not load app icon", exc_info=True)
         return None
+
+
+def logo_pixmap(size: int = 96) -> object | None:
+    """Return a square ``QPixmap`` of the logo at `size` px, or ``None``.
+
+    Used to put the logo *forward* in the UI (e.g. the About dialog header).
+    Best-effort and never raises — callers skip the image if it's ``None``.
+    """
+    try:
+        from PySide6.QtCore import QSize
+
+        icon = app_icon()
+        if icon is None:
+            return None
+        pixmap = icon.pixmap(QSize(size, size))  # type: ignore[attr-defined]
+        return None if pixmap.isNull() else pixmap
+    except Exception:  # noqa: BLE001 — a missing logo must never break a dialog
+        log.debug("could not build logo pixmap", exc_info=True)
+        return None

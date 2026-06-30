@@ -704,9 +704,11 @@ Decided 2026-06-04 (user-approved; this is a sanctioned evolution of the distrib
 
 **Status: all three slices SHIPPED** — (a) self-integration 2026-06-05, (c) host wizard 2026-06-05 (+ cyanrip step 2026-06-09), (b) self-update 2026-06-09 (zsync update-information embedded by an appimagetool re-pack in `build_appimage.sh`; `.zsync` uploaded by release.yml; in-app Help → Check for updates… delegates to AppImageUpdate or the release page). Remaining proof is hardware/release-gated: a real delta update needs two consecutive releases with the embed (v0.2.0 → v0.3.0).
 
-### KDD-18 — cyanrip is the strategic successor backend; never fork whipper
+### KDD-18 — cyanrip is the ripping backend (whipper fully removed); never fork
 
 Decided 2026-06-04 after a researched ecosystem audit ([docs/archive/ecosystem-audit-2026-06.md](docs/archive/ecosystem-audit-2026-06.md)), prompted by whipper's `offset find` failing on real hardware (Pioneer BDR-209D) and the question of long-term foundation.
+
+> **AMENDED 2026-06-30 — whipper removed entirely; cyanrip is now the *sole* backend.** Research (the comparison in [docs/ripper-engine-strategy.md](docs/ripper-engine-strategy.md) + the two backend impls) confirmed cyanrip needs **nothing structural** for EAC parity — it already reaches AccurateRip confidence 200 / bit-perfect on the BDR-209D rig — and that whipper had **no functional advantage**: its only drive-dependent factor (the cd-paranoia >587 read-offset bug) *always* favours cyanrip, and its other edges (cdrdao gap detection, `--keep-going`, CD-R safety) are niche and feature-not-drive-dependent. With the maintainer's explicit sign-off, the whipper backend, its Settings option, its whipper-only rip flags, and its container install/export were all deleted; the `RipBackend` ABC moved to a neutral `adapters/rip_backend.py` (so a future engine can still slot in). The read offset now lives in the GUI's own config (cyanrip is fed it as `-s`; `whipper.conf` is kept read-only for reference). The "never fork" stance below stands unchanged. The original decision text is preserved as the record of how we got here.
 
 > **Under long-term research (2026-06-23, maintainer-requested).** The "never
 > fork" stance is the *current* operating decision, but the maintainer has asked

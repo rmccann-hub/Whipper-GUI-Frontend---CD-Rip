@@ -7,8 +7,8 @@
 #
 #   1. Ensure Distrobox + a container backend (podman/docker) are installed.
 #   2. Create the `ripping` Distrobox container (Fedora-based).
-#   3. Install whipper + flac + python3-setuptools inside it.
-#   4. Export the whipper/metaflac binaries to ~/.local/bin on the host.
+#   3. Install cyanrip (from the barsnick COPR) + flac inside it.
+#   4. Export the cyanrip/metaflac/flac binaries to ~/.local/bin on the host.
 #   5. Clone the repo (if not already inside it) and run dev-setup.sh
 #      (venv + editable install + desktop launcher).
 #
@@ -37,7 +37,6 @@ IMAGE="registry.fedoraproject.org/fedora-toolbox:latest"
 DRY_RUN=0
 ASSUME_YES=0
 DO_GUI=1
-DO_CYANRIP=0
 REPO_URL="https://github.com/rmccann-hub/Platterpus.git"
 # Where to clone if we're not already inside a checkout.
 CLONE_DIR="${PLATTERPUS_CLONE_DIR:-$HOME/Platterpus}"
@@ -46,14 +45,14 @@ usage() {
     cat <<'HELP'
 setup-host.sh — one-command host bootstrap for Platterpus.
 
-Automates README Steps 1-4 (Distrobox, the `ripping` container, whipper +
+Automates README Steps 1-4 (Distrobox, the `ripping` container, cyanrip +
 flac install, binary export) and then clones + installs the GUI.
 
 Steps performed:
   1. Ensure Distrobox + a container backend (podman/docker) are installed.
   2. Create the `ripping` container (Fedora-based).
-  3. Install whipper + flac + python3-setuptools inside it.
-  4. Export whipper/metaflac to ~/.local/bin on the host.
+  3. Install cyanrip (from the barsnick COPR) + flac inside it.
+  4. Export cyanrip/metaflac/flac to ~/.local/bin on the host.
   5. Clone the repo (if needed) and run dev-setup.sh.
 
 Not done here: drive calibration (use the GUI's drive setup wizard) and
@@ -65,7 +64,6 @@ Usage:
   bash setup-host.sh                 sane defaults
   bash setup-host.sh --yes           assume "yes" to confirmations
   bash setup-host.sh --dry-run       print every command, change nothing
-  bash setup-host.sh --cyanrip       also install + export the cyanrip backend
   bash setup-host.sh --no-gui        host stack only; skip clone + dev-setup
   bash setup-host.sh --container NAME --image IMAGE
   bash setup-host.sh --help
@@ -78,7 +76,6 @@ while [ $# -gt 0 ]; do
         --yes|-y) ASSUME_YES=1 ;;
         --dry-run) DRY_RUN=1 ;;
         --no-gui) DO_GUI=0 ;;
-        --cyanrip) DO_CYANRIP=1 ;;
         --container) shift; CONTAINER="${1:?--container needs a value}" ;;
         --image) shift; IMAGE="${1:?--image needs a value}" ;;
         -h|--help) usage; exit 0 ;;
@@ -220,21 +217,19 @@ ensure_container() {
     run distrobox create --yes --name "$CONTAINER" --image "$IMAGE"
 }
 
-# --- Step 3: whipper + metaflac --------------------------------------------
+# --- Step 3: cyanrip + flac ------------------------------------------------
 install_tools() {
-    step "Step 3/5 — whipper + flac + python3-setuptools (in container)"
-    # python3-setuptools is required because whipper 0.10 imports
-    # pkg_resources, which modern Python no longer bundles.
-    in_container sudo dnf install -y whipper flac python3-setuptools
+    step "Step 3/5 — flac + cyanrip (in container)"
+    # flac provides flac (decoder, for FLAC verify + the CTDB audio check) and
+    # metaflac (the tag editor used after a rip).
+    in_container sudo dnf install -y flac
 
-    if [ "$DO_CYANRIP" -eq 1 ]; then
-        echo "Installing cyanrip (optional backend) from its COPR"
-        # Fedora doesn't package cyanrip; the prebuilt source is the COPR
-        # barsnick/non-fed (GPG-checked). Same stanza the GUI's host-setup
-        # wizard writes (deps/host_setup.py) — keep the two in sync. The
-        # stanza is passed as a positional "$1" so $releasever is never
-        # shell-expanded; the repo is enabled only INSIDE the container.
-        in_container sudo sh -c 'printf %s "$1" > /etc/yum.repos.d/copr-barsnick-non-fed.repo' write-copr-repo \
+    # cyanrip is the sole ripping backend (KDD-18). Fedora doesn't package it;
+    # the prebuilt source is the COPR barsnick/non-fed (GPG-checked). Same
+    # stanza the GUI's host-setup wizard writes (deps/host_setup.py) — keep the
+    # two in sync. The stanza is passed as a positional "$1" so $releasever is
+    # never shell-expanded; the repo is enabled only INSIDE the container.
+    in_container sudo sh -c 'printf %s "$1" > /etc/yum.repos.d/copr-barsnick-non-fed.repo' write-copr-repo \
 '[copr:copr.fedorainfracloud.org:barsnick:non-fed]
 name=Copr repo for non-fed owned by barsnick (provides cyanrip)
 baseurl=https://download.copr.fedorainfracloud.org/results/barsnick/non-fed/fedora-$releasever-$basearch/
@@ -245,23 +240,20 @@ repo_gpgcheck=0
 skip_if_unavailable=True
 enabled=1
 '
-        in_container sudo dnf install -y cyanrip
-    fi
+    in_container sudo dnf install -y cyanrip
 }
 
 # --- Step 4: export to host ------------------------------------------------
 export_binaries() {
-    step "Step 4/5 — export whipper + metaflac to ~/.local/bin"
-    in_container distrobox-export --bin /usr/bin/whipper
+    step "Step 4/5 — export cyanrip + metaflac + flac to ~/.local/bin"
+    in_container distrobox-export --bin /usr/bin/cyanrip
     in_container distrobox-export --bin /usr/bin/metaflac
-    if [ "$DO_CYANRIP" -eq 1 ]; then
-        in_container distrobox-export --bin /usr/bin/cyanrip
-    fi
+    in_container distrobox-export --bin /usr/bin/flac
     if [ "$DRY_RUN" -eq 0 ]; then
-        if [ -x "$HOME/.local/bin/whipper" ]; then
-            echo "Exported: $HOME/.local/bin/whipper"
+        if [ -x "$HOME/.local/bin/cyanrip" ]; then
+            echo "Exported: $HOME/.local/bin/cyanrip"
         else
-            die "Export did not create ~/.local/bin/whipper — see README Step 4."
+            die "Export did not create ~/.local/bin/cyanrip — see README Step 4."
         fi
         case ":$PATH:" in
             *":$HOME/.local/bin:"*) ;;

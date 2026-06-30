@@ -50,6 +50,19 @@ class AboutDialog(QDialog):
         self.resize(560, 460)
 
         layout = QVBoxLayout(self)
+        # Put the logo forward: a centered header image above the version text.
+        # Best-effort — if the logo can't be loaded we just skip the image.
+        from platterpus.app_icon import logo_pixmap
+
+        pixmap = logo_pixmap(96)
+        if pixmap is not None:
+            from PySide6.QtCore import Qt
+            from PySide6.QtWidgets import QLabel
+
+            logo = QLabel(self)
+            logo.setPixmap(pixmap)  # type: ignore[arg-type]
+            logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(logo)
         layout.addWidget(_markdown_viewer(self, self._build_markdown()))
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)

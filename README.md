@@ -4,16 +4,16 @@
 
 # Platterpus
 
-**A secure, EAC-style CD ripper for Linux (FLAC, WAV, WavPack, MP3).** Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage. It drives the [`whipper`](https://github.com/whipper-team/whipper) and [`cyanrip`](https://github.com/cyanreg/cyanrip) ripping backends and verifies every rip against AccurateRip and CTDB.
+**A secure, EAC-style CD ripper for Linux (FLAC, WAV, WavPack, MP3).** Aims for EAC-equivalent (Exact Audio Copy) archival quality on Linux, packaged as a single-file AppImage. It drives the [`cyanrip`](https://github.com/cyanreg/cyanrip) ripping engine and verifies every rip against AccurateRip and CTDB.
 
-> **Status: v0.3.x — public pre-release.** Implemented end-to-end with 1,000+ tests (including a full-pipeline end-to-end test) at ~93% branch coverage, and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, with every track's Test CRC matching its Copy CRC. Highlights since v0.1.0: **no-terminal first-run setup** (the AppImage adds itself to your menu; a guided wizard installs the ripping stack), **read-offset auto-detect** from the bundled AccurateRip drive list (no disc needed), a selectable **cyanrip backend** alongside whipper, **multiple output formats** (FLAC is always the lossless master; WavPack/MP3/WAV are derived from it), **goal presets** (Fast verified / Archival exact / Portable) that anchor the settings to your intent, an at-a-glance **verification verdict** (AccurateRip + CTDB) with a machine-readable JSON rip report written beside the log, a per-drive **read-offset trust line** showing where the offset came from and how confident we are, **true in-app updates** (download → checksum-verify → self-restart), and **backend-independent cover art** from the Cover Art Archive. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Platterpus/issues) for anything you hit.
+> **Status: v0.4.x — public pre-release.** Implemented end-to-end with 1,000+ tests (including a full-pipeline end-to-end test) at ~93% branch coverage, and validated on real Bazzite hardware: a full 16-track rip *through the published AppImage*, AccurateRip-verified bit-perfect. Highlights: **no-terminal first-run setup** (the AppImage adds itself to your menu; a guided wizard installs the ripping stack), **read-offset auto-detect** from the bundled AccurateRip drive list (no disc needed), **cyanrip as the single ripping backend** (actively maintained, no >587 read-offset bug — whipper was retired, see KDD-18), **multiple output formats** (FLAC is always the lossless master; WavPack/MP3/WAV are derived from it), **goal presets** (Fast verified / Archival exact / Portable) that anchor the settings to your intent, an at-a-glance **verification verdict** (AccurateRip + CTDB) with a machine-readable JSON rip report written beside the log, a per-drive **read-offset trust line** showing where the offset came from and how confident we are, **true in-app updates** (download → checksum-verify → self-restart), and **cover art** from the Cover Art Archive. This is an early release for wider testing — expect rough edges, and please [open an issue](https://github.com/rmccann-hub/Platterpus/issues) for anything you hit.
 
 ## At a glance
 
 - **Linux only.** Primary target is Bazzite KDE Plasma 6; should work on any modern desktop Linux running Qt 6 (Fedora, Arch, Ubuntu, Tumbleweed).
-- **Runs whipper inside Distrobox.** The GUI calls the host-exported `whipper` binary; it never bundles whipper or tries to install it. This is intentional — see [PLANNING.md §8 KDD-07](PLANNING.md).
+- **Runs cyanrip inside Distrobox.** The GUI calls the host-exported `cyanrip` binary; it never bundles cyanrip or tries to install it itself (the guided wizard provisions the container). This is intentional — see [PLANNING.md §8 KDD-07](PLANNING.md).
 - **Single-file AppImage** for the GUI itself; no system-level installs required.
-- **Bypasses whipper's interactive prompt** by querying MusicBrainz directly and passing `--release-id` to whipper. You never see a terminal prompt.
+- **No terminal prompts from the ripper** — the GUI queries MusicBrainz directly, then runs cyanrip offline with the chosen release's tags, so its interactive prompt never surfaces.
 - **Choose your output format** — FLAC (default), WavPack, MP3, or WAV. FLAC is always produced as the lossless master; other formats are derived from it, so you never lose the archival copy. See [Audio output](#audio-output-what-you-get-what-you-dont).
 - **Distribution model:** AppImage primary, `pipx` secondary.
 
@@ -189,20 +189,25 @@ You're now inside the container. The prompt should change to show you're in the 
 
 > **Why `:latest` and not `:40`?** The brief specifies Fedora 40; newer Fedora releases (41, 42, 43, 44…) also work and ship newer security fixes. `:latest` resolves to whatever's current. If you specifically want to pin to Fedora 40 to match the brief exactly, swap `:latest` for `:40`.
 
-### Step 3 — Install whipper and metaflac
+### Step 3 — Install cyanrip and flac
+
+> **Easiest path:** run [`setup-host.sh`](setup-host.sh) (or the one-line installer above) — it adds cyanrip's COPR repo and installs everything for you. The manual steps below are only if you're doing it by hand.
 
 Inside the container (your prompt should still show you're in `ripping`):
 
 ```bash
-sudo dnf install whipper flac python3-setuptools
+# flac provides both the `flac` decoder and `metaflac` (the tag editor).
+sudo dnf install flac
+
+# cyanrip isn't packaged by Fedora — add the barsnick COPR (GPG-checked), then install it:
+sudo dnf copr enable barsnick/non-fed
+sudo dnf install cyanrip
 ```
 
-The `python3-setuptools` package is needed because whipper imports `pkg_resources` from setuptools, and recent Fedora releases (44+) don't pull it in automatically. Without it you'll see a `ModuleNotFoundError: No module named 'pkg_resources'` traceback when you try to run whipper.
-
-Verify both tools are installed:
+Verify the tools are installed:
 
 ```bash
-whipper --version
+cyanrip -V
 metaflac --version
 ```
 

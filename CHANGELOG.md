@@ -23,9 +23,13 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   detected read offset to Platterpus's own settings (cyanrip is fed it as `-s`;
   it reads no config file of its own). A legacy `whipper.conf` offset is still
   shown for reference. The backend interface (`RipBackend` ABC) stays so another
-  engine could be slotted in later.
+  engine could be slotted in later. The `setup-host.sh` / `install.sh` scripts
+  install cyanrip + flac (not whipper) now, and the docs (README, DEPENDENCIES,
+  PLANNING KDD-18, the user guide, the locked Critical Rules) were updated.
 
 ### Added
+- **The Platterpus logo now appears in the About dialog** (Help → About), above
+  the version and environment details.
 - **One dependency dialog instead of several.** A fresh install used to pop a
   separate dialog for each missing piece (whipper *and* metaflac each opened
   their own). Now every installable missing dependency is a single checkbox row

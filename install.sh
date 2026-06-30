@@ -2,7 +2,7 @@
 # install.sh — one-command, single-file installer for Platterpus (end users).
 #
 # Takes a machine from nothing to a launchable app:
-#   1. Host stack: Distrobox + the `ripping` container + whipper + flac,
+#   1. Host stack: Distrobox + the `ripping` container + cyanrip + flac,
 #      exported to ~/.local/bin (delegated to setup-host.sh --no-gui).
 #   2. The GUI: downloads the published AppImage release (or uses a local /
 #      freshly-built one) and parks it in ~/Applications.
@@ -45,7 +45,7 @@ usage() {
 install.sh — one-command installer for Platterpus.
 
 Installs everything an end user needs:
-  1. Host stack  : Distrobox + the `ripping` container + whipper + flac,
+  1. Host stack  : Distrobox + the `ripping` container + cyanrip + flac,
                    exported to ~/.local/bin (via setup-host.sh --no-gui).
   2. GUI         : downloads the published AppImage into ~/Applications.
   3. Shortcuts   : app-menu entry, Desktop icon, and an "Uninstall Whipper
@@ -140,7 +140,7 @@ HOST_FLAGS=()
 [ -n "$IMAGE" ] && HOST_FLAGS+=(--image "$IMAGE")
 
 if [ "$DO_HOST" -eq 1 ]; then
-    echo "==> 1/3 Host stack (Distrobox + ripping container + whipper)…"
+    echo "==> 1/3 Host stack (Distrobox + ripping container + cyanrip)…"
     host_sh="$(fetch_script setup-host.sh)" \
         || { echo "Couldn't obtain setup-host.sh." >&2; exit 1; }
     run bash "$host_sh" --no-gui "${HOST_FLAGS[@]}"
