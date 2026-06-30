@@ -117,17 +117,18 @@ def test_debug_logging_defaults_off_and_round_trips(
     assert config_module.load().debug_logging is True
 
 
-def test_ctdb_verify_defaults_off_and_round_trips(
+def test_ctdb_verify_defaults_on_and_round_trips(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _redirect_config(tmp_path, monkeypatch)
 
     cfg = config_module.load()
-    assert cfg.ctdb_verify_after_rip is False  # default off (network call)
+    # On by default (0.4.5): full verification of the master for every format.
+    assert cfg.ctdb_verify_after_rip is True
 
-    cfg.ctdb_verify_after_rip = True
+    cfg.ctdb_verify_after_rip = False
     config_module.save(cfg)
-    assert config_module.load().ctdb_verify_after_rip is True
+    assert config_module.load().ctdb_verify_after_rip is False
 
 
 def test_verify_flac_defaults_on_and_round_trips(

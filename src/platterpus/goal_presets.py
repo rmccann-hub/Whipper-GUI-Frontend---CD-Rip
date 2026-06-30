@@ -35,31 +35,39 @@ class GoalPreset:
 
     output_format: str
     ctdb_verify_after_rip: bool
+    verify_flac_after_rip: bool
     recompress_flac_after_rip: bool
     secure_rerip_matches: int
 
 
-# The three goals. NOTE: GOAL_FAST equals the shipping Config defaults, so the
-# default goal is "fast_verified" and adopting presets changed no behaviour.
-#   * Fast verified — lossless FLAC, AccurateRip-verified, no extra network/CPU.
-#   * Archival exact — also CTDB whole-disc verify + max-compression re-encode.
-#   * Portable — MP3 derived from the FLAC master, for phones/players.
+# The three goals. Verification is the constant across ALL of them — every rip
+# verifies the bit-perfect FLAC master with the full suite (AccurateRip always +
+# CTDB whole-disc + FLAC-integrity decode) BEFORE any transcode, because the
+# maintainer's bar is "verification is paramount for every format" (the FLAC
+# master is always kept; MP3/WavPack/WAV are derived from it afterward). The
+# presets differ only in OUTPUT and effort, not in how hard they check:
+#   * Fast verified — lossless FLAC, full verification, no max-compression pass.
+#   * Archival exact — same, plus a max-compression re-encode (smallest files).
+#   * Portable — MP3 derived from the (fully verified) FLAC master.
 PRESETS: dict[str, GoalPreset] = {
     GOAL_FAST: GoalPreset(
         output_format="flac",
-        ctdb_verify_after_rip=False,
+        ctdb_verify_after_rip=True,
+        verify_flac_after_rip=True,
         recompress_flac_after_rip=False,
         secure_rerip_matches=0,
     ),
     GOAL_ARCHIVAL: GoalPreset(
         output_format="flac",
         ctdb_verify_after_rip=True,
+        verify_flac_after_rip=True,
         recompress_flac_after_rip=True,
         secure_rerip_matches=0,
     ),
     GOAL_PORTABLE: GoalPreset(
         output_format="mp3",
-        ctdb_verify_after_rip=False,
+        ctdb_verify_after_rip=True,
+        verify_flac_after_rip=True,
         recompress_flac_after_rip=False,
         secure_rerip_matches=0,
     ),
@@ -68,9 +76,9 @@ PRESETS: dict[str, GoalPreset] = {
 # (key, human label) in display order — the Settings combo reads this. "Custom"
 # is appended by the dialog; it's not a real preset.
 GOAL_LABELS: list[tuple[str, str]] = [
-    (GOAL_FAST, "Fast verified — lossless, AccurateRip-checked (recommended)"),
-    (GOAL_ARCHIVAL, "Archival exact — also CTDB-verify + smallest lossless files"),
-    (GOAL_PORTABLE, "Portable — MP3 copy for phones/players"),
+    (GOAL_FAST, "Fast verified — lossless, fully verified (AccurateRip + CTDB)"),
+    (GOAL_ARCHIVAL, "Archival exact — fully verified + smallest lossless files"),
+    (GOAL_PORTABLE, "Portable — MP3 from a fully verified master"),
 ]
 
 
@@ -87,6 +95,7 @@ def apply_preset(config: Config, goal: str) -> Config:
         rip_goal=goal,
         output_format=preset.output_format,
         ctdb_verify_after_rip=preset.ctdb_verify_after_rip,
+        verify_flac_after_rip=preset.verify_flac_after_rip,
         recompress_flac_after_rip=preset.recompress_flac_after_rip,
         secure_rerip_matches=preset.secure_rerip_matches,
     )
@@ -102,6 +111,7 @@ def detect_goal(config: Config) -> str:
         if (
             config.output_format == preset.output_format
             and config.ctdb_verify_after_rip == preset.ctdb_verify_after_rip
+            and config.verify_flac_after_rip == preset.verify_flac_after_rip
             and config.recompress_flac_after_rip == preset.recompress_flac_after_rip
             and config.secure_rerip_matches == preset.secure_rerip_matches
         ):

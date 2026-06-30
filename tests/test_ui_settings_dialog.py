@@ -136,14 +136,15 @@ def test_auto_eject_reflects_config_and_round_trips(qapp: QApplication) -> None:
 
 def test_ctdb_verify_reflects_config_and_round_trips(qapp: QApplication) -> None:
     # Reflects the incoming config…
-    dialog = SettingsDialog(Config(ctdb_verify_after_rip=True))
-    assert dialog._ctdb_verify_check.isChecked() is True
+    dialog = SettingsDialog(Config(ctdb_verify_after_rip=False))
+    assert dialog._ctdb_verify_check.isChecked() is False
 
-    # …and defaults off, with a user toggle surviving to_config().
+    # …and defaults ON (0.4.5: full verification), with a user toggle-off
+    # surviving to_config().
     dialog2 = SettingsDialog(Config())
-    assert dialog2._ctdb_verify_check.isChecked() is False
-    dialog2._ctdb_verify_check.setChecked(True)
-    assert dialog2.to_config().ctdb_verify_after_rip is True
+    assert dialog2._ctdb_verify_check.isChecked() is True
+    dialog2._ctdb_verify_check.setChecked(False)
+    assert dialog2.to_config().ctdb_verify_after_rip is False
 
 
 def test_verify_flac_reflects_config_and_round_trips(qapp: QApplication) -> None:
@@ -230,8 +231,8 @@ def test_selecting_goal_applies_the_preset_to_controls(qapp: QApplication) -> No
 def test_editing_a_control_flips_goal_to_custom(qapp: QApplication) -> None:
     dialog = SettingsDialog(Config())
     assert dialog._goal_combo.currentData() == GOAL_FAST
-    # User hand-toggles CTDB on → no preset matches → Custom.
-    dialog._ctdb_verify_check.setChecked(True)
+    # Every preset verifies, so hand-toggling CTDB OFF matches none → Custom.
+    dialog._ctdb_verify_check.setChecked(False)
     assert dialog._goal_combo.currentData() == GOAL_CUSTOM
     assert dialog.to_config().rip_goal == GOAL_CUSTOM
 

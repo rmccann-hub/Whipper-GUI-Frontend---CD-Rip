@@ -177,7 +177,13 @@ class Config:
     # match is only "experimental" and is labelled as such in the UI. The
     # verify fails *safe*: a wrong CRC can only ever under-claim (NO_MATCH),
     # never fabricate a "verified".
-    ctdb_verify_after_rip: bool = False
+    # On by default (0.4.5): the maintainer's bar is "verification is paramount
+    # for every format", so a fresh install runs the full verification suite
+    # (AccurateRip + CTDB + FLAC-integrity) on the master before any transcode.
+    # The cost is a network lookup + a FLAC decode per rip; it fails safe and
+    # off-thread, and the user can still turn it off. (An existing config keeps
+    # whatever value it saved — defaults only fill an absent field.)
+    ctdb_verify_after_rip: bool = True
 
     # --- FLAC encode-verify ---
     # After a successful rip, run `flac --test` on each output FLAC to confirm it

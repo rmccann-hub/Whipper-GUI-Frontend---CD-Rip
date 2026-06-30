@@ -11,6 +11,17 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Changed
+- **Every rip now fully verifies the bit-perfect FLAC master before deriving any
+  format.** Verification used to be format-dependent (CTDB only ran under the
+  Archival goal). Now all three goals — and a fresh install — run the full suite
+  on the master: **AccurateRip** (always) + **CTDB** whole-disc + **FLAC-integrity
+  decode**, *before* any MP3/WavPack/WAV transcode. So a portable MP3 is derived
+  from a master that's had exactly the same proof as an archival FLAC. The FLAC
+  master is always kept. CTDB is now on by default (a network lookup + a decode
+  per rip; it fails safe and off-thread, and is still toggleable). The goals now
+  differ only in *output* and *compression effort*, never in how hard they check.
+
 ### Added
 - **File-naming presets with a live preview.** Settings has a new "Naming
   scheme" dropdown offering the layouts the popular tools use — *Artist / Album

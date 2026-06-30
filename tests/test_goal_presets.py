@@ -31,16 +31,26 @@ def test_apply_archival_sets_the_bundle() -> None:
 def test_apply_portable_selects_mp3() -> None:
     out = apply_preset(Config(), GOAL_PORTABLE)
     assert out.output_format == "mp3"
-    assert out.ctdb_verify_after_rip is False
+    # Every preset now fully verifies the master (incl. CTDB) before deriving.
+    assert out.ctdb_verify_after_rip is True
+    assert out.verify_flac_after_rip is True
     assert detect_goal(out) == GOAL_PORTABLE
 
 
+def test_every_preset_fully_verifies_the_master() -> None:
+    # Verification is the constant across all presets: AccurateRip is always on
+    # (cyanrip), and every preset enables CTDB + FLAC-integrity verify.
+    for goal in (GOAL_FAST, GOAL_ARCHIVAL, GOAL_PORTABLE):
+        out = apply_preset(Config(), goal)
+        assert out.ctdb_verify_after_rip is True
+        assert out.verify_flac_after_rip is True
+
+
 def test_hand_tuned_config_detects_as_custom() -> None:
-    # FLAC + CTDB on but NOT recompressed matches no preset.
+    # Turning verification OFF matches no preset (they all verify) → Custom.
     cfg = Config(
         output_format="flac",
-        ctdb_verify_after_rip=True,
-        recompress_flac_after_rip=False,
+        ctdb_verify_after_rip=False,
     )
     assert detect_goal(cfg) == GOAL_CUSTOM
 

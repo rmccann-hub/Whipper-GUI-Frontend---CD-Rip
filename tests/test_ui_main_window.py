@@ -3024,7 +3024,8 @@ class _FakeCtdbClient(CTDBClient):
 
 
 def test_ctdb_verify_skipped_when_disabled(teardown_threads, tmp_path: Path) -> None:
-    window = teardown_threads()  # default config: ctdb_verify_after_rip off
+    # CTDB is on by default now (0.4.5), so disable it explicitly for this case.
+    window = teardown_threads(config=Config(ctdb_verify_after_rip=False))
     window._active_rip_params = _params(tmp_path, unknown=False)
 
     window._on_rip_finished(True, "")
