@@ -29,7 +29,7 @@ from platterpus.paths import (
 
 # Bump this when the schema grows new keys or changes defaults that we
 # want to migrate. Migration logic lives in _migrate() below.
-SCHEMA_VERSION: int = 2
+SCHEMA_VERSION: int = 3
 
 # Computed once at import time. If the user's HOME changes mid-process,
 # the GUI needs a restart — same as every other XDG-aware application.
@@ -43,15 +43,18 @@ _DEFAULT_WORKING_DIR: Path = Path.home() / ".cache" / "platterpus"
 #
 # We keep TWO template pairs and pick per rip (see ui/rip_controls):
 #
-#   * Known disc  → rich tags: "Artist/Album/## - Title - Album - Artist - Year".
-#     A disc with no year leaves a trailing " - " (whipper templates are
-#     flat — they can't conditionally drop an empty field). Multi-disc
-#     sets: add "/%N" to the folder portion yourself.
+#   * Known disc  → the clean "Artist/Album/## - Title" layout (the
+#     `naming.DEFAULT_PRESET`; matches Picard/beets/Plex). The old v2 default
+#     repeated the album and artist in every filename and put the full date
+#     on the end — replaced in v3 (see migrate(); a real-user report, 0.4.4).
+#     The Settings dialog offers more presets (year-in-folder, compilation)
+#     and a live preview — see `naming.py`. Multi-disc folders aren't expressible
+#     (cyanrip's scheme has no disc-number token).
 #   * Unknown disc → literal "Unknown Artist/Unknown Album/## - Track NN".
 #     We deliberately do NOT use %d here: for a disc MusicBrainz can't
 #     identify, whipper fills %d with the raw disc-ID hash, so a literal
 #     path keeps unknown rips tidy (and matches the placeholder tags).
-_DEFAULT_TRACK_TEMPLATE: str = "%A/%d/%t - %n - %d - %A - %y"
+_DEFAULT_TRACK_TEMPLATE: str = "%A/%d/%t - %n"
 _DEFAULT_DISC_TEMPLATE: str = "%A/%d/%d"
 _DEFAULT_TRACK_TEMPLATE_UNKNOWN: str = "Unknown Artist/Unknown Album/%t - Track %t"
 _DEFAULT_DISC_TEMPLATE_UNKNOWN: str = "Unknown Artist/Unknown Album/Unknown Album"
@@ -60,6 +63,12 @@ _DEFAULT_DISC_TEMPLATE_UNKNOWN: str = "Unknown Artist/Unknown Album/Unknown Albu
 # untouched template and upgrade it without clobbering a custom one.
 _V1_TRACK_TEMPLATE: str = "%A - %d/%t. %a - %n"
 _V1_DISC_TEMPLATE: str = "%A - %d/%A - %d"
+
+# The v2 defaults (the cluttered "## - Title - Album - Artist - Year" layout),
+# kept so the v2→v3 migration can recognise an untouched template and upgrade
+# it to the clean v3 default without clobbering a hand-edited one.
+_V2_TRACK_TEMPLATE: str = "%A/%d/%t - %n - %d - %A - %y"
+_V2_DISC_TEMPLATE: str = "%A/%d/%d"
 
 log = logging.getLogger(__name__)
 
@@ -275,14 +284,31 @@ def _migrate(raw: dict) -> dict:
         # template the user never customized (still the v1 default) so we
         # never clobber a hand-edited one. A template that's absent stays
         # absent — load() will fall back to the v2 default.
+        # Upgrade to the *v2* default here; the v2→v3 step below then carries it
+        # forward to the current clean default. (Stepwise so each migration is
+        # self-consistent and an untouched template rides the whole chain.)
         if raw.get("track_template") == _V1_TRACK_TEMPLATE:
-            raw["track_template"] = _DEFAULT_TRACK_TEMPLATE
+            raw["track_template"] = _V2_TRACK_TEMPLATE
         if raw.get("disc_template") == _V1_DISC_TEMPLATE:
-            raw["disc_template"] = _DEFAULT_DISC_TEMPLATE
+            raw["disc_template"] = _V2_DISC_TEMPLATE
         raw["schema_version"] = 2
         version = 2
 
-    if version == 2:
+    if version < 3:
+        # v2→v3: the cluttered default template ("## - Title - Album - Artist -
+        # Year", which repeated the album/artist and tacked the full date on the
+        # end) was replaced by the clean "Artist/Album/## - Title". Only upgrade a
+        # template the user never customized (still the exact v2 default) so a
+        # hand-edited one is never clobbered. Absent stays absent → load() falls
+        # back to the v3 default.
+        if raw.get("track_template") == _V2_TRACK_TEMPLATE:
+            raw["track_template"] = _DEFAULT_TRACK_TEMPLATE
+        if raw.get("disc_template") == _V2_DISC_TEMPLATE:
+            raw["disc_template"] = _DEFAULT_DISC_TEMPLATE
+        raw["schema_version"] = 3
+        version = 3
+
+    if version == SCHEMA_VERSION:
         return raw
 
     # Unknown future versions get a warning and current-version

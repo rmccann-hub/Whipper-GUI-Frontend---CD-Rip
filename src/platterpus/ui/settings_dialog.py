@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from platterpus import goal_presets, offset_config
+from platterpus import goal_presets, naming, offset_config
 from platterpus.config import Config
 from platterpus.ui.dialogs.centering import CenteredDialog
 
@@ -81,15 +81,46 @@ class SettingsDialog(CenteredDialog):
         form.addRow("Working directory:", working_row)
 
         # --- Templates ---
+        # A preset dropdown so the common layouts are one click instead of a
+        # hand-written code string (the old default looked terrible — repeated
+        # album/artist + a trailing full date). Picking a preset fills the
+        # track/disc template fields below; editing those by hand flips the
+        # dropdown to "Custom". A live preview shows the real resulting filename.
+        self._naming_combo: QComboBox = QComboBox(self)
+        self._naming_combo.setAccessibleName("File naming scheme")
+        for preset in naming.PRESETS:
+            self._naming_combo.addItem(preset.label, preset.key)
+        self._naming_combo.addItem(naming.CUSTOM_LABEL, None)
+        form.addRow("Naming scheme:", self._naming_combo)
+
         self._track_template_edit: QLineEdit = QLineEdit(config.track_template, self)
         self._track_template_edit.setToolTip(
             "Path for identified discs. Codes: %A artist, %d album, "
-            "%t track #, %n title, %a track artist, %y year, %N disc #."
+            "%t track #, %n title, %a track artist, %y date.\n"
+            "Pick a preset above, or hand-edit here."
         )
         form.addRow("Track template:", self._track_template_edit)
 
         self._disc_template_edit: QLineEdit = QLineEdit(config.disc_template, self)
         form.addRow("Disc template (.log/.cue):", self._disc_template_edit)
+
+        # Live preview: the selected template rendered against a metadata-heavy
+        # sample (colon in the title, a featured/per-track artist) so the user
+        # sees how it copes with the awkward cases before committing. Updates as
+        # the preset or the template text changes.
+        self._naming_preview: QLabel = QLabel("", self)
+        self._naming_preview.setWordWrap(True)
+        self._naming_preview.setAccessibleName("Filename preview")
+        self._naming_preview.setStyleSheet("color: palette(mid);")
+        form.addRow("Example:", self._naming_preview)
+
+        # Wire up: preset → fill fields; manual edit → flip to Custom; either →
+        # refresh preview. Signals are blocked while syncing to avoid a loop.
+        self._naming_combo.currentIndexChanged.connect(self._on_naming_preset_chosen)
+        self._track_template_edit.textChanged.connect(self._on_template_text_changed)
+        self._disc_template_edit.textChanged.connect(self._on_template_text_changed)
+        self._sync_naming_combo_to_templates()
+        self._refresh_naming_preview()
 
         # Unknown-disc templates: used for the --unknown rip so the
         # disc-ID hash whipper puts in %d never reaches the path.
@@ -398,6 +429,57 @@ class SettingsDialog(CenteredDialog):
     def _update_wav_warning(self) -> None:
         """Show the no-tags/art warning only when WAV is the selected format."""
         self._wav_warning_label.setVisible(self._format_combo.currentData() == "wav")
+
+    # --- Naming presets ----------------------------------------------------
+
+    def _on_naming_preset_chosen(self) -> None:
+        """Fill the template fields from the chosen preset.
+
+        "Custom" (data is None) leaves the fields alone — it just means the
+        current templates don't match a preset. We block the edits' signals so
+        setting their text doesn't immediately re-sync the combo back.
+        """
+        key = self._naming_combo.currentData()
+        if key is None:
+            return
+        preset = next((p for p in naming.PRESETS if p.key == key), None)
+        if preset is None:
+            return
+        self._track_template_edit.blockSignals(True)
+        self._disc_template_edit.blockSignals(True)
+        self._track_template_edit.setText(preset.track_template)
+        self._disc_template_edit.setText(preset.disc_template)
+        self._track_template_edit.blockSignals(False)
+        self._disc_template_edit.blockSignals(False)
+        self._refresh_naming_preview()
+
+    def _on_template_text_changed(self) -> None:
+        """A hand-edit of either template re-syncs the combo and the preview."""
+        self._sync_naming_combo_to_templates()
+        self._refresh_naming_preview()
+
+    def _sync_naming_combo_to_templates(self) -> None:
+        """Point the combo at the matching preset, or "Custom" if hand-edited.
+
+        Combo signals are blocked so this never re-triggers preset application.
+        """
+        preset = naming.preset_for_templates(
+            self._track_template_edit.text(), self._disc_template_edit.text()
+        )
+        target = preset.key if preset is not None else None
+        index = self._naming_combo.findData(target)
+        if index < 0:
+            return
+        self._naming_combo.blockSignals(True)
+        self._naming_combo.setCurrentIndex(index)
+        self._naming_combo.blockSignals(False)
+
+    def _refresh_naming_preview(self) -> None:
+        """Render the current track template against the stress sample."""
+        example = naming.render_preview(
+            self._track_template_edit.text(), naming.SAMPLE_STRESS
+        )
+        self._naming_preview.setText(example)
 
     # --- Goal presets ------------------------------------------------------
 

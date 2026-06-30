@@ -205,11 +205,12 @@ def test_unknown_keys_are_dropped(
     assert not hasattr(cfg, "future_key_not_in_v1")
 
 
-def test_v1_to_v2_upgrades_untouched_templates(
+def test_v1_untouched_templates_ride_chain_to_current_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A v1 config still holding the v1 default templates auto-upgrades
-    to the v2 Artist/Album layout on load."""
+    """A v1 config still holding the v1 default templates rides the whole
+    migration chain (v1→v2→v3) to the current clean Artist/Album/## - Title
+    default on load."""
     config_file = _redirect_config(tmp_path, monkeypatch)
     config_file.write_text(
         "schema_version = 1\n"
@@ -219,21 +220,40 @@ def test_v1_to_v2_upgrades_untouched_templates(
 
     cfg = config_module.load()
 
-    assert cfg.schema_version == 2
-    assert cfg.track_template == "%A/%d/%t - %n - %d - %A - %y"
+    assert cfg.schema_version == SCHEMA_VERSION
+    assert cfg.track_template == "%A/%d/%t - %n"
     assert cfg.disc_template == "%A/%d/%d"
     # The unknown-disc templates fill in from defaults (absent in v1).
     assert cfg.track_template_unknown.startswith("Unknown Artist/Unknown Album/")
 
 
-def test_v1_to_v2_preserves_custom_templates(
+def test_v2_cluttered_default_upgrades_to_clean_v3(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A user who hand-edited their template keeps it through the upgrade."""
+    """A v2 config still on the cluttered default template (repeated
+    album/artist + trailing date) auto-upgrades to the clean v3 default."""
+    config_file = _redirect_config(tmp_path, monkeypatch)
+    config_file.write_text(
+        "schema_version = 2\n"
+        'track_template = "%A/%d/%t - %n - %d - %A - %y"\n'
+        'disc_template = "%A/%d/%d"\n'
+    )
+
+    cfg = config_module.load()
+
+    assert cfg.schema_version == SCHEMA_VERSION
+    assert cfg.track_template == "%A/%d/%t - %n"
+    assert cfg.disc_template == "%A/%d/%d"
+
+
+def test_migration_preserves_custom_templates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A user who hand-edited their template keeps it through every upgrade."""
     config_file = _redirect_config(tmp_path, monkeypatch)
     config_file.write_text('schema_version = 1\ntrack_template = "my/custom/%t %n"\n')
 
     cfg = config_module.load()
 
-    assert cfg.schema_version == 2
+    assert cfg.schema_version == SCHEMA_VERSION
     assert cfg.track_template == "my/custom/%t %n"

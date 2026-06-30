@@ -186,6 +186,15 @@ def main(argv: list[str] | None = None) -> int:
     if _icon is not None:
         app.setWindowIcon(_icon)
 
+    # Centre every dialog (incl. QMessageBox / QFileDialog) over the window the
+    # user is looking at, so a prompt never opens on a different monitor and
+    # looks frozen. Parented to `app` so it lives for the whole session. No-op
+    # under native Wayland (clients can't self-position). See auto_center.
+    from platterpus.ui.dialogs.auto_center import DialogCenterFilter
+
+    _dialog_center_filter = DialogCenterFilter(app)
+    app.installEventFilter(_dialog_center_filter)
+
     # From here on, any uncaught exception (including ones raised inside a
     # Qt slot during the event loop) goes to the log + an on-screen dialog
     # rather than silently aborting the process.

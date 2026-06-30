@@ -11,7 +11,35 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **File-naming presets with a live preview.** Settings has a new "Naming
+  scheme" dropdown offering the layouts the popular tools use — *Artist / Album
+  / 01 - Title* (the clean default, à la Picard/beets/Plex), a no-dash variant,
+  *Artist / Album (Year)* (Plex/Jellyfin media-server style), *Artist / Year -
+  Album* (foobar2000 chronological), and a compilation layout that keeps the
+  per-track artist. Picking one fills the template fields; hand-editing flips it
+  to "Custom". An **Example** line renders the real resulting filename live
+  (against a metadata-heavy sample) so you see exactly what you'll get — colons
+  and all — before committing.
+
+### Changed
+- **The default filename layout is now the clean `Artist/Album/01 - Title`.** The
+  old default repeated the album and artist in every filename and tacked the full
+  release date on the end (`01 - Roxanne - Every Breath You Take… - The Police -
+  1995-09-12.flac`). Existing configs still on that default auto-upgrade on load;
+  a hand-edited template is never touched.
+- The **album-artist field** now has a tooltip explaining it fills every track's
+  Artist column and that individual rows can be overridden (for compilations or
+  featured guests).
+
 ### Fixed
+- **Dialogs now centre over the main window even when they're a plain message
+  box.** The 0.4.4 centering only covered our own dialog subclasses, so the
+  first-run "add to menu", shortcut, and update prompts (plain `QMessageBox`)
+  could still open on another monitor. An application-wide filter now centres
+  every dialog — message boxes and file pickers included — on the window that
+  opened it. (Still a no-op under native Wayland, where clients can't position
+  themselves; the app prefers XWayland, where it works.)
 - **The main-window splitter is draggable at the normal window size, not only
   when maximized.** The three stacked panes' minimum heights summed to nearly
   the whole default window, so the splitter handles showed the resize cursor but

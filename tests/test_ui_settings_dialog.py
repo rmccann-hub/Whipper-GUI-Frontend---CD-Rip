@@ -4,11 +4,41 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QDialogButtonBox
 
+from platterpus import naming
 from platterpus.config import SCHEMA_VERSION, Config
 from platterpus.goal_presets import GOAL_ARCHIVAL, GOAL_CUSTOM, GOAL_FAST
 from platterpus.ui.settings_dialog import SettingsDialog
 
 # --- Construction --------------------------------------------------------
+
+
+# --- Naming presets ------------------------------------------------------
+
+
+def test_naming_combo_reflects_default_template(qapp: QApplication) -> None:
+    # A fresh config uses the recommended preset, so the combo shows it (not
+    # "Custom") and the preview is populated.
+    dialog = SettingsDialog(Config())
+    assert dialog._naming_combo.currentData() == naming.DEFAULT_PRESET.key
+    assert dialog._naming_preview.text().endswith(".flac")
+
+
+def test_choosing_naming_preset_fills_template_fields(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())
+    year_preset = next(p for p in naming.PRESETS if "(%y)" in p.track_template)
+    index = dialog._naming_combo.findData(year_preset.key)
+    dialog._naming_combo.setCurrentIndex(index)
+    assert dialog._track_template_edit.text() == year_preset.track_template
+    assert dialog._disc_template_edit.text() == year_preset.disc_template
+    assert dialog.to_config().track_template == year_preset.track_template
+
+
+def test_hand_editing_template_flips_combo_to_custom(qapp: QApplication) -> None:
+    dialog = SettingsDialog(Config())
+    dialog._track_template_edit.setText("my/own/%t %n")
+    # Custom is the entry whose data is None — it must not overwrite the text.
+    assert dialog._naming_combo.currentData() is None
+    assert dialog.to_config().track_template == "my/own/%t %n"
 
 
 def test_window_title_and_modality(qapp: QApplication) -> None:

@@ -16,7 +16,32 @@ and a no-op in headless tests that construct a dialog but never show it.
 from __future__ import annotations
 
 from PySide6.QtGui import QShowEvent
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QDialog, QWidget
+
+
+def center_on_anchor(widget: QWidget) -> None:
+    """Move `widget` over its parent window (or the active window / screen).
+
+    Best-effort and never raises: a no-op under native Wayland (clients can't
+    position themselves — the app prefers XWayland, where ``move()`` works) and
+    in headless tests that construct a dialog but never show it. Shared by
+    :class:`CenteredDialog` and the app-wide ``auto_center`` filter (which
+    catches ``QMessageBox`` and other dialogs that don't subclass this).
+    """
+    try:
+        parent = widget.parentWidget()
+        anchor = parent.window() if parent is not None else QApplication.activeWindow()
+        frame = widget.frameGeometry()
+        if anchor is not None and anchor is not widget:
+            frame.moveCenter(anchor.frameGeometry().center())
+        else:
+            screen = widget.screen() or QApplication.primaryScreen()
+            if screen is None:
+                return
+            frame.moveCenter(screen.availableGeometry().center())
+        widget.move(frame.topLeft())
+    except Exception:  # noqa: BLE001 — placement is cosmetic, never fatal
+        pass
 
 
 class CenteredDialog(QDialog):
@@ -29,20 +54,4 @@ class CenteredDialog(QDialog):
         if self._centered_once:
             return
         self._centered_once = True
-        try:
-            self._center_on_anchor()
-        except Exception:  # noqa: BLE001 — placement is cosmetic, never fatal
-            pass
-
-    def _center_on_anchor(self) -> None:
-        parent = self.parentWidget()
-        anchor = parent.window() if parent is not None else QApplication.activeWindow()
-        frame = self.frameGeometry()
-        if anchor is not None and anchor is not self:
-            frame.moveCenter(anchor.frameGeometry().center())
-        else:
-            screen = self.screen() or QApplication.primaryScreen()
-            if screen is None:
-                return
-            frame.moveCenter(screen.availableGeometry().center())
-        self.move(frame.topLeft())
+        center_on_anchor(self)

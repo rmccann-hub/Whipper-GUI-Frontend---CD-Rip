@@ -40,6 +40,22 @@ itself up by asking a couple of questions.
 That's the whole thing: one download, a couple of clicks, answer the prompts.
 (Updating later = download the new AppImage and replace the old one.)
 
+### Easy second option — one command with pipx
+
+Comfortable with a terminal? A single copy-paste installs Platterpus from PyPI
+and puts it on your `PATH` (the GUI still runs the first-run wizard to set up the
+ripping stack):
+
+```bash
+pipx install platterpus    # then run:  platterpus
+```
+
+Don't have pipx? `sudo dnf install pipx` (Fedora/Bazzite) or `sudo apt install
+pipx` (Ubuntu/Debian). Upgrade later with `pipx upgrade platterpus`. (If it isn't
+on PyPI yet — before the first published release — see
+[Method B](#method-b--pipx-recommended-for-technical-users) for installing from a
+checkout.)
+
 > **Why a wizard?** Ripping runs through `cyanrip` inside a small container so
 > it never touches your system ([why](PLANNING.md)). The first-run wizard sets
 > that container up for you — the same work the scripts below do by hand.

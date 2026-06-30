@@ -193,6 +193,15 @@ class TrackTable(QWidget):
         self._album_artist_edit.setAccessibleName("Album artist")
         self._album_title_edit.setAccessibleName("Album title")
         self._album_year_edit.setAccessibleName("Album year")
+        # Explain the album-artist field's dual role: it's the album-level
+        # artist AND it fills every track's Artist column (the common
+        # single-artist case), but each row stays editable for compilations
+        # and featured guests. Without this the "global field that also
+        # overwrites a column" behaviour looks inconsistent.
+        self._album_artist_edit.setToolTip(
+            "Sets the album artist and fills every track's Artist below. "
+            "Edit a row to override it (e.g. a compilation or a featured guest)."
+        )
         album_form.addRow("Album artist:", self._album_artist_edit)
         album_form.addRow("Album title:", self._album_title_edit)
         album_form.addRow("Year:", self._album_year_edit)
