@@ -80,6 +80,7 @@ def build_report(
     transcode_result: object | None = None,
     derived_verify_result: object | None = None,
     read_speed: dict | None = None,
+    eta_trace: list | None = None,
     checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
@@ -110,6 +111,7 @@ def build_report(
             checksums,
             derived_verify_result,
             read_speed,
+            eta_trace,
         )
     except Exception:  # noqa: BLE001 — a report builder must never crash a rip
         log.exception("rip-report build failed; emitting minimal envelope")
@@ -192,6 +194,7 @@ def _build(
     checksums: dict | None = None,
     derived_verify_result: object | None = None,
     read_speed: dict | None = None,
+    eta_trace: list | None = None,
 ) -> dict:
     message, level = accuraterip_verdict(rip_log)
     info = getattr(rip_log, "ripping_info", None)
@@ -223,6 +226,26 @@ def _build(
         # on a normal single-pass rip. `unresolved: true` FLAGS a disc that never
         # read clean even at the floor speed — surfaced, never papered over.
         "read_speed": (dict(read_speed) if read_speed else None),
+        # ETA trace kept "for posterity": a throttled series of samples, each
+        # with the PC wall-clock time, elapsed, progress, the read speed in
+        # effect, OUR smoothed album ETA, and cyanrip's own per-op ETA — recorded
+        # so both estimates can be compared against the real finish (in `timing`)
+        # and mined to build a better ETA model later. None on a rip too short to
+        # sample. NOT the estimate shown live.
+        "eta_trace": (
+            {
+                "note": (
+                    "Per-sample ETA record for analysis, not display. "
+                    "'our_eta_seconds' is Platterpus's smoothed album estimate; "
+                    "'cyanrip_eta' is cyanrip's own per-op estimate (untrusted); "
+                    "'read_speed' is the -S value in effect (0 = drive max); "
+                    "'at' is the PC wall-clock time. Compare against 'timing'."
+                ),
+                "samples": [dict(s) for s in eta_trace],
+            }
+            if eta_trace
+            else None
+        ),
         # Whole-disc loudness (integrated LUFS / LRA / true peak) from cyanrip's
         # "Album Loudness Summary"; per-track loudness lives in each track's
         # `replaygain`. None when absent (e.g. whipper logs).
@@ -417,6 +440,7 @@ def write_report(
     transcode_result: object | None = None,
     derived_verify_result: object | None = None,
     read_speed: dict | None = None,
+    eta_trace: list | None = None,
     checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
@@ -438,6 +462,7 @@ def write_report(
             transcode_result=transcode_result,
             derived_verify_result=derived_verify_result,
             read_speed=read_speed,
+            eta_trace=eta_trace,
             checksums=checksums,
             generated_at=generated_at,
             timing=timing,

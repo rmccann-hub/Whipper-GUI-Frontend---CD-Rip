@@ -58,11 +58,53 @@ _APPIMAGE_ENV_VARS: tuple[str, ...] = (
 
 
 def _relaunch_env() -> dict[str, str]:
-    """The environment to launch the updated AppImage with: the current env minus
-    the AppImage-runtime-injected vars (see :data:`_APPIMAGE_ENV_VARS`)."""
+    """The environment to launch the updated AppImage with: the current env with
+    the OLD AppImage mount scrubbed out of it.
+
+    The old AppImage's AppRun injects **many** vars that point into its mount
+    (``$APPDIR``, e.g. ``/tmp/.mount_platterXXXX``): ``LD_LIBRARY_PATH``,
+    ``PYTHONPATH``, and — the ones a fixed name-blocklist keeps missing —
+    ``QT_PLUGIN_PATH`` / ``QML2_IMPORT_PATH`` / ``GI_TYPELIB_PATH`` /
+    ``GST_PLUGIN_*`` / ``XDG_DATA_DIRS`` additions. When *this* process exits the
+    mount vanishes, so any such var handed to the NEW instance sends it looking
+    into a gone directory and it aborts on startup — the silent "it closed but
+    didn't reopen" (real-user reports 2026-06-27 and again on 0.4.6, where the
+    Qt platform plugin couldn't be found). A name blocklist can't win that
+    whack-a-mole, so we scrub by **value**: drop any var — or any single segment
+    of a ``PATH``-style list — whose value points into the old mount, and let the
+    new AppRun set everything fresh. Session vars (HOME, DISPLAY, WAYLAND_DISPLAY,
+    DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR, LANG, XAUTHORITY, …) don't point
+    into the mount, so they're kept untouched. The named list is retained as a
+    belt for flag-style vars (e.g. PYTHONDONTWRITEBYTECODE) that carry no path.
+    """
     import os
 
-    return {k: v for k, v in os.environ.items() if k not in _APPIMAGE_ENV_VARS}
+    # The old mount root. AppRun sets $APPDIR to it; the AppImage runtime's
+    # default mount prefix is /tmp/.mount_ — match either so we catch the mount
+    # even if $APPDIR is somehow unset.
+    appdir = (os.environ.get("APPDIR") or "").strip()
+    markers = [m for m in (appdir, "/tmp/.mount_") if m]
+
+    def _into_old_mount(segment: str) -> bool:
+        return any(marker in segment for marker in markers)
+
+    cleaned: dict[str, str] = {}
+    for key, value in os.environ.items():
+        if key in _APPIMAGE_ENV_VARS:
+            continue  # named AppRun var → always let the new AppRun re-set it
+        if os.pathsep in value:
+            # A path list (PATH, XDG_DATA_DIRS, QT_PLUGIN_PATH, …): keep only the
+            # segments that DON'T point into the old mount, so e.g. PATH keeps its
+            # system entries while losing the dead /tmp/.mount_* one.
+            kept = [s for s in value.split(os.pathsep) if s and not _into_old_mount(s)]
+            if kept:
+                cleaned[key] = os.pathsep.join(kept)
+            # else: entirely old-mount → drop the var
+        elif value and _into_old_mount(value):
+            continue  # a single value pointing into the old mount → drop it
+        else:
+            cleaned[key] = value
+    return cleaned
 
 
 def _is_download_phase(status_message: str) -> bool:

@@ -239,6 +239,29 @@ def test_read_speed_block_absent_on_single_pass() -> None:
     assert build_report(_sample_log())["read_speed"] is None
 
 
+def test_eta_trace_block_serialized_and_labeled() -> None:
+    samples = [
+        {
+            "at": "2026-07-01T04:20:00-05:00",
+            "elapsed_seconds": 100,
+            "overall_percent": 50.0,
+            "read_speed": 8,
+            "our_eta_seconds": 100,
+            "cyanrip_eta": "49m",
+        }
+    ]
+    report = build_report(_sample_log(), eta_trace=samples)
+    et = report["eta_trace"]
+    assert et is not None
+    assert et["samples"] == samples
+    # The block is self-describing (labeled) — both estimates + the clock.
+    assert "our_eta_seconds" in et["note"] and "cyanrip_eta" in et["note"]
+
+
+def test_eta_trace_absent_when_not_recorded() -> None:
+    assert build_report(_sample_log())["eta_trace"] is None
+
+
 def test_derived_verify_mismatch_serialized() -> None:
     from platterpus.adapters.derived_verify import DerivedVerifyResult
 

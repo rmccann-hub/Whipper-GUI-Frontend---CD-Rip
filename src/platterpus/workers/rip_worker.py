@@ -160,6 +160,40 @@ _PROGRESS_MIN_INTERVAL_S: float = 0.1
 # before that, elapsed÷fraction projects wild/"0s" values off almost no data.
 _MIN_ELAPSED_FOR_ETA_S: float = 8.0
 
+# EMA weight for the new raw ETA sample each tick (0<α≤1). Small = heavy
+# smoothing. 0.15 damps the encode-phase sawtooth while still tracking real
+# slowdowns within a few seconds.
+_ETA_SMOOTHING_ALPHA: float = 0.15
+
+# The "for posterity" ETA trace: sample at most this often (seconds) and cap the
+# number of samples, so a long rip yields a compact comparable curve, not a
+# per-tick flood. ~10s over even a 5-hour rip stays well under the cap.
+_ETA_SAMPLE_INTERVAL_S: float = 10.0
+_ETA_TRACE_MAX: int = 2000
+
+# cyanrip appends its OWN per-op ETA to each progress redraw
+# ("…, progress - 42%, ETA - 3m"). We distrust it (it printed "822h" at 0.01%)
+# and show our own smoothed album ETA instead — so strip cyanrip's trailing
+# ETA clause from the lines we forward to the log view, or the two would
+# contradict each other on screen (real-user report). It's always the last
+# field, so match to end of line.
+_CYANRIP_ETA_CLAUSE = re.compile(r",\s*ETA\s*-.*$")
+
+
+def _coarsen_eta_seconds(seconds: float) -> int:
+    """Round an ETA to a bucket sized to its magnitude, so the displayed number
+    is steady instead of ticking every second (a 1-hour ETA doesn't need
+    5-second precision). Bigger ETA → bigger bucket."""
+    if seconds >= 3600:  # ≥ 1 h → nearest 5 min
+        step = 300
+    elif seconds >= 600:  # ≥ 10 min → nearest 1 min
+        step = 60
+    elif seconds >= 120:  # ≥ 2 min → nearest 30 s
+        step = 30
+    else:  # < 2 min → nearest 10 s
+        step = 10
+    return int(round(seconds / step) * step)
+
 
 class RipWorker(QObject):
     """QObject worker that owns a rip subprocess for its lifetime.
@@ -231,6 +265,25 @@ class RipWorker(QObject):
         # every phase and is wildly wrong early (it printed "822h" at 0.01% on a
         # real disc). None until the loop starts.
         self._started_monotonic: float | None = None
+        # Smoothed album-ETA state (an exponential moving average of the raw
+        # elapsed÷fraction projection). The raw projection sawtooths — it creeps
+        # UP during a track's encode pass (overall bar frozen while time passes)
+        # then drops when the next read advances the bar — so we damp it here and
+        # round coarsely for display, per real-user feedback ("smooth it out").
+        self._smoothed_remaining_s: float | None = None
+        # ETA trace kept "for posterity" (maintainer's ask): a throttled series of
+        # samples, each pairing the PC wall-clock time with BOTH estimates —
+        # cyanrip's own per-op ETA and our smoothed album ETA — so the report can
+        # be compared against reality (the real elapsed/finish live in `timing`).
+        # `_last_cyanrip_eta` is the most recent cyanrip reading (updated as its
+        # progress lines stream); the trace is sampled in `_album_eta_text`.
+        self._last_cyanrip_eta: str | None = None
+        self._eta_trace: list[dict] = []
+        self._last_eta_sample_monotonic: float = 0.0
+        # The read speed (`-S`) in effect for the current pass (0 = drive max),
+        # stamped into each ETA sample so the recorded curve is correlated with
+        # speed — the raw material for a better ETA model later (maintainer's ask).
+        self._current_read_speed: int = 0
         # The adaptive read-speed ladder's history: one SpeedAttempt per rip pass
         # (speed + -Z + whether it read clean). The GUI reads this at finish and
         # folds it into the report, so a disc that needed a slow re-read — or that
@@ -242,9 +295,14 @@ class RipWorker(QObject):
 
         Computed from actual elapsed and the album fraction done — so it absorbs
         secure re-read slowdowns instead of jumping like cyanrip's per-operation
-        ETA. Returns "" until we're actually ripping tracks (past the ≤5% disc
-        scan), until a few seconds have elapsed (before which any projection is
-        noise — no "about 0s left"), and once effectively done. Never raises.
+        ETA. The raw projection is then **smoothed** (an EMA) and **coarsely
+        rounded** (bigger buckets for bigger ETAs) so it reads as a steady
+        estimate rather than a second-by-second jitter (real-user feedback). It's
+        also the ONLY ETA the user sees — cyanrip's per-op "ETA - …" is stripped
+        from the forwarded log lines (see the stream loop), so nothing contradicts
+        this number. Returns "" during the ≤5% disc scan, before a few seconds
+        have elapsed (any projection is noise then), and once effectively done.
+        Never raises.
         """
         from platterpus.rip_timing import format_duration
 
@@ -258,10 +316,65 @@ class RipWorker(QObject):
         elapsed = time.monotonic() - started
         if elapsed < _MIN_ELAPSED_FOR_ETA_S:
             return ""
-        remaining = elapsed * (1.0 - frac) / frac
-        if not remaining >= 1:  # guards NaN/inf and sub-second "0s left"
+        raw_remaining = elapsed * (1.0 - frac) / frac
+        if not raw_remaining >= 1:  # guards NaN/inf and sub-second "0s left"
             return ""
-        return f" · about {format_duration(round(remaining))} left"
+        # EMA-smooth so a per-tick swing doesn't yank the number around.
+        if self._smoothed_remaining_s is None:
+            self._smoothed_remaining_s = raw_remaining
+        else:
+            self._smoothed_remaining_s = (
+                _ETA_SMOOTHING_ALPHA * raw_remaining
+                + (1.0 - _ETA_SMOOTHING_ALPHA) * self._smoothed_remaining_s
+            )
+        display = _coarsen_eta_seconds(self._smoothed_remaining_s)
+        if display < 1:
+            return ""
+        # Record a throttled trace sample (PC clock + both estimates) for the
+        # report — this is the point where both are freshest. Best-effort.
+        self._record_eta_sample(overall_pct, elapsed, display)
+        return f" · about {format_duration(display)} left"
+
+    def _record_cyanrip_eta(self, eta: str | None) -> None:
+        """Remember cyanrip's most recent per-op ETA reading (raw string), for the
+        posterity trace. A no-op when cyanrip's line carried no ETA."""
+        if eta:
+            self._last_cyanrip_eta = eta.strip()
+
+    def _record_eta_sample(
+        self, overall_pct: float, elapsed_s: float, our_eta_s: int
+    ) -> None:
+        """Append a throttled ETA-trace sample: PC wall-clock time + both
+        estimates + progress, for the report's ``eta_trace``. Never raises."""
+        try:
+            now = time.monotonic()
+            if self._eta_trace and (
+                now - self._last_eta_sample_monotonic < _ETA_SAMPLE_INTERVAL_S
+            ):
+                return
+            if len(self._eta_trace) >= _ETA_TRACE_MAX:
+                return
+            from datetime import datetime
+
+            self._last_eta_sample_monotonic = now
+            self._eta_trace.append(
+                {
+                    # The actual PC clock time of this sample (maintainer's ask).
+                    "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                    "elapsed_seconds": round(elapsed_s),
+                    "overall_percent": round(overall_pct, 2),
+                    # The read speed (`-S`) in effect (0 = drive max) — recorded
+                    # so a future ETA model can correlate rate with speed.
+                    "read_speed": self._current_read_speed,
+                    # Our smoothed album estimate (seconds remaining).
+                    "our_eta_seconds": our_eta_s,
+                    # cyanrip's own per-op ETA at this moment (its raw string), or
+                    # None if it hasn't printed one yet.
+                    "cyanrip_eta": self._last_cyanrip_eta,
+                }
+            )
+        except Exception:  # noqa: BLE001 — a diagnostic trace must never crash a rip
+            log.exception("ETA-trace sample failed; skipping")
 
     @property
     def needs_unknown_retry(self) -> bool:
@@ -280,6 +393,13 @@ class RipWorker(QObject):
         """The adaptive read-speed ladder's per-pass history (empty on a normal
         single-pass rip). The GUI reads this at finish for the report."""
         return list(self._speed_attempts)
+
+    @property
+    def eta_trace(self) -> list[dict]:
+        """The "for posterity" ETA trace: throttled samples pairing the PC clock
+        time with cyanrip's ETA and our smoothed album ETA. The GUI reads this at
+        finish for the report. NOT the estimate shown live (that's the status)."""
+        return list(self._eta_trace)
 
     # --- Slots ---
 
@@ -310,6 +430,8 @@ class RipWorker(QObject):
         while True:
             attempt += 1
             self._reset_pass_progress()
+            # Remember this pass's speed so ETA samples are tagged with it.
+            self._current_read_speed = speed
             outcome = self._rip_once(
                 read_speed=speed, secure_rerip_matches=secure_rerip
             )
@@ -426,7 +548,11 @@ class RipWorker(QObject):
                 if is_progress:
                     if now - self._last_progress_emit >= _PROGRESS_MIN_INTERVAL_S:
                         self._last_progress_emit = now
-                        self.log_line.emit(line)
+                        # Strip cyanrip's own trailing "ETA - …" so the log pane
+                        # never shows an ETA that contradicts our smoothed album
+                        # ETA in the status line (real-user report). Detection
+                        # below still uses the raw `line`.
+                        self.log_line.emit(_CYANRIP_ETA_CLAUSE.sub("", line))
                 else:
                     self.log_line.emit(line)
                 # Watch for whipper's "no online metadata" abort so the GUI
@@ -568,6 +694,7 @@ class RipWorker(QObject):
         match = _CYANRIP_TRACK_PROGRESS.search(line)
         if match:
             self._current_track = int(match.group("track"))
+            self._record_cyanrip_eta(match.group("eta"))
             task = float(match.group("pct"))
             frac = (
                 ((self._current_track - 1) + task / 100.0) / self._total_tracks

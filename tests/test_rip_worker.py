@@ -360,6 +360,76 @@ def test_album_eta_is_self_computed_from_elapsed(
     assert not hasattr(worker, "estimated_seconds")
 
 
+def test_coarsen_eta_seconds_buckets() -> None:
+    from platterpus.workers.rip_worker import _coarsen_eta_seconds
+
+    assert _coarsen_eta_seconds(3998) == 3900  # ≥1h → nearest 5 min
+    assert _coarsen_eta_seconds(1234) == 1260  # ≥10 min → nearest 1 min
+    assert _coarsen_eta_seconds(137) == 150  # ≥2 min → nearest 30 s
+    assert _coarsen_eta_seconds(43) == 40  # <2 min → nearest 10 s
+
+
+def test_album_eta_is_smoothed(qapp: QApplication, tmp_path: Path) -> None:
+    """The displayed ETA is an EMA, so a swing in the raw projection only nudges
+    it — it doesn't jump the whole way (real-user 'smooth it out')."""
+    worker = RipWorker(_FakeBackend(handle=_FakeHandle(lines=[])), _params(tmp_path))
+    worker._started_monotonic = time.monotonic() - 100.0
+    worker._album_eta_text(50.0)  # seeds the EMA at ~100s
+    seeded = worker._smoothed_remaining_s
+    assert seeded is not None
+    # A pass that suddenly implies a much larger remaining shouldn't yank the
+    # smoothed value all the way there.
+    worker._album_eta_text(10.0)  # raw ~900s, but EMA moves only ~15% of the gap
+    assert worker._smoothed_remaining_s < 0.5 * (seeded + 900)
+
+
+def test_eta_trace_records_both_estimates_speed_and_clock(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    """The 'for posterity' trace samples pair the PC clock with BOTH estimates
+    and the read speed in effect (raw material for a future ETA model)."""
+    worker = RipWorker(_FakeBackend(handle=_FakeHandle(lines=[])), _params(tmp_path))
+    worker._started_monotonic = time.monotonic() - 100.0
+    worker._current_read_speed = 8
+    worker._last_cyanrip_eta = "49m"
+
+    worker._album_eta_text(50.0)
+
+    trace = worker.eta_trace
+    assert len(trace) == 1
+    s = trace[0]
+    assert s["read_speed"] == 8
+    assert s["cyanrip_eta"] == "49m"
+    assert isinstance(s["our_eta_seconds"], int) and s["our_eta_seconds"] > 0
+    assert s["at"] and "T" in s["at"]  # an ISO wall-clock timestamp
+    assert s["overall_percent"] == 50.0
+
+
+def test_cyanrip_eta_stripped_from_forwarded_log(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    """cyanrip's own 'ETA - …' is scrubbed from the forwarded log line so it
+    can't contradict our smoothed album ETA in the status."""
+    handle = _FakeHandle(
+        lines=[
+            "Disc tracks:    1",
+            "Ripping and encoding track 1, progress - 50.00%, ETA - 49m",
+        ],
+        exit_code=0,
+    )
+    worker = RipWorker(_FakeBackend(handle=handle), _params(tmp_path))
+    sigs = _Signals()
+    sigs.attach(worker)
+
+    worker.start_rip()
+
+    progress_lines = [ln for ln in sigs.log_lines if "progress - 50.00%" in ln]
+    assert progress_lines, "the progress line should be forwarded"
+    assert all("ETA" not in ln for ln in progress_lines)  # cyanrip ETA stripped
+    # …and cyanrip's ETA was still captured for the posterity trace.
+    assert worker._last_cyanrip_eta == "49m"
+
+
 def test_progress_redraws_are_rate_limited_in_the_log(
     qapp: QApplication, tmp_path: Path
 ) -> None:

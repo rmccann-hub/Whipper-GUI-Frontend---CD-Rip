@@ -428,6 +428,9 @@ class RipMixin:
         # is still alive (it's cleared below), so the report can record which
         # speed / -Z the disc needed — or that it never read clean at the floor.
         self._last_speed_attempts = getattr(self._rip_worker, "speed_attempts", [])
+        # The "for posterity" ETA trace (PC clock + cyanrip's ETA + our ETA),
+        # captured while the worker is alive; folded into the report below.
+        self._last_eta_trace = getattr(self._rip_worker, "eta_trace", [])
 
         self._rip_controls.set_rip_active(False)
         self._set_rip_lock(False)  # rip over — re-enable the locked-down UI
@@ -1024,6 +1027,7 @@ class RipMixin:
             read_speed=read_speed_ladder.attempts_to_report(
                 getattr(self, "_last_speed_attempts", []) or []
             ),
+            eta_trace=getattr(self, "_last_eta_trace", None) or None,
             checksums=getattr(self, "_last_checksums", None),
             generated_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             timing=self._last_rip_timing,

@@ -11,6 +11,34 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Fixed
+- **Update relaunch: "it closed but didn't reopen."** The post-update relaunch
+  scrubbed only a fixed *list* of AppImage-runtime vars from the environment, so
+  ones it didn't name — notably `QT_PLUGIN_PATH` (and `QML2_IMPORT_PATH` /
+  `GI_TYPELIB_PATH` / `GST_PLUGIN_*` / `XDG_DATA_DIRS`) — still pointed into the
+  old, about-to-vanish mount, and the new instance aborted on startup (couldn't
+  load its Qt platform plugin). The relaunch now scrubs by **value**: any var, or
+  any single `PATH`-style segment, that references the old mount is dropped, so
+  the new AppImage's `AppRun` sets everything fresh. Session vars (HOME, DISPLAY,
+  Wayland/DBus, LANG, …) are untouched.
+
+### Changed
+- **One ETA, and it's smoothed.** The status line showed our self-computed album
+  ETA while the log still echoed cyanrip's own per-op "ETA - …", so the two
+  disagreed on screen. cyanrip's ETA (which we distrust — it once said 822h) is
+  now stripped from the forwarded log lines, so only our estimate is shown. That
+  estimate is also **smoothed** (an exponential moving average) and **coarsely
+  rounded** (bigger buckets for bigger ETAs), so it reads as a steady figure
+  instead of jumping every tick.
+
+### Added
+- **ETA trace in the report, for posterity + future tuning.** The
+  `.platterpus.json` now carries a separate, labeled `eta_trace`: throttled
+  samples pairing the PC wall-clock time with the read speed in effect, our
+  smoothed album ETA, and cyanrip's own per-op ETA — so both estimates can be
+  compared against the real finish (in `timing`) and mined to build a better ETA
+  model later. It's kept out of the live UI (analysis data, not display).
+
 ## [0.4.6] — 2026-07-01
 
 ### Changed

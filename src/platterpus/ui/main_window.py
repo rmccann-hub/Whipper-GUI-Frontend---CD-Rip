@@ -289,6 +289,9 @@ class MainWindow(
         # rip (read off the worker at finish, before it's cleared), folded into
         # the report so a slow re-read — or a still-unresolved disc — is recorded.
         self._last_speed_attempts: list = []
+        # The just-finished rip's ETA trace (PC clock + cyanrip's ETA + our ETA +
+        # read speed) — recorded in the report "for posterity" / future modelling.
+        self._last_eta_trace: list = []
         # Rip time-windows (epoch start, end) for every rip THIS session, used to
         # strip *other* albums' rip lines out of each report's embedded debug log
         # (the report stays a self-contained, single-album debug record). The

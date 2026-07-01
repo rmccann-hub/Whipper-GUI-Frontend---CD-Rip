@@ -2416,6 +2416,35 @@ def test_relaunch_env_strips_appimage_runtime_vars(monkeypatch) -> None:
     assert env.get("HOME") == "/home/u"
 
 
+def test_relaunch_env_scrubs_old_mount_by_value(monkeypatch) -> None:
+    """Regression (0.4.6 "closed but didn't reopen"): a name blocklist misses
+    vars like QT_PLUGIN_PATH that also point into the old mount, so the new Qt
+    aborts loading its platform plugin. Scrub by VALUE: any var (or PATH segment)
+    pointing into the old $APPDIR mount is dropped; session vars survive; a
+    PATH-style list keeps its non-mount segments."""
+    from platterpus.ui.main_window_update import _relaunch_env
+
+    monkeypatch.setenv("APPDIR", "/tmp/.mount_old")
+    # NOT in the name blocklist, but points into the old mount → must be dropped.
+    monkeypatch.setenv("QT_PLUGIN_PATH", "/tmp/.mount_old/usr/plugins")
+    monkeypatch.setenv("GI_TYPELIB_PATH", "/tmp/.mount_old/usr/lib/girepository")
+    # A path list: the mount segment goes, the system ones stay.
+    monkeypatch.setenv("PATH", "/tmp/.mount_old/usr/bin:/usr/bin:/bin")
+    monkeypatch.setenv("XDG_DATA_DIRS", "/tmp/.mount_old/usr/share:/usr/share")
+    # Ordinary session vars must survive untouched.
+    monkeypatch.setenv("HOME", "/home/u")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+
+    env = _relaunch_env()
+
+    assert "QT_PLUGIN_PATH" not in env  # would crash the new instance
+    assert "GI_TYPELIB_PATH" not in env
+    assert env["PATH"] == "/usr/bin:/bin"  # mount segment filtered, rest kept
+    assert env["XDG_DATA_DIRS"] == "/usr/share"
+    assert env["HOME"] == "/home/u"
+    assert env["WAYLAND_DISPLAY"] == "wayland-0"
+
+
 def test_host_setup_finished_skips_drive_refresh_when_drive_selected(
     teardown_threads, monkeypatch
 ) -> None:
