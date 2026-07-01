@@ -11,6 +11,17 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **Year-only naming token `%Y`.** cyanrip's `%y` expands to the *full* release
+  date (e.g. `1995-09-12`) and cyanrip has no year-only token, so the two
+  "year in the folder" presets used to name a folder `Album (1995-09-12)`.
+  Platterpus now has its own `%Y` (the 4-digit year), which the cyanrip backend
+  pre-expands to the literal year — taken from the release date the GUI already
+  fetched — *before* the template reaches cyanrip. The `Artist / Album (Year)`
+  and `Artist / Year - Album` presets now use `%Y`, so a folder reads
+  `Album (1995)`. A config still on the old `%y` year presets is auto-upgraded
+  (schema v3→v4); hand-edited templates are left untouched.
+
 ## [0.4.5] — 2026-07-01
 
 ### Fixed

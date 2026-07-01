@@ -29,11 +29,15 @@ end.**
 Token reference (matches ``adapters/cyanrip_backend`` so a preset round-trips):
     %A = album artist   %a = track artist   %d = album (disc) title
     %t = track number   %n = track title    %y = release date
+    %Y = release year (4-char)
 
-Caveat on %y: it resolves to the *full* release date the tagger has (e.g.
-``1995-09-12``), not a bare year — cyanrip's scheme has no year-only token. The
-year presets therefore show the full date today; :func:`render_preview` reflects
-that honestly so the choice is informed.
+The %y vs %Y distinction: cyanrip's own scheme has a ``{date}`` token (our %y)
+that resolves to the *full* release date the tagger has (e.g. ``1995-09-12``),
+but **no** year-only token. So Platterpus adds its own %Y — a 4-character year —
+which the backend pre-expands to the literal year (from the fetched release
+date) *before* handing the template to cyanrip, since cyanrip wouldn't
+understand %Y. The year presets use %Y so a folder reads "Album (1995)", not
+"Album (1995-09-12)"; :func:`render_preview` shows exactly that.
 """
 
 from __future__ import annotations
@@ -83,6 +87,12 @@ class SampleTrack:
             raw = self.title
         elif token == "y":
             raw = self.date
+        elif token == "Y":
+            # Platterpus-only year-only token: the first 4 chars of the release
+            # date ("1995-09-12" → "1995", "1995" → "1995"). cyanrip has no
+            # year-only token, so the backend pre-expands %Y to this literal
+            # year before the template reaches cyanrip (see cyanrip_backend).
+            raw = self.date[:4]
         elif token == "t":
             # cyanrip zero-pads the track number to the disc's width (min 2).
             width = max(2, len(str(self.track_total)))
@@ -154,16 +164,16 @@ PRESETS: tuple[NamingPreset, ...] = (
     NamingPreset(
         key="artist_album_year_track_title",
         label="Artist / Album (Year) / 01 - Title  (media servers)",
-        track_template="%A/%d (%y)/%t - %n",
-        disc_template="%A/%d (%y)/%d",
-        note="Plex/Jellyfin style — year in the folder. (%y is the full date today.)",
+        track_template="%A/%d (%Y)/%t - %n",
+        disc_template="%A/%d (%Y)/%d",
+        note="Plex/Jellyfin style — the 4-digit year in the folder.",
     ),
     NamingPreset(
         key="artist_year_album_track_title",
         label="Artist / Year - Album / 01 - Title  (chronological)",
-        track_template="%A/%y - %d/%t - %n",
-        disc_template="%A/%y - %d/%d",
-        note="foobar2000 style — albums sort by date. (%y is the full date today.)",
+        track_template="%A/%Y - %d/%t - %n",
+        disc_template="%A/%Y - %d/%d",
+        note="foobar2000 style — albums sort by year.",
     ),
     NamingPreset(
         key="compilation",

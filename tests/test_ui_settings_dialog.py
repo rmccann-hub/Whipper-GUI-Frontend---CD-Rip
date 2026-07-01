@@ -25,7 +25,7 @@ def test_naming_combo_reflects_default_template(qapp: QApplication) -> None:
 
 def test_choosing_naming_preset_fills_template_fields(qapp: QApplication) -> None:
     dialog = SettingsDialog(Config())
-    year_preset = next(p for p in naming.PRESETS if "(%y)" in p.track_template)
+    year_preset = next(p for p in naming.PRESETS if "(%Y)" in p.track_template)
     index = dialog._naming_combo.findData(year_preset.key)
     dialog._naming_combo.setCurrentIndex(index)
     assert dialog._track_template_edit.text() == year_preset.track_template

@@ -29,7 +29,7 @@ from platterpus.paths import (
 
 # Bump this when the schema grows new keys or changes defaults that we
 # want to migrate. Migration logic lives in _migrate() below.
-SCHEMA_VERSION: int = 3
+SCHEMA_VERSION: int = 4
 
 # Computed once at import time. If the user's HOME changes mid-process,
 # the GUI needs a restart — same as every other XDG-aware application.
@@ -69,6 +69,19 @@ _V1_DISC_TEMPLATE: str = "%A - %d/%A - %d"
 # it to the clean v3 default without clobbering a hand-edited one.
 _V2_TRACK_TEMPLATE: str = "%A/%d/%t - %n - %d - %A - %y"
 _V2_DISC_TEMPLATE: str = "%A/%d/%d"
+
+# The v3 "year in the folder" preset templates, which used %y (the FULL release
+# date, e.g. "1995-09-12"). v4 introduced the year-only %Y token and switched
+# these presets to it, so the v3→v4 migration carries an untouched year-preset
+# config forward to the cleaner 4-digit-year form. Keyed old→new; a hand-edited
+# template matches nothing here and is left untouched. Order pairs each track
+# template with its disc template so both migrate together.
+_V3_TO_V4_TEMPLATES: dict[str, str] = {
+    "%A/%d (%y)/%t - %n": "%A/%d (%Y)/%t - %n",  # "Artist / Album (Year) / …"
+    "%A/%d (%y)/%d": "%A/%d (%Y)/%d",
+    "%A/%y - %d/%t - %n": "%A/%Y - %d/%t - %n",  # "Artist / Year - Album / …"
+    "%A/%y - %d/%d": "%A/%Y - %d/%d",
+}
 
 log = logging.getLogger(__name__)
 
@@ -313,6 +326,20 @@ def _migrate(raw: dict) -> dict:
             raw["disc_template"] = _DEFAULT_DISC_TEMPLATE
         raw["schema_version"] = 3
         version = 3
+
+    if version < 4:
+        # v3→v4: the year-in-folder presets switched from %y (the full release
+        # date) to the new year-only %Y token. Upgrade a config still holding an
+        # untouched v3 year-preset template to its %Y form so "Album (1995-09-12)"
+        # becomes "Album (1995)". A hand-edited template matches nothing in the
+        # map and is left alone. Only the "known disc" templates carry a year
+        # preset; the unknown-disc templates never do.
+        for field_name in ("track_template", "disc_template"):
+            upgraded = _V3_TO_V4_TEMPLATES.get(raw.get(field_name))
+            if upgraded is not None:
+                raw[field_name] = upgraded
+        raw["schema_version"] = 4
+        version = 4
 
     if version == SCHEMA_VERSION:
         return raw

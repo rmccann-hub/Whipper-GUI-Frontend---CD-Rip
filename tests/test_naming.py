@@ -43,9 +43,33 @@ def test_render_preview_sanitises_colon_in_value_not_separator() -> None:
 
 
 def test_render_preview_year_token_is_full_date_today() -> None:
-    # Documented caveat: %y resolves to the full date, not a bare year.
+    # %y resolves to the full date (cyanrip's {date}), not a bare year.
     out = naming.render_preview("%d (%y)", naming.SAMPLE_EASY)
     assert "(1971-11-08)" in out
+
+
+def test_render_preview_capital_year_token_is_year_only() -> None:
+    # %Y (Platterpus-only) is the 4-digit year, distinct from %y's full date.
+    out = naming.render_preview("%d (%Y)", naming.SAMPLE_EASY)
+    assert "(1971)" in out
+    assert "1971-11-08" not in out
+    # And it works when the release date is already year-only.
+    out2 = naming.render_preview(
+        "%Y", naming.SampleTrack("A", "A", "D", "T", 1, 1, "1980")
+    )
+    assert out2 == "1980.flac"
+
+
+def test_year_presets_use_year_only_token() -> None:
+    # The two year-in-folder presets switched from %y to %Y in v4, so a folder
+    # reads "Album (1971)", never the full date.
+    for key in ("artist_album_year_track_title", "artist_year_album_track_title"):
+        preset = next(p for p in naming.PRESETS if p.key == key)
+        assert "%Y" in preset.track_template
+        assert "%y" not in preset.track_template
+        out = naming.render_preview(preset.track_template, naming.SAMPLE_EASY)
+        assert "1971-11-08" not in out
+        assert "1971" in out
 
 
 def test_render_preview_compilation_uses_track_artist() -> None:

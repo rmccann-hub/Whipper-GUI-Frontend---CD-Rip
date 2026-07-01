@@ -258,3 +258,36 @@ def test_migration_preserves_custom_templates(
 
     assert cfg.schema_version == SCHEMA_VERSION
     assert cfg.track_template == "my/custom/%t %n"
+
+
+def test_v3_year_preset_upgrades_to_year_only_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A v3 config on a year-in-folder preset (which used %y = the full date)
+    auto-upgrades to the year-only %Y form introduced in v4."""
+    config_file = _redirect_config(tmp_path, monkeypatch)
+    config_file.write_text(
+        "schema_version = 3\n"
+        'track_template = "%A/%d (%y)/%t - %n"\n'
+        'disc_template = "%A/%d (%y)/%d"\n'
+    )
+
+    cfg = config_module.load()
+
+    assert cfg.schema_version == SCHEMA_VERSION
+    assert cfg.track_template == "%A/%d (%Y)/%t - %n"
+    assert cfg.disc_template == "%A/%d (%Y)/%d"
+
+
+def test_v3_year_preset_migration_leaves_custom_templates_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The v3→v4 year-token upgrade only touches an exact old preset template —
+    a hand-edited one that happens to contain %y is left untouched."""
+    config_file = _redirect_config(tmp_path, monkeypatch)
+    config_file.write_text('schema_version = 3\ntrack_template = "%A - %d - %y/%t"\n')
+
+    cfg = config_module.load()
+
+    assert cfg.schema_version == SCHEMA_VERSION
+    assert cfg.track_template == "%A - %d - %y/%t"

@@ -268,6 +268,53 @@ def test_scheme_neutralizes_literal_braces() -> None:
     assert scheme_from_template("{weird} %n") == "(weird) {title}"
 
 
+def test_scheme_expands_year_only_token_to_literal() -> None:
+    # %Y has no cyanrip equivalent, so it's substituted with the literal year
+    # here (cyanrip only ever sees "1995", never "%Y").
+    assert scheme_from_template("%d (%Y)", year="1995") == "{album} (1995)"
+    # Empty year → the token drops out (dateless disc).
+    assert scheme_from_template("%d (%Y)", year="") == "{album} ()"
+    # A %%Y escape stays a literal percent + "Y" — the year is NOT spliced in
+    # mid-escape (why we scan rather than str.replace).
+    assert scheme_from_template("%%Y", year="1995") == "%%Y"
+
+
+def test_rip_argv_preexpands_year_only_token_from_release_date() -> None:
+    # A %Y in the template is expanded to the 4-char year taken from the fetched
+    # release date, BEFORE the template is handed to cyanrip (which has no
+    # year-only token). Here the date is a full "YYYY-MM-DD".
+    meta = RipMetadata(
+        album_artist="Nirvana", album_title="Nevermind", year="1991-09-24"
+    )
+    argv = _impl()._build_rip_argv(
+        "/dev/sr0",
+        unknown=False,
+        cover_art="embed",
+        max_retries=5,
+        read_offset_override=None,
+        track_template="%A/%d (%Y)/%t - %n",
+        metadata=meta,
+    )
+    assert argv[argv.index("-D") + 1] == "{album_artist}/{album} (1991)"
+    assert "%Y" not in " ".join(argv)
+
+
+def test_rip_argv_year_only_token_empty_without_metadata() -> None:
+    # No metadata / no year → %Y vanishes (same as cyanrip's own {date} on a
+    # dateless disc); it must never leak the literal "%Y" into the folder name.
+    argv = _impl()._build_rip_argv(
+        "/dev/sr0",
+        unknown=True,
+        cover_art="",
+        max_retries=5,
+        read_offset_override=None,
+        track_template="%A/%d (%Y)/%t - %n",
+        metadata=None,
+    )
+    assert argv[argv.index("-D") + 1] == "{album_artist}/{album} ()"
+    assert "%Y" not in " ".join(argv)
+
+
 # --- drive scan -----------------------------------------------------------
 
 

@@ -160,11 +160,17 @@ class CyanripImpl(RipBackend):
         # part -F — cyanrip renders {tokens} from the -a/-t tags above and
         # sanitizes tag values, so a "/" typed IN a template still nests
         # while a "/" inside an album title doesn't.
+        # Platterpus-only %Y (year-only) has no cyanrip equivalent, so we
+        # pre-expand it to the literal 4-char year here (from the release date
+        # the GUI fetched) BEFORE the template reaches cyanrip — otherwise the
+        # folder would literally contain "%Y". Empty when there's no year (the
+        # token then vanishes, same as cyanrip's own {date} on a dateless disc).
+        year = ((metadata.year if metadata else "") or "")[:4]
         dir_part, _, file_part = track_template.rpartition("/")
         if dir_part:
-            argv += ["-D", scheme_from_template(dir_part)]
+            argv += ["-D", scheme_from_template(dir_part, year=year)]
         if file_part:
-            argv += ["-F", scheme_from_template(file_part)]
+            argv += ["-F", scheme_from_template(file_part, year=year)]
         if not cover_art:
             argv.append("-G")  # disable cover-art embedding
         return argv
@@ -403,7 +409,7 @@ _TOKEN_MAP: dict[str, str] = {
 }
 
 
-def scheme_from_template(template: str) -> str:
+def scheme_from_template(template: str, *, year: str = "") -> str:
     """Translate a whipper path template into a cyanrip -D/-F scheme.
 
     Known %x tokens map per _TOKEN_MAP; an unrecognized %x is kept
@@ -411,6 +417,12 @@ def scheme_from_template(template: str) -> str:
     braces are flattened to parentheses because ``{...}`` is cyanrip's own
     substitution syntax — a stray brace would otherwise be parsed as a
     (missing) tag key.
+
+    ``%Y`` is the one Platterpus-only token: cyanrip has no year-only field, so
+    we substitute the literal 4-char ``year`` right here (the caller passes the
+    release year). Doing the substitution inside this single scanner — rather
+    than a blind ``str.replace("%Y", …)`` upstream — keeps ``%%`` escapes intact
+    (``%%Y`` stays a literal percent + "Y", never a stray year).
     """
     out: list[str] = []
     i = 0
@@ -418,6 +430,11 @@ def scheme_from_template(template: str) -> str:
         ch = template[i]
         if ch == "%" and i + 1 < len(template):
             token = template[i : i + 2]
+            if token == "%Y":
+                # Literal year (e.g. "1995"); "" on a dateless disc → drops out.
+                out.append(year)
+                i += 2
+                continue
             mapped = _TOKEN_MAP.get(token)
             if mapped is not None:
                 out.append(mapped)
