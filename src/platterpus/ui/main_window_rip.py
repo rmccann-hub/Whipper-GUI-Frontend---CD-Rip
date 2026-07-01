@@ -424,6 +424,10 @@ class RipMixin:
         # logs the disc's audio length and a finish timestamp but never how long
         # the rip took. Captured here (worker still alive) before it's cleared.
         self._last_rip_timing = self._build_rip_timing()
+        # Capture the read-speed ladder's per-pass history now, while the worker
+        # is still alive (it's cleared below), so the report can record which
+        # speed / -Z the disc needed — or that it never read clean at the floor.
+        self._last_speed_attempts = getattr(self._rip_worker, "speed_attempts", [])
 
         self._rip_controls.set_rip_active(False)
         self._set_rip_lock(False)  # rip over — re-enable the locked-down UI
@@ -996,7 +1000,7 @@ class RipMixin:
         """
         from datetime import datetime
 
-        from platterpus import rip_report
+        from platterpus import read_speed_ladder, rip_report
 
         debug_log = self._build_rip_debug_log()
         rip_report.write_report(
@@ -1006,6 +1010,9 @@ class RipMixin:
             flac_verify_result=getattr(self, "_last_flac_verify_result", None),
             transcode_result=getattr(self, "_last_transcode_result", None),
             derived_verify_result=getattr(self, "_last_derived_verify_result", None),
+            read_speed=read_speed_ladder.attempts_to_report(
+                getattr(self, "_last_speed_attempts", []) or []
+            ),
             checksums=getattr(self, "_last_checksums", None),
             generated_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             timing=self._last_rip_timing,

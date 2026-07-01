@@ -308,6 +308,45 @@ class SettingsDialog(CenteredDialog):
         )
         form.addRow("Re-rip until reads match:", self._secure_rerip_spin)
 
+        # --- Adaptive read-speed ladder (headline, 0.4.6) ---
+        # "Adaptive ladder" (default): rip fast, and only if a disc reads with
+        # errors, re-rip it slower (and, at the floor, harder). "Fixed speed"
+        # disables the ladder and always rips at the chosen speed. The fixed
+        # spinner is enabled only in Fixed mode.
+        self._read_speed_mode_combo: QComboBox = QComboBox(self)
+        self._read_speed_mode_combo.addItem(
+            "Adaptive ladder — fast, slower only if a disc needs it", "auto_ladder"
+        )
+        self._read_speed_mode_combo.addItem("Fixed speed (advanced)", "fixed")
+        mode_index = self._read_speed_mode_combo.findData(config.read_speed_mode)
+        self._read_speed_mode_combo.setCurrentIndex(
+            mode_index if mode_index >= 0 else 0
+        )
+        self._read_speed_mode_combo.setToolTip(
+            "Adaptive ladder (recommended): start at the drive's top speed and, "
+            "only if a disc reads with errors, re-rip it a rung slower "
+            "(max → 8× → 4× → 2×) and then re-read harder. Quality only ever "
+            "goes up. Fixed speed disables the ladder and always rips at the "
+            "speed below (advanced; some drives read marginal discs better slow)."
+        )
+        form.addRow("Read speed:", self._read_speed_mode_combo)
+
+        self._read_speed_spin: QSpinBox = QSpinBox(self)
+        self._read_speed_spin.setRange(0, 72)  # 0 = drive max; CD ×-speeds
+        self._read_speed_spin.setValue(config.read_speed)
+        self._read_speed_spin.setSpecialValueText("Max")  # shown when value is 0
+        self._read_speed_spin.setToolTip(
+            "The fixed drive read speed (cyanrip's -S), used only in Fixed-speed "
+            "mode. 'Max' (0) lets the drive pick. Whether the drive honours this "
+            "depends on the drive + Linux stack."
+        )
+        form.addRow("Fixed speed (×):", self._read_speed_spin)
+        # The fixed-speed spinner only applies in Fixed mode.
+        self._read_speed_mode_combo.currentIndexChanged.connect(
+            self._update_read_speed_enabled
+        )
+        self._update_read_speed_enabled()
+
         # --- CTDB verification (KDD-14 Phase 1) ---
         # A second, TOC-keyed verification path alongside AccurateRip. Off by
         # default: it's a post-rip network call, and a match is currently
@@ -406,6 +445,8 @@ class SettingsDialog(CenteredDialog):
             cover_art=self._cover_art_combo.currentData(),
             max_retries=self._max_retries_spin.value(),
             secure_rerip_matches=self._secure_rerip_spin.value(),
+            read_speed_mode=self._read_speed_mode_combo.currentData(),
+            read_speed=self._read_speed_spin.value(),
             ctdb_verify_after_rip=self._ctdb_verify_check.isChecked(),
             verify_flac_after_rip=self._verify_flac_check.isChecked(),
             recompress_flac_after_rip=self._recompress_flac_check.isChecked(),
@@ -429,6 +470,13 @@ class SettingsDialog(CenteredDialog):
     def _update_wav_warning(self) -> None:
         """Show the no-tags/art warning only when WAV is the selected format."""
         self._wav_warning_label.setVisible(self._format_combo.currentData() == "wav")
+
+    def _update_read_speed_enabled(self) -> None:
+        """The fixed-speed spinner only applies in Fixed mode; in Adaptive-ladder
+        mode the speed is chosen automatically, so grey the spinner out."""
+        self._read_speed_spin.setEnabled(
+            self._read_speed_mode_combo.currentData() == "fixed"
+        )
 
     # --- Naming presets ----------------------------------------------------
 
@@ -491,6 +539,7 @@ class SettingsDialog(CenteredDialog):
             self._ctdb_verify_check,
             self._recompress_flac_check,
             self._secure_rerip_spin,
+            self._read_speed_mode_combo,
         ]
 
     def _wire_goal_presets(self) -> None:
@@ -506,6 +555,9 @@ class SettingsDialog(CenteredDialog):
         self._ctdb_verify_check.toggled.connect(self._on_dependent_changed)
         self._recompress_flac_check.toggled.connect(self._on_dependent_changed)
         self._secure_rerip_spin.valueChanged.connect(self._on_dependent_changed)
+        self._read_speed_mode_combo.currentIndexChanged.connect(
+            self._on_dependent_changed
+        )
 
     def _on_goal_changed(self) -> None:
         """Apply the selected preset to the dependent controls."""
@@ -525,6 +577,9 @@ class SettingsDialog(CenteredDialog):
             self._ctdb_verify_check.setChecked(preset.ctdb_verify_after_rip)
             self._recompress_flac_check.setChecked(preset.recompress_flac_after_rip)
             self._secure_rerip_spin.setValue(preset.secure_rerip_matches)
+            mode_index = self._read_speed_mode_combo.findData(preset.read_speed_mode)
+            if mode_index >= 0:
+                self._read_speed_mode_combo.setCurrentIndex(mode_index)
         finally:
             self._applying_preset = False
 

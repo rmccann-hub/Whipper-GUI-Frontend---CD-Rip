@@ -223,6 +223,22 @@ def test_derived_verify_lossy_mp3_states_it_is_not_bit_identity() -> None:
     assert dv["ok"] is True  # ok here means decode-clean + complete
 
 
+def test_read_speed_block_serialized() -> None:
+    from platterpus.read_speed_ladder import SpeedAttempt, attempts_to_report
+
+    attempts = [SpeedAttempt(1, 0, 0, clean=False), SpeedAttempt(2, 8, 0, clean=True)]
+    report = build_report(_sample_log(), read_speed=attempts_to_report(attempts))
+    rs = report["read_speed"]
+    assert rs is not None
+    assert rs["escalated"] is True and rs["unresolved"] is False
+    assert rs["final_speed"] == 8
+
+
+def test_read_speed_block_absent_on_single_pass() -> None:
+    # A normal single-pass rip passes no read_speed → the key is None (omitted).
+    assert build_report(_sample_log())["read_speed"] is None
+
+
 def test_derived_verify_mismatch_serialized() -> None:
     from platterpus.adapters.derived_verify import DerivedVerifyResult
 

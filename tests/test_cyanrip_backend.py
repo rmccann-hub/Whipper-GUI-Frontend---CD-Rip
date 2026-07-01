@@ -150,6 +150,32 @@ def test_rip_argv_passes_secure_rerip_when_set() -> None:
     assert "-Z" in argv and argv[argv.index("-Z") + 1] == "2"
 
 
+def test_rip_argv_omits_read_speed_when_zero() -> None:
+    # 0 (drive max / the ladder's first rung) → no -S; the drive picks.
+    argv = _impl()._build_rip_argv(
+        "/dev/sr0",
+        unknown=False,
+        cover_art="embed",
+        max_retries=5,
+        read_offset_override=667,
+        read_speed=0,
+    )
+    assert "-S" not in argv
+
+
+def test_rip_argv_passes_read_speed_when_set() -> None:
+    # A positive speed → cyanrip's -S N (cap the drive read speed for this pass).
+    argv = _impl()._build_rip_argv(
+        "/dev/sr0",
+        unknown=False,
+        cover_art="embed",
+        max_retries=5,
+        read_offset_override=667,
+        read_speed=8,
+    )
+    assert "-S" in argv and argv[argv.index("-S") + 1] == "8"
+
+
 def test_rip_argv_always_disables_mb_and_feeds_gui_metadata() -> None:
     """KDD-18 metadata model: cyanrip never does its own MB lookup — the
     GUI's tags (release pick + user edits) are fed via -a/-t, offline."""

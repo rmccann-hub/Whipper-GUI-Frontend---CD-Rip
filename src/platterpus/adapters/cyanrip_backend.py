@@ -119,6 +119,7 @@ class CyanripImpl(RipBackend):
         track_template: str = "",
         metadata: RipMetadata | None = None,
         secure_rerip_matches: int = 0,
+        read_speed: int = 0,
     ) -> list[str]:
         """Build the cyanrip rip argv (pure — unit-tested).
 
@@ -149,6 +150,15 @@ class CyanripImpl(RipBackend):
         # burns time, so the default rip omits it entirely.
         if secure_rerip_matches > 0:
             argv += ["-Z", str(secure_rerip_matches)]
+        # `-S <speed>`: cap the drive's read speed for this pass. Only passed when
+        # a positive speed is requested (> 0); 0 means "let the drive pick" (its
+        # maximum), so the default fast rip omits `-S` entirely. The adaptive
+        # ladder (read_speed_ladder.py) feeds progressively slower values here on
+        # a re-rip of a marginal disc. Graceful fallback: if the drive/libcdio-
+        # paranoia stack ignores `-S` (hardware-gated — the BDR-209D is unverified
+        # here), the pass simply reads at the drive's speed — no regression.
+        if read_speed > 0:
+            argv += ["-S", str(read_speed)]
         # Always -N: the GUI is the single metadata source (see docstring).
         # `unknown` just means the GUI has placeholder tags instead of MB
         # ones — either way cyanrip itself stays offline.
@@ -188,6 +198,7 @@ class CyanripImpl(RipBackend):
         secure_rerip_matches: int = 0,
         read_offset_override: int | None = None,
         metadata: RipMetadata | None = None,
+        read_speed: int = 0,
     ) -> RipHandle:
         # disc_template is unused: cyanrip puts the log/cue in the -D folder
         # already (derived from track_template, which carries the same
@@ -204,6 +215,7 @@ class CyanripImpl(RipBackend):
             track_template=track_template,
             metadata=metadata,
             secure_rerip_matches=secure_rerip_matches,
+            read_speed=read_speed,
         )
         # cyanrip writes under the current directory (its -D/-F schemes are
         # relative), so run it from the output dir.

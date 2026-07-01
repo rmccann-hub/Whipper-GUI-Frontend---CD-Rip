@@ -51,6 +51,7 @@ def build_report(
     flac_verify_result: object | None = None,
     transcode_result: object | None = None,
     derived_verify_result: object | None = None,
+    read_speed: dict | None = None,
     checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
@@ -80,6 +81,7 @@ def build_report(
             transcode_result,
             checksums,
             derived_verify_result,
+            read_speed,
         )
     except Exception:  # noqa: BLE001 — a report builder must never crash a rip
         log.exception("rip-report build failed; emitting minimal envelope")
@@ -161,6 +163,7 @@ def _build(
     transcode_result: object | None = None,
     checksums: dict | None = None,
     derived_verify_result: object | None = None,
+    read_speed: dict | None = None,
 ) -> dict:
     message, level = accuraterip_verdict(rip_log)
     info = getattr(rip_log, "ripping_info", None)
@@ -187,6 +190,11 @@ def _build(
         ),
         "disc_duration": getattr(rip_log, "disc_duration", "") or None,
         "paranoia_counts": dict(getattr(rip_log, "paranoia_counts", {}) or {}) or None,
+        # Adaptive read-speed ladder history: the speed / -Z each pass used and
+        # whether it read clean (see read_speed_ladder.attempts_to_report). None
+        # on a normal single-pass rip. `unresolved: true` FLAGS a disc that never
+        # read clean even at the floor speed — surfaced, never papered over.
+        "read_speed": (dict(read_speed) if read_speed else None),
         # Whole-disc loudness (integrated LUFS / LRA / true peak) from cyanrip's
         # "Album Loudness Summary"; per-track loudness lives in each track's
         # `replaygain`. None when absent (e.g. whipper logs).
@@ -411,6 +419,7 @@ def write_report(
     flac_verify_result: object | None = None,
     transcode_result: object | None = None,
     derived_verify_result: object | None = None,
+    read_speed: dict | None = None,
     checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
@@ -431,6 +440,7 @@ def write_report(
             flac_verify_result=flac_verify_result,
             transcode_result=transcode_result,
             derived_verify_result=derived_verify_result,
+            read_speed=read_speed,
             checksums=checksums,
             generated_at=generated_at,
             timing=timing,

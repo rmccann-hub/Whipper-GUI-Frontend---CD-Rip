@@ -291,3 +291,36 @@ def test_v3_year_preset_migration_leaves_custom_templates_alone(
 
     assert cfg.schema_version == SCHEMA_VERSION
     assert cfg.track_template == "%A - %d - %y/%t"
+
+
+def test_read_speed_defaults_and_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _redirect_config(tmp_path, monkeypatch)
+
+    cfg = config_module.load()
+    # Default = the adaptive ladder, starting at the drive's max (0).
+    assert cfg.read_speed_mode == "auto_ladder"
+    assert cfg.read_speed == 0
+
+    cfg.read_speed_mode = "fixed"
+    cfg.read_speed = 8
+    config_module.save(cfg)
+    reloaded = config_module.load()
+    assert reloaded.read_speed_mode == "fixed"
+    assert reloaded.read_speed == 8
+
+
+def test_v4_config_upgrades_to_v5_with_read_speed_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A v4 config (no read-speed fields) loads at the current schema with the
+    adaptive-ladder defaults filled in — no value transform needed."""
+    config_file = _redirect_config(tmp_path, monkeypatch)
+    config_file.write_text("schema_version = 4\n")
+
+    cfg = config_module.load()
+
+    assert cfg.schema_version == SCHEMA_VERSION
+    assert cfg.read_speed_mode == "auto_ladder"
+    assert cfg.read_speed == 0

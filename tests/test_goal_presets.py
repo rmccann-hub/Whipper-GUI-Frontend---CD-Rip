@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from platterpus.config import Config
 from platterpus.goal_presets import (
     GOAL_ARCHIVAL,
@@ -44,6 +46,20 @@ def test_every_preset_fully_verifies_the_master() -> None:
         out = apply_preset(Config(), goal)
         assert out.ctdb_verify_after_rip is True
         assert out.verify_flac_after_rip is True
+
+
+def test_every_preset_uses_the_adaptive_ladder() -> None:
+    # All shipped goals default to the adaptive read-speed ladder (fast, careful
+    # only when needed) — a fixed speed is a Custom choice.
+    for goal in (GOAL_FAST, GOAL_ARCHIVAL, GOAL_PORTABLE):
+        assert apply_preset(Config(), goal).read_speed_mode == "auto_ladder"
+
+
+def test_fixed_read_speed_detects_as_custom() -> None:
+    # Choosing a fixed speed (disabling the ladder) matches no preset → Custom.
+    cfg = apply_preset(Config(), GOAL_FAST)
+    cfg = replace(cfg, read_speed_mode="fixed")
+    assert detect_goal(cfg) == GOAL_CUSTOM
 
 
 def test_hand_tuned_config_detects_as_custom() -> None:

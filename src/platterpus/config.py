@@ -29,7 +29,7 @@ from platterpus.paths import (
 
 # Bump this when the schema grows new keys or changes defaults that we
 # want to migrate. Migration logic lives in _migrate() below.
-SCHEMA_VERSION: int = 4
+SCHEMA_VERSION: int = 5
 
 # Computed once at import time. If the user's HOME changes mid-process,
 # the GUI needs a restart — same as every other XDG-aware application.
@@ -181,6 +181,23 @@ class Config:
     # Settings greys the control out for whipper (same pattern as the
     # FLAC re-compress / verify toggles).
     secure_rerip_matches: int = 0
+
+    # --- Adaptive read-speed ladder (headline, 0.4.6) ---
+    # How the read speed is chosen for a rip:
+    #   "auto_ladder" (default) — start at the drive's max speed; on a pass with
+    #      unrecoverable read errors, re-rip the disc down a slower ladder
+    #      (max → 8× → 4× → 2×) and, at the floor, escalate `-Z`. Behaves like a
+    #      careful EAC user: fast on a clean disc, careful only when needed —
+    #      quality can only go UP (see read_speed_ladder.py).
+    #   "fixed" — always rip at `read_speed` (below), no escalation. This is the
+    #      "advanced fixed speed" / "disable the ladder" option.
+    # NOTE: whether the drive honours `-S` at all is hardware-gated (the tested
+    # BDR-209D is unverified); if it's ignored the ladder degrades to plain
+    # re-reads at the drive's speed — no regression.
+    read_speed_mode: str = "auto_ladder"
+    # The fixed drive read speed (cyanrip's `-S N`) when read_speed_mode ==
+    # "fixed". 0 = let the drive pick its maximum (also the ladder's first rung).
+    read_speed: int = 0
 
     # --- CTDB verification (KDD-14 Phase 1) ---
     # After a successful rip, verify the result against the CUETools Database
@@ -340,6 +357,15 @@ def _migrate(raw: dict) -> dict:
                 raw[field_name] = upgraded
         raw["schema_version"] = 4
         version = 4
+
+    if version < 5:
+        # v4→v5: added the adaptive read-speed ladder fields (read_speed_mode /
+        # read_speed). No value transform is needed — an absent field fills in
+        # from the dataclass defaults on load (auto_ladder / 0), which is exactly
+        # the intended behaviour for an upgrading config. We still bump the
+        # version so the record is explicit and the chain stays honest.
+        raw["schema_version"] = 5
+        version = 5
 
     if version == SCHEMA_VERSION:
         return raw

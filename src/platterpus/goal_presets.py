@@ -38,6 +38,10 @@ class GoalPreset:
     verify_flac_after_rip: bool
     recompress_flac_after_rip: bool
     secure_rerip_matches: int
+    # How read speed is chosen. All shipped goals use the adaptive ladder: fast
+    # on a clean disc, careful only when a disc needs it (quality only goes up).
+    # A user who picks a fixed speed in Settings drops to the "custom" goal.
+    read_speed_mode: str
 
 
 # The three goals. Verification is the constant across ALL of them — every rip
@@ -56,6 +60,7 @@ PRESETS: dict[str, GoalPreset] = {
         verify_flac_after_rip=True,
         recompress_flac_after_rip=False,
         secure_rerip_matches=0,
+        read_speed_mode="auto_ladder",
     ),
     GOAL_ARCHIVAL: GoalPreset(
         output_format="flac",
@@ -63,6 +68,7 @@ PRESETS: dict[str, GoalPreset] = {
         verify_flac_after_rip=True,
         recompress_flac_after_rip=True,
         secure_rerip_matches=0,
+        read_speed_mode="auto_ladder",
     ),
     GOAL_PORTABLE: GoalPreset(
         output_format="mp3",
@@ -70,6 +76,7 @@ PRESETS: dict[str, GoalPreset] = {
         verify_flac_after_rip=True,
         recompress_flac_after_rip=False,
         secure_rerip_matches=0,
+        read_speed_mode="auto_ladder",
     ),
 }
 
@@ -98,6 +105,7 @@ def apply_preset(config: Config, goal: str) -> Config:
         verify_flac_after_rip=preset.verify_flac_after_rip,
         recompress_flac_after_rip=preset.recompress_flac_after_rip,
         secure_rerip_matches=preset.secure_rerip_matches,
+        read_speed_mode=preset.read_speed_mode,
     )
 
 
@@ -114,6 +122,7 @@ def detect_goal(config: Config) -> str:
             and config.verify_flac_after_rip == preset.verify_flac_after_rip
             and config.recompress_flac_after_rip == preset.recompress_flac_after_rip
             and config.secure_rerip_matches == preset.secure_rerip_matches
+            and config.read_speed_mode == preset.read_speed_mode
         ):
             return key
     return GOAL_CUSTOM

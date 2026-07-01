@@ -285,6 +285,10 @@ class MainWindow(
         self._rip_started_monotonic: float | None = None
         self._rip_started_at: str = ""
         self._last_rip_timing: dict | None = None
+        # The adaptive read-speed ladder's per-pass history for the just-finished
+        # rip (read off the worker at finish, before it's cleared), folded into
+        # the report so a slow re-read — or a still-unresolved disc — is recorded.
+        self._last_speed_attempts: list = []
         # Rip time-windows (epoch start, end) for every rip THIS session, used to
         # strip *other* albums' rip lines out of each report's embedded debug log
         # (the report stays a self-contained, single-album debug record). The

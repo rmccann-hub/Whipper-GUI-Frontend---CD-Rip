@@ -21,6 +21,22 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
   window close so nothing queued is ever lost.
 
 ### Added
+- **Adaptive read-speed ladder — the app now behaves like a careful EAC user.**
+  Rips start at the drive's top speed, and only slow down / re-read harder when a
+  disc actually reads with errors — quality can only go up, never down. On a pass
+  with unrecoverable read errors, Platterpus re-rips the disc a rung slower
+  (max → 8× → 4× → 2×, cyanrip's `-S`) and, at the floor, re-reads until repeated
+  passes agree (`-Z`), stopping the moment it reads clean or the ladder is
+  exhausted — a disc that still can't be read clean is FLAGGED (never papered
+  over). A clean disc is a single fast pass, exactly as before. Settings adds an
+  advanced "Fixed speed" choice that disables the ladder. Each pass's speed / `-Z`
+  / outcome is recorded in the `.platterpus.json` (`read_speed`) and the album
+  log. The pure decision logic is unit-tested and never raises. **Three pieces
+  are hardware-gated pending validation on the Pioneer BDR-209D rig — whether the
+  drive honours `-S`, whether cyanrip's per-track read-error signal is reliable,
+  and whether a track subset can be re-ripped; until then the ladder is
+  best-effort and cannot cause a regression** (see `docs/ripper-engine-strategy.md
+  §8.1`).
 - **Derived files (MP3/WavPack/WAV) are now verified too (Task #19).** The FLAC
   master was already fully verified (AccurateRip + CTDB + `flac --test`); now the
   files we derive from it are proven as well — honestly per format. WavPack and

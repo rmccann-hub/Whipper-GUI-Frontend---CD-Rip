@@ -231,6 +231,7 @@ class RipBackend(ABC):
         secure_rerip_matches: int = 0,
         read_offset_override: int | None = None,
         metadata: RipMetadata | None = None,
+        read_speed: int = 0,
     ) -> RipHandle:
         """Begin a rip. `release_id` is an MBID, never an interactive prompt.
 
@@ -240,7 +241,10 @@ class RipBackend(ABC):
         backend's accepted values, or "" to skip) and `max_retries` map to the
         matching rip flags — the EAC bit-perfect parity gaps (KDD-13).
         `secure_rerip_matches`, when > 0, is cyanrip's `-Z N` (re-rip a track
-        until N reads' checksums agree) for marginal discs. The returned handle
+        until N reads' checksums agree) for marginal discs. `read_speed`, when
+        > 0, caps the drive read speed for this pass (cyanrip's `-S N`); 0 lets
+        the drive pick its maximum. The adaptive ladder feeds slower values here
+        on a re-rip (see :mod:`platterpus.read_speed_ladder`). The returned handle
         streams the backend's stdout and supports cancel.
         """
 

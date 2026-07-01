@@ -244,19 +244,55 @@ ships no Linux ripper.
   AccurateRip/CTDB external verification already reach provable bit-perfection.
   C2 would only make it *faster*, not *more correct*. Defensible: our north star
   is correctness, and AccurateRip verifies independently of any drive flag.
-- **(d) Expose read speed `-S` — cheap partial mitigation.** Not C2, but the real
-  speed lever we don't yet surface. A lower fixed speed cuts read errors → fewer
-  re-read passes → faster net on marginal discs. Low effort; best payoff after (a).
+- **(d) Expose read speed `-S` — cheap partial mitigation. ✅ SHIPPED (0.4.6).**
+  Not C2, but the real speed lever we didn't surface. See §8.1 — this grew from
+  "a Settings knob" into the adaptive read-speed **ladder** (the 0.4.6 headline):
+  start fast, and only slow down / re-read harder when a disc actually reads with
+  errors. Low effort, high payoff — exactly as ranked.
 - **(b) Patch/fork libcdio-paranoia (or cyanrip's read loop) to use C2.** Very high
   effort — C2 logic belongs in the conservative GPL-3.0 paranoia core; low upstream
   appetite. **Pointless on the BDR-209D if it exposes no C2.** Hardware-gated.
 - **(c) Swap extraction engine for a C2-using one.** No mature Linux candidate
   exists. Not viable.
 
-**Recommendation.** Keep **(a)**; add **(d)** as a Settings knob when convenient.
-Treat **(b)/(c)** as parked behind a real-hardware confirmation that the drive
-even exposes C2 — current evidence says it does not, which by itself defeats them
-for this rig. Effort-vs-payoff rank: **(a) > (d) > (b) > (c)**.
+**Recommendation.** Keep **(a)**; **(d) shipped** (§8.1). Treat **(b)/(c)** as
+parked behind a real-hardware confirmation that the drive even exposes C2 —
+current evidence says it does not, which by itself defeats them for this rig.
+Effort-vs-payoff rank: **(a) > (d) > (b) > (c)**.
+
+### 8.1 The adaptive read-speed ladder (shipped 0.4.6)
+
+Option (d) landed as more than a fixed knob: a **ladder** that behaves like a
+careful EAC user with zero terminal. **Quality can only go up.**
+
+- **Default (`read_speed_mode = "auto_ladder"`):** rip at the drive's max speed.
+  If a pass completes with unrecoverable read errors (cyanrip's log
+  `Ripping errors: N > 0` / a track "with errors"), re-rip the disc a rung slower
+  — `max → 8× → 4× → 2×` (`-S`) — and, at the 2× floor, re-read harder with
+  `-Z 2` then `-Z 3`. Stop when a pass reads clean or the ladder is exhausted
+  (then the disc is **FLAGGED** as unresolved in the report — never silently
+  interpolated or papered over). Bounded by a hard `MAX_ATTEMPTS`.
+- **Manual override:** Settings → "Fixed speed (advanced)" disables the ladder
+  and rips at one chosen `-S` value (0 = drive max).
+- **Honest reporting:** each pass's speed + `-Z` + clean/not lands in
+  `.platterpus.json` under `read_speed` (and the album `.platterpus.log`).
+- **Where:** the pure decision logic is `src/platterpus/read_speed_ladder.py`
+  (never raises, fully unit-tested); the loop lives in `workers/rip_worker.py`;
+  `-S` plumbing is in `adapters/cyanrip_backend.py`.
+
+**Three checks are HARDWARE-GATED — validate on the Bazzite + Pioneer BDR-209D
+rig before treating the ladder as authoritative (it's "best effort" until then;
+none of these can cause a regression — a clean disc is always a single fast pass):**
+1. **Does the BDR-209D honour `-S`** through the Linux/libcdio-paranoia stack? If
+   it silently ignores it, the "slower rungs" re-read at the same speed — the
+   ladder then degrades to plain re-reads + `-Z` (still safe, just less effective).
+2. **Is cyanrip's per-track "unrecoverable read" signal reliable?** Today we
+   trigger on the whole-disc `Ripping errors:` count — confirm it fires exactly
+   when a track genuinely couldn't be read clean (and not on benign conditions).
+3. **Can cyanrip re-rip a SUBSET of tracks** at a new speed, or must the whole
+   disc re-run? We currently re-run the whole disc (safe, but slower on a big disc
+   with one bad track). If cyanrip has reliable track selection, re-ripping only
+   the failed tracks is the obvious follow-up optimisation.
 
 [eac]: https://www.exactaudiocopy.de/extraction-technology/
 [cmp]: https://wiki.hydrogenaudio.org/index.php?title=Comparison_of_CD_rippers

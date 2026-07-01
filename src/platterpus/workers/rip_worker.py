@@ -34,6 +34,12 @@ from platterpus.adapters.rip_backend import (
     RipHandle,
     RipMetadata,
 )
+from platterpus.read_speed_ladder import (
+    MAX_ATTEMPTS,
+    SpeedAttempt,
+    next_step,
+    read_errors_present,
+)
 
 log = logging.getLogger(__name__)
 
@@ -60,6 +66,14 @@ class RipParameters:
     # cyanrip's `-Z N` (rip until N reads' checksums match) for marginal
     # discs. 0 = off.
     secure_rerip_matches: int = 0
+    # Adaptive read-speed ladder (0.4.6). `read_speed_mode` is "auto_ladder"
+    # (start fast, re-rip slower on read errors) or "fixed"; `read_speed` is the
+    # fixed/starting `-S` value (0 = drive max). Defaults are conservative here
+    # ("fixed" / 0 == today's behaviour) so a worker constructed without them —
+    # e.g. in a unit test — never enters the escalation loop; the GUI passes the
+    # user's config values (auto_ladder by default) explicitly.
+    read_speed_mode: str = "fixed"
+    read_speed: int = 0
     # When set, applied as the read offset for the rip (cyanrip's `-s`).
     read_offset_override: int | None = None
     # The GUI's already-fetched album/track tags (track table content),
@@ -217,6 +231,11 @@ class RipWorker(QObject):
         # every phase and is wildly wrong early (it printed "822h" at 0.01% on a
         # real disc). None until the loop starts.
         self._started_monotonic: float | None = None
+        # The adaptive read-speed ladder's history: one SpeedAttempt per rip pass
+        # (speed + -Z + whether it read clean). The GUI reads this at finish and
+        # folds it into the report, so a disc that needed a slow re-read — or that
+        # never read clean even at the floor — is recorded honestly, not hidden.
+        self._speed_attempts: list[SpeedAttempt] = []
 
     def _album_eta_text(self, overall_pct: float) -> str:
         """A smoothed, self-correcting album ETA suffix (" · about 25m left").
@@ -256,11 +275,87 @@ class RipWorker(QObject):
         Set when whipper gives up on an unreadable track."""
         return self._failure_hint
 
+    @property
+    def speed_attempts(self) -> list[SpeedAttempt]:
+        """The adaptive read-speed ladder's per-pass history (empty on a normal
+        single-pass rip). The GUI reads this at finish for the report."""
+        return list(self._speed_attempts)
+
     # --- Slots ---
 
     @Slot()
     def start_rip(self) -> None:
-        """Begin the rip. Invoked via QThread.started."""
+        """Begin the rip. Invoked via QThread.started.
+
+        Runs the adaptive read-speed ladder: rip once, and — in ``auto_ladder``
+        mode — if the pass completed with unrecoverable read errors, re-rip the
+        disc a rung slower (and, at the floor, with a higher ``-Z``), until it
+        reads clean or the ladder is exhausted (then the disc is FLAGGED via the
+        recorded attempts). A clean disc, or ``fixed`` mode, is a single pass
+        exactly as before — no regression. Each pass's speed/``-Z``/outcome is
+        recorded in ``_speed_attempts`` for honest reporting.
+        """
+        # Stamp the wall-clock start once (album-ETA baseline spans all passes).
+        self._started_monotonic = time.monotonic()
+
+        auto_ladder = self._params.read_speed_mode == "auto_ladder"
+        # Starting rung: the ladder starts at the drive's max (0); a fixed mode
+        # uses the configured speed for its single pass.
+        speed = 0 if auto_ladder else self._params.read_speed
+        secure_rerip = self._params.secure_rerip_matches
+
+        success = False
+        log_path_str = ""
+        attempt = 0
+        while True:
+            attempt += 1
+            self._reset_pass_progress()
+            outcome = self._rip_once(
+                read_speed=speed, secure_rerip_matches=secure_rerip
+            )
+            if outcome is None:
+                # A hard start/stream error already emitted `error`; stop here.
+                self.finished.emit(False, "")
+                return
+            success, log_path_str = outcome
+            if self._cancelled:
+                break
+            # Did this pass read clean? (No unrecoverable errors in its log.)
+            errors = success and read_errors_present(self._parse_log(log_path_str))
+            self._speed_attempts.append(
+                SpeedAttempt(attempt, speed, secure_rerip, clean=not errors)
+            )
+            # Escalate only in auto_ladder mode, only on a completed-with-errors
+            # pass, and only while the ladder + hard cap allow.
+            if not (auto_ladder and errors) or attempt >= MAX_ATTEMPTS:
+                break
+            step = next_step(current_speed=speed, current_secure_rerip=secure_rerip)
+            if step is None:
+                # Floor + -Z exhausted — stop and leave the disc FLAGGED
+                # (unresolved in the report). Quality never went DOWN.
+                log.warning("read-speed ladder exhausted; disc still has read errors")
+                break
+            speed, secure_rerip = step.speed, step.secure_rerip_matches
+            self.status.emit(f"Read errors — {step.reason}…")
+            self.log_line.emit(f"[read-speed ladder] {step.reason}")
+
+        if success:
+            # Peg both bars at 100% so a finished rip never leaves the
+            # overall bar short of full (the post-rip AccurateRip phase
+            # has no reliable percentage of its own).
+            self.progress.emit(100.0, 100.0)
+        self.finished.emit(success, log_path_str)
+
+    def _rip_once(
+        self, *, read_speed: int, secure_rerip_matches: int
+    ) -> tuple[bool, str] | None:
+        """Run ONE rip pass at the given speed/``-Z``; stream its output.
+
+        Returns ``(success, log_path_str)`` for a completed pass, or None on a
+        hard start/stream error (having already emitted ``error``) so the caller
+        stops the whole rip. Emits log/progress/status/current_track exactly as
+        the single-pass rip always did.
+        """
         try:
             self._handle = self._backend.rip(
                 drive=self._params.drive,
@@ -271,20 +366,19 @@ class RipWorker(QObject):
                 unknown=self._params.unknown,
                 cover_art=self._params.cover_art,
                 max_retries=self._params.max_retries,
-                secure_rerip_matches=self._params.secure_rerip_matches,
+                secure_rerip_matches=secure_rerip_matches,
                 read_offset_override=self._params.read_offset_override,
                 metadata=self._params.metadata,
+                read_speed=read_speed,
             )
         except RipError as exc:
             log.exception("rip failed to start")
             self.error.emit(str(exc))
-            self.finished.emit(False, "")
-            return
+            return None
         except Exception as exc:  # noqa: BLE001 — last-resort guard
             log.exception("unexpected error starting rip")
             self.error.emit(f"unexpected error: {exc}")
-            self.finished.emit(False, "")
-            return
+            return None
 
         # Close the startup-window cancel race: if cancel() arrived while
         # backend.rip() was still spawning the subprocess — before _handle was
@@ -298,10 +392,6 @@ class RipWorker(QObject):
                 self._handle.cancel()
             except Exception:  # noqa: BLE001 — cancel is best-effort
                 log.exception("startup-window cancel() raised; ignored")
-
-        # Stamp the wall-clock start now (subprocess is spawned, reads about to
-        # begin) so the album-ETA computation has a baseline.
-        self._started_monotonic = time.monotonic()
 
         # Stream output. Iteration ends when whipper closes its stdout
         # (i.e. exits) or when cancel() flips the flag.
@@ -366,18 +456,42 @@ class RipWorker(QObject):
         except Exception as exc:  # noqa: BLE001
             log.exception("error reading whipper stdout")
             self.error.emit(f"rip stream error: {exc}")
-            self.finished.emit(False, "")
-            return
+            return None
 
         exit_code = self._handle.wait()
         success = (exit_code == 0) and not self._cancelled
-        if success:
-            # Peg both bars at 100% so a finished rip never leaves the
-            # overall bar short of full (the post-rip AccurateRip phase
-            # has no reliable percentage of its own).
-            self.progress.emit(100.0, 100.0)
         log_path = self._find_log_path()
-        self.finished.emit(success, str(log_path) if log_path else "")
+        return success, str(log_path) if log_path else ""
+
+    def _reset_pass_progress(self) -> None:
+        """Reset the per-pass progress state before a (re-)rip pass, so a re-rip's
+        bar sweeps fresh from 0 instead of inheriting the previous pass's value."""
+        self._overall = 0.0
+        self._current_track = 0
+        self._emitted_track = 0
+        self._last_status = ""
+        self._last_progress_emit = 0.0
+
+    def _parse_log(self, log_path_str: str) -> object | None:
+        """Parse a rip log for the escalation decision. Never raises (parsers
+        don't, and a missing/unreadable file just yields None → 'no errors')."""
+        if not log_path_str:
+            return None
+        from platterpus.parsers.cyanrip_log import (
+            looks_like_cyanrip_log,
+            parse_cyanrip_log,
+        )
+        from platterpus.parsers.rip_log import parse_rip_log
+
+        try:
+            text = Path(log_path_str).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        return (
+            parse_cyanrip_log(text)
+            if looks_like_cyanrip_log(text)
+            else parse_rip_log(text)
+        )
 
     @Slot()
     def cancel(self) -> None:

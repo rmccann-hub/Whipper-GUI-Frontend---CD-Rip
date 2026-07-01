@@ -41,6 +41,38 @@ def test_hand_editing_template_flips_combo_to_custom(qapp: QApplication) -> None
     assert dialog.to_config().track_template == "my/own/%t %n"
 
 
+# --- Read-speed ladder ---------------------------------------------------
+
+
+def test_read_speed_default_is_adaptive_ladder_with_spinner_disabled(
+    qapp: QApplication,
+) -> None:
+    dialog = SettingsDialog(Config())
+    assert dialog._read_speed_mode_combo.currentData() == "auto_ladder"
+    # In adaptive mode the fixed-speed spinner is greyed out.
+    assert dialog._read_speed_spin.isEnabled() is False
+
+
+def test_choosing_fixed_speed_enables_spinner_and_round_trips(
+    qapp: QApplication,
+) -> None:
+    dialog = SettingsDialog(Config())
+    fixed_index = dialog._read_speed_mode_combo.findData("fixed")
+    dialog._read_speed_mode_combo.setCurrentIndex(fixed_index)
+    assert dialog._read_speed_spin.isEnabled() is True
+    dialog._read_speed_spin.setValue(4)
+    out = dialog.to_config()
+    assert out.read_speed_mode == "fixed" and out.read_speed == 4
+
+
+def test_fixed_speed_flips_goal_to_custom(qapp: QApplication) -> None:
+    # Switching off the ladder is a hand-tune → the goal combo shows Custom.
+    dialog = SettingsDialog(Config())
+    fixed_index = dialog._read_speed_mode_combo.findData("fixed")
+    dialog._read_speed_mode_combo.setCurrentIndex(fixed_index)
+    assert dialog._goal_combo.currentData() == GOAL_CUSTOM
+
+
 def test_window_title_and_modality(qapp: QApplication) -> None:
     dialog = SettingsDialog(Config())
     assert dialog.windowTitle() == "Settings"

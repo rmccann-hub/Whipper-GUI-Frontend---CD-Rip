@@ -15,6 +15,7 @@ import time
 from collections.abc import Iterable
 from pathlib import Path
 
+import pytest
 from PySide6.QtWidgets import QApplication
 
 from platterpus.adapters.rip_backend import (
@@ -95,6 +96,7 @@ class _FakeBackend(RipBackend):
         secure_rerip_matches: int = 0,
         read_offset_override: int | None = None,
         metadata=None,
+        read_speed: int = 0,
     ) -> RipHandle:
         self.rip_calls.append(
             {
@@ -107,6 +109,7 @@ class _FakeBackend(RipBackend):
                 "secure_rerip_matches": secure_rerip_matches,
                 "read_offset_override": read_offset_override,
                 "metadata": metadata,
+                "read_speed": read_speed,
             }
         )
         if self._raise_on_rip:
@@ -196,6 +199,82 @@ def test_secure_rerip_param_forwarded_to_backend(
     worker.start_rip()
 
     assert backend.rip_calls[0]["secure_rerip_matches"] == 2
+
+
+# --- Adaptive read-speed ladder -------------------------------------------
+
+
+def test_fixed_speed_mode_is_single_pass_and_forwards_read_speed(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    backend = _FakeBackend(handle=_FakeHandle(lines=[], exit_code=0))
+    worker = RipWorker(
+        backend, _params(tmp_path, read_speed_mode="fixed", read_speed=4)
+    )
+
+    worker.start_rip()
+
+    assert len(backend.rip_calls) == 1  # no ladder in fixed mode
+    assert backend.rip_calls[0]["read_speed"] == 4
+
+
+def test_auto_ladder_clean_disc_is_a_single_pass(
+    qapp: QApplication, tmp_path: Path
+) -> None:
+    # No read errors (the default parse of no-log → no errors) → one pass, at max.
+    backend = _FakeBackend(handle=_FakeHandle(lines=[], exit_code=0))
+    worker = RipWorker(backend, _params(tmp_path, read_speed_mode="auto_ladder"))
+
+    worker.start_rip()
+
+    assert len(backend.rip_calls) == 1
+    assert backend.rip_calls[0]["read_speed"] == 0  # started at the drive's max
+    assert worker.speed_attempts[0].clean is True
+
+
+def test_auto_ladder_re_rips_slower_on_read_errors_then_stops_clean(
+    qapp: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pass with unrecoverable read errors triggers a re-rip a rung slower;
+    once a pass reads clean, the ladder stops."""
+    import platterpus.workers.rip_worker as mod
+
+    backend = _FakeBackend(handle=_FakeHandle(lines=["ripping"], exit_code=0))
+    worker = RipWorker(backend, _params(tmp_path, read_speed_mode="auto_ladder"))
+    # Errors on the first pass, clean on the second.
+    verdicts = iter([True, False])
+    monkeypatch.setattr(mod, "read_errors_present", lambda _log: next(verdicts, False))
+    sigs = _Signals()
+    sigs.attach(worker)
+
+    worker.start_rip()
+
+    assert len(backend.rip_calls) == 2  # re-ripped once
+    assert backend.rip_calls[0]["read_speed"] == 0  # max first
+    assert backend.rip_calls[1]["read_speed"] == 8  # stepped down to 8×
+    attempts = worker.speed_attempts
+    assert [a.clean for a in attempts] == [False, True]
+    assert sigs.finished == [(True, "")]
+
+
+def test_auto_ladder_flags_unresolved_after_exhausting_the_ladder(
+    qapp: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A disc that never reads clean escalates down the whole ladder + -Z, then
+    stops (bounded) and is left FLAGGED as unresolved — quality never went down."""
+    import platterpus.workers.rip_worker as mod
+    from platterpus.read_speed_ladder import MAX_ATTEMPTS, attempts_to_report
+
+    backend = _FakeBackend(handle=_FakeHandle(lines=["ripping"], exit_code=0))
+    worker = RipWorker(backend, _params(tmp_path, read_speed_mode="auto_ladder"))
+    monkeypatch.setattr(mod, "read_errors_present", lambda _log: True)
+
+    worker.start_rip()
+
+    assert len(backend.rip_calls) <= MAX_ATTEMPTS  # bounded, never infinite
+    assert worker.speed_attempts[-1].clean is False
+    report = attempts_to_report(worker.speed_attempts)
+    assert report["unresolved"] is True and report["escalated"] is True
 
 
 def test_cyanrip_progress_lines_drive_bars_and_track(
