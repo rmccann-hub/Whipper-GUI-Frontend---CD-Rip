@@ -11,6 +11,8 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+## [0.4.6] — 2026-07-01
+
 ### Changed
 - **One per-album debug file: the JSON. No more `.platterpus.log` sidecar.**
   The album folder now holds only the audio, the front cover, cyanrip's EAC-style
@@ -1410,7 +1412,8 @@ track's Test CRC matching its Copy CRC and "no errors occurred".
   hardware-bootstrap path has had limited real-world runs.
 - Linux x86-64 only.
 
-[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.2...v0.4.4
 [0.4.2]: https://github.com/rmccann-hub/Platterpus/compare/v0.4.1...v0.4.2
