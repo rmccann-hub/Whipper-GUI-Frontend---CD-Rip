@@ -877,11 +877,10 @@ class RipMixin:
         self._rip_progress.set_ctdb_result(result)  # type: ignore[arg-type]
         verdict = getattr(getattr(result, "verdict", None), "value", "?")
         log.info("CTDB verify verdict: %s", verdict)
-        # Record + re-write so the report includes the CTDB verdict alongside
-        # whatever else has finished.
+        # Record + schedule a (debounced) re-write so the report picks up the
+        # CTDB verdict alongside whatever else has finished.
         self._last_ctdb_result = result
-        if self._last_rip_log is not None and self._last_rip_log_file is not None:
-            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
+        self._schedule_rip_report_write()
 
     def _build_rip_timing(self) -> dict | None:
         """Build the timing dict for the just-finished rip and log it.
@@ -970,11 +969,15 @@ class RipMixin:
 
         Pulls every accumulated post-rip result from ``self`` (CTDB, FLAC-verify,
         transcode, checksums) so the file always reflects whatever has finished
-        so far. It's re-written after each async verify completes; since each
-        write passes *all* results, the final file holds everything regardless of
-        completion order. A small JSON write — safe on the GUI thread (computing
-        the checksums, which is NOT, happens off-thread and is passed in via
-        ``self._last_checksums``). Never raises (write_report swallows OSError).
+        so far. The first write (from ``_on_rip_finished``) calls this directly
+        so the report exists the instant the rip ends; the later async verifies
+        route through ``_schedule_rip_report_write`` so their re-writes coalesce
+        onto the debounce timer instead of serializing the whole JSON per check.
+        Since every write passes *all* results, a coalesced write is never lossy
+        — the final file holds everything regardless of completion order. A small
+        JSON write — safe on the GUI thread (computing the checksums, which is
+        NOT, happens off-thread and is passed in via ``self._last_checksums``).
+        Never raises (write_report swallows OSError).
         """
         from datetime import datetime
 
@@ -996,6 +999,33 @@ class RipMixin:
         # (X.platterpus.log) so it lives WITH the album, not only in the global
         # log.txt — same "other albums excluded" scoping as the JSON's copy.
         rip_report.write_debug_log(log_file, debug_log)
+
+    def _schedule_rip_report_write(self) -> None:
+        """Coalesce a rip-report re-write onto the debounce timer.
+
+        The post-rip async checks (CTDB / FLAC-verify / checksums / transcode)
+        each finish independently and each wants the report refreshed with its
+        result. Instead of every handler serializing the whole JSON itself (up
+        to ~5×/rip), they call this: a single-shot timer (re)armed here writes
+        once when the burst settles. Because every write pulls *all* accumulated
+        results from ``self`` (see ``_write_rip_report``), a coalesced write is
+        never lossy — the file still ends up holding every finished check. A
+        no-op until a rip log exists; flushed on window close so nothing pending
+        is dropped.
+        """
+        if self._last_rip_log is None or self._last_rip_log_file is None:
+            return
+        self._rip_report_timer.start()  # (re)arm; single-shot, so it coalesces
+
+    def _flush_rip_report(self) -> None:
+        """Write any pending debounced rip report immediately (timer slot + close).
+
+        Stops the debounce timer and serializes now, so a queued write is never
+        left unwritten when the window closes mid-verify. Safe to call when
+        nothing is pending (no rip log yet, or the timer already fired)."""
+        self._rip_report_timer.stop()
+        if self._last_rip_log is not None and self._last_rip_log_file is not None:
+            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
 
     # --- Per-file SHA256 digests (embedded in the report) -------------------
 
@@ -1033,8 +1063,7 @@ class RipMixin:
             return
         self._last_checksums = digests
         log.info("SHA256 digests: %d file(s) hashed", len(digests))
-        if self._last_rip_log is not None and self._last_rip_log_file is not None:
-            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
+        self._schedule_rip_report_write()
 
     # --- Post-rip FLAC encode-verify (opt-in, default on) -------------------
 
@@ -1070,11 +1099,10 @@ class RipMixin:
         """
         if not isinstance(result, FlacVerifyResult):
             return
-        # Record + re-write the report so the FLAC-integrity outcome lands in the
-        # one debug file alongside the other checks.
+        # Record + schedule a re-write so the FLAC-integrity outcome lands in the
+        # one debug file alongside the other checks (debounced/coalesced).
         self._last_flac_verify_result = result
-        if self._last_rip_log is not None and self._last_rip_log_file is not None:
-            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
+        self._schedule_rip_report_write()
         if result.error:
             message = f"FLAC verify: skipped — {result.error}"
         elif result.failures:
@@ -1134,10 +1162,10 @@ class RipMixin:
         """
         if not isinstance(result, TranscodeResult):
             return
-        # Record + re-write so the transcode outcome is in the report too.
+        # Record + schedule a (debounced) re-write so the transcode outcome is
+        # in the report too.
         self._last_transcode_result = result
-        if self._last_rip_log is not None and self._last_rip_log_file is not None:
-            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
+        self._schedule_rip_report_write()
         if result.error:
             message = f"Transcode: skipped — {result.error} (FLAC master kept)"
         elif result.failures:

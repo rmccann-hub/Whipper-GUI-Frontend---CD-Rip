@@ -242,6 +242,19 @@ class MainWindow(
         self._repaint_timer: QTimer = QTimer(self)
         self._repaint_timer.setInterval(500)
         self._repaint_timer.timeout.connect(self.update)
+        # Debounce for the JSON rip-report re-writes. The post-rip async checks
+        # (CTDB / FLAC-verify / checksums / transcode) each finish at their own
+        # time and each wants the report re-serialized with its result. Rather
+        # than write the file once per check (up to ~5×/rip), the async handlers
+        # schedule a single coalesced write on this single-shot timer, so a burst
+        # of results that land close together costs one serialization. Flushed
+        # synchronously on window close so a pending write is never lost. (The
+        # very first write, from _on_rip_finished, stays immediate so the report
+        # exists the moment the rip ends.) See main_window_rip._flush_rip_report.
+        self._rip_report_timer: QTimer = QTimer(self)
+        self._rip_report_timer.setSingleShot(True)
+        self._rip_report_timer.setInterval(750)
+        self._rip_report_timer.timeout.connect(self._flush_rip_report)
         # Holds the daemon thread for a manual/auto eject so tests can join it.
         self._eject_thread: threading.Thread | None = None
         # Post-rip cover-art fetch (backend-independent, 2026-06-13): the
@@ -451,6 +464,9 @@ class MainWindow(
         # after the window is gone. This is the "exit = force stop" contract.
         if self._rip_worker is not None:
             self._rip_worker.cancel()
+        # Flush any debounced rip-report write so closing mid-verify never loses
+        # the last result that had been queued for serialization.
+        self._flush_rip_report()
         super().closeEvent(event)  # type: ignore[arg-type]
 
     # --- Menus --------------------------------------------------------------

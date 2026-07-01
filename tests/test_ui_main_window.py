@@ -3130,8 +3130,9 @@ def test_rip_report_accumulates_verify_results_and_checksums(
     teardown_threads, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Each async post-rip result (FLAC verify, checksums, …) arrives separately
-    and re-writes the report; because every write passes ALL accumulated
-    results, the final .platterpus.json holds every one regardless of order."""
+    and schedules a debounced re-write; because every write passes ALL
+    accumulated results, the coalesced .platterpus.json holds every one
+    regardless of order once flushed."""
     import json as _json
 
     from platterpus.adapters.flac_verify import FlacVerifyResult
@@ -3145,15 +3146,53 @@ def test_rip_report_accumulates_verify_results_and_checksums(
     # Skip the session-log machinery — not what this test is about.
     monkeypatch.setattr(window, "_build_rip_debug_log", lambda: None)
 
-    # Arrive out of order: checksums first, then FLAC verify. Each must persist.
+    # Arrive out of order: checksums first, then FLAC verify. Each async result
+    # schedules a coalesced write on the debounce timer; flush it (as window
+    # close does) to serialize the accumulated state now, without a real wait.
     window._on_checksums_done({"01 - A.flac": "deadbeef", "01 - A.mp3": "cafe"})
     window._on_flac_verified(FlacVerifyResult(checked=3))
+    window._flush_rip_report()
 
     report = _json.loads((tmp_path / "Album.platterpus.json").read_text())
     assert report["schema_version"] == 2
     assert report["checksums"] == {"01 - A.flac": "deadbeef", "01 - A.mp3": "cafe"}
     assert report["verification"]["flac_integrity"]["checked"] == 3
     assert report["verification"]["flac_integrity"]["ok"] is True
+
+
+def test_async_rip_report_rewrites_are_debounced_into_one_write(
+    teardown_threads, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A burst of post-rip results (checksums + FLAC-verify + transcode) arms the
+    debounce timer and coalesces to a SINGLE serialization on flush — not one
+    write per result (the old ~5×/rip behaviour)."""
+    from platterpus import rip_report as rr
+    from platterpus.adapters.flac_verify import FlacVerifyResult
+    from platterpus.adapters.transcode import TranscodeResult
+
+    window = teardown_threads()
+    log_file = tmp_path / "Album.log"
+    log_file.write_text("log", encoding="utf-8")
+    window._last_rip_log = RipLog(tracks=())
+    window._last_rip_log_file = log_file
+    window._last_rip_timing = None
+    monkeypatch.setattr(window, "_build_rip_debug_log", lambda: None)
+
+    writes: list[int] = []
+    monkeypatch.setattr(rr, "write_report", lambda *a, **k: writes.append(1))
+    monkeypatch.setattr(rr, "write_debug_log", lambda *a, **k: None)
+
+    window._on_checksums_done({"01 - A.flac": "deadbeef"})
+    window._on_flac_verified(FlacVerifyResult(checked=1))
+    window._on_transcoded(TranscodeResult(transcoded=1))
+
+    # All three coalesced onto the single-shot timer: it's armed, nothing written.
+    assert window._rip_report_timer.isActive()
+    assert writes == []
+    # Flush (what window-close does) → exactly one write for the whole burst.
+    window._flush_rip_report()
+    assert writes == [1]
+    assert not window._rip_report_timer.isActive()
 
 
 def test_successful_rip_starts_checksum_thread(

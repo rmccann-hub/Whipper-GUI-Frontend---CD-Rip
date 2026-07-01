@@ -11,6 +11,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Changed
+- **Rip-report writes are debounced.** The post-rip checks (CTDB, FLAC-verify,
+  checksums, transcode) each finish independently and each wanted the
+  `.platterpus.json` re-serialized with its result — up to ~5 full writes per
+  rip. The initial write (the moment the rip ends) is still immediate, but the
+  async re-writes now coalesce onto a single-shot timer, so a burst of results
+  costs one serialization instead of several. A pending write is flushed on
+  window close so nothing queued is ever lost.
+
 ### Added
 - **Year-only naming token `%Y`.** cyanrip's `%y` expands to the *full* release
   date (e.g. `1995-09-12`) and cyanrip has no year-only token, so the two
