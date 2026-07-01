@@ -145,6 +145,57 @@ def test_debug_section_notes_truncation() -> None:
     assert build_report(_sample_log(), debug_log=debug)["debug"]["truncated"] is True
 
 
+# --- Verification block + checksums (0.4.5, schema v2) -------------------
+
+
+def test_verification_block_present_but_empty_by_default() -> None:
+    report = build_report(_sample_log())
+    assert report["verification"] == {"flac_integrity": None, "transcode": None}
+    assert report["checksums"] is None
+
+
+def test_flac_integrity_result_serialized() -> None:
+    from platterpus.adapters.flac_verify import FlacVerifyResult
+
+    report = build_report(
+        _sample_log(), flac_verify_result=FlacVerifyResult(checked=14)
+    )
+    fi = report["verification"]["flac_integrity"]
+    assert fi["ran"] is True and fi["ok"] is True and fi["checked"] == 14
+    assert fi["failures"] == [] and fi["error"] is None
+
+
+def test_flac_integrity_failure_serialized() -> None:
+    from platterpus.adapters.flac_verify import FlacVerifyResult
+
+    result = FlacVerifyResult(checked=14, failures=(Path("bad.flac"),))
+    fi = build_report(_sample_log(), flac_verify_result=result)["verification"][
+        "flac_integrity"
+    ]
+    assert fi["ok"] is False and fi["failures"] == ["bad.flac"]
+
+
+def test_transcode_result_serialized() -> None:
+    from platterpus.adapters.transcode import TranscodeResult
+
+    report = build_report(
+        _sample_log(), transcode_result=TranscodeResult(transcoded=14)
+    )
+    tc = report["verification"]["transcode"]
+    assert tc["ran"] is True and tc["ok"] is True and tc["transcoded"] == 14
+
+
+def test_checksums_embedded_in_report() -> None:
+    sums = {"01 - A.flac": "abc123", "01 - A.mp3": "def456"}
+    report = build_report(_sample_log(), checksums=sums)
+    assert report["checksums"] == sums
+
+
+def test_schema_version_is_v2() -> None:
+    assert REPORT_SCHEMA_VERSION == 2
+    assert build_report(_sample_log())["schema_version"] == 2
+
+
 def test_debug_section_caps_embedded_lines_and_keeps_most_recent() -> None:
     """A marathon session must not bloat the report (or its on-GUI-thread
     re-serialization): the embedded log is capped to the most-recent lines and

@@ -3126,6 +3126,65 @@ def test_flac_verify_runs_for_non_self_verifying_backend(
     assert calls == [album_dir]  # verified the album folder the rip wrote
 
 
+def test_rip_report_accumulates_verify_results_and_checksums(
+    teardown_threads, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each async post-rip result (FLAC verify, checksums, …) arrives separately
+    and re-writes the report; because every write passes ALL accumulated
+    results, the final .platterpus.json holds every one regardless of order."""
+    import json as _json
+
+    from platterpus.adapters.flac_verify import FlacVerifyResult
+
+    window = teardown_threads()
+    log_file = tmp_path / "Album.log"
+    log_file.write_text("log", encoding="utf-8")
+    window._last_rip_log = RipLog(tracks=())
+    window._last_rip_log_file = log_file
+    window._last_rip_timing = None
+    # Skip the session-log machinery — not what this test is about.
+    monkeypatch.setattr(window, "_build_rip_debug_log", lambda: None)
+
+    # Arrive out of order: checksums first, then FLAC verify. Each must persist.
+    window._on_checksums_done({"01 - A.flac": "deadbeef", "01 - A.mp3": "cafe"})
+    window._on_flac_verified(FlacVerifyResult(checked=3))
+
+    report = _json.loads((tmp_path / "Album.platterpus.json").read_text())
+    assert report["schema_version"] == 2
+    assert report["checksums"] == {"01 - A.flac": "deadbeef", "01 - A.mp3": "cafe"}
+    assert report["verification"]["flac_integrity"]["checked"] == 3
+    assert report["verification"]["flac_integrity"]["ok"] is True
+
+
+def test_successful_rip_starts_checksum_thread(
+    teardown_threads, tmp_path: Path
+) -> None:
+    # Every successful rip fingerprints its files (all formats), off-thread.
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - A.flac").write_bytes(b"audio")
+    log_file = album_dir / "Album.log"
+    log_file.write_text("", encoding="utf-8")
+    window = teardown_threads()
+    window._active_rip_params = _params(tmp_path, unknown=False)
+
+    window._on_rip_finished(True, str(log_file))
+
+    assert window._checksums_thread is not None
+    window._checksums_thread.join(timeout=10)
+    # The digest lands on the GUI thread via the queued checksums_done signal;
+    # pump the event loop so it's delivered before we assert.
+    from PySide6.QtWidgets import QApplication
+
+    for _ in range(50):
+        QApplication.processEvents()
+        if window._last_checksums:
+            break
+    import hashlib
+
+    assert window._last_checksums["01 - A.flac"] == hashlib.sha256(b"audio").hexdigest()
+
+
 def test_on_flac_verified_surfaces_failure_loudly(teardown_threads) -> None:
     """The slot (GUI thread) hijacks the status line for a FAILURE but leaves it
     alone on a clean pass (which only notes the result in the log view)."""

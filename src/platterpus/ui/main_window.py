@@ -118,6 +118,10 @@ class MainWindow(
     # thread) with the TranscodeResult, so the FLAC→MP3/WavPack/WAV transcode
     # outcome renders on the GUI thread.
     transcode_done = Signal(object)
+    # Emitted (from a daemon thread; queued to the GUI thread) with the
+    # {relpath: sha256} digest map, once every audio file (masters + any
+    # derived) has been hashed, so the report's checksums land on the GUI thread.
+    checksums_done = Signal(object)
 
     def __init__(
         self,
@@ -341,6 +345,7 @@ class MainWindow(
         # Transcode outcome (when a non-FLAC output format is selected) lands in
         # the rip log view.
         self.transcode_done.connect(self._on_transcoded)
+        self.checksums_done.connect(self._on_checksums_done)
 
         self.setCentralWidget(central)
 

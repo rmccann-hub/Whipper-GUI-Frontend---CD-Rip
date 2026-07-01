@@ -11,6 +11,15 @@ entries move under a dated `## [X.Y.Z]` heading. (Design decisions live in
 
 ## [Unreleased]
 
+### Added
+- **The `.platterpus.json` is now the single debug record for a rip** — the only
+  files a rip leaves are the EAC-compliant `.log`, the `.cue`, and this one JSON.
+  It now folds in **all** post-rip verification: the CTDB verdict (as before) plus
+  the **FLAC-integrity** decode result and the **transcode** outcome, and a
+  **per-file SHA256** map for long-term integrity checking (bit-rot) — embedded
+  here rather than a separate `checksums.sha256` sidecar. The report is re-written
+  as each async check finishes, so the final file always reflects every one.
+
 ### Changed
 - **Every rip now fully verifies the bit-perfect FLAC master before deriving any
   format.** Verification used to be format-dependent (CTDB only ran under the

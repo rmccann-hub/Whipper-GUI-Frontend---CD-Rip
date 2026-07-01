@@ -78,6 +78,11 @@ log = logging.getLogger(__name__)
 # escalate sooner.
 _FORCE_STOP_COUNTDOWN_MS: int = 5000
 
+# Bound on how long the checksum step waits for in-flight tagging/transcode to
+# settle before hashing (mirrors the CTDB/FLAC-verify settle bound), so a wedged
+# post-rip step can't hang the digest thread forever.
+_CHECKSUM_SETTLE_TIMEOUT_S: float = 120.0
+
 
 class RipMixin:
     """Start/cancel/finish a rip, plus eject, unknown-album, and cover art."""
@@ -163,6 +168,15 @@ class RipMixin:
         self._last_rip_log_file = None
         self._last_rip_timing = None
         self._current_rip_window = None
+        # Async post-rip verification outcomes, accumulated as each finishes.
+        # The report is re-written after each, passing all of them, so the final
+        # .platterpus.json holds every check regardless of completion order — and
+        # a late-finishing verify from THIS rip never carries into the next
+        # (they're reset here at the start of each finish).
+        self._last_ctdb_result = None
+        self._last_flac_verify_result = None
+        self._last_transcode_result = None
+        self._last_checksums = None
         # Allow exactly one auto-heal retry (rip-as-unknown) per Start, so a
         # persistent failure can't loop.
         self._auto_retry_done = False
@@ -567,6 +581,13 @@ class RipMixin:
                 rip_dir = Path(log_path).parent if log_path else params.output_dir
                 self._start_flac_verify(rip_dir, wait_for=post_rip_thread)
 
+            # Per-file SHA256 digests for the report's integrity section. Always
+            # on a successful rip (every format), after the post-rip thread so it
+            # hashes the final masters + any derived files. Off-thread; folded
+            # into the one debug report via checksums_done.
+            rip_dir = Path(log_path).parent if log_path else params.output_dir
+            self._start_checksums(rip_dir, wait_for=post_rip_thread)
+
         # Auto-eject on a clean finish if the user opted in. Only on success —
         # a failed/cancelled rip leaves the disc in so the user can retry, and
         # ejecting mid-failure could fight the force-stop path.
@@ -852,12 +873,11 @@ class RipMixin:
         self._rip_progress.set_ctdb_result(result)  # type: ignore[arg-type]
         verdict = getattr(getattr(result, "verdict", None), "value", "?")
         log.info("CTDB verify verdict: %s", verdict)
-        # Re-write the JSON report now that CTDB has a verdict, so the
-        # machine-readable record includes both verification paths.
+        # Record + re-write so the report includes the CTDB verdict alongside
+        # whatever else has finished.
+        self._last_ctdb_result = result
         if self._last_rip_log is not None and self._last_rip_log_file is not None:
-            self._write_rip_report(
-                self._last_rip_log, self._last_rip_log_file, ctdb_result=result
-            )
+            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
 
     def _build_rip_timing(self) -> dict | None:
         """Build the timing dict for the just-finished rip and log it.
@@ -935,15 +955,16 @@ class RipMixin:
             buffer.lines_excluding(others), truncated=buffer.truncated
         )
 
-    def _write_rip_report(
-        self, rip_log: object, log_file: Path, *, ctdb_result: object | None = None
-    ) -> None:
+    def _write_rip_report(self, rip_log: object, log_file: Path) -> None:
         """Write the JSON rip report beside ``log_file`` (best-effort).
 
-        A small file write — safe on the GUI thread. Never raises (write_report
-        swallows OSError); the report is a nice-to-have, not part of the rip.
-        Carries the timing dict measured at finish (``_last_rip_timing``) so the
-        CTDB re-write preserves the elapsed-vs-estimate record.
+        Pulls every accumulated post-rip result from ``self`` (CTDB, FLAC-verify,
+        transcode, checksums) so the file always reflects whatever has finished
+        so far. It's re-written after each async verify completes; since each
+        write passes *all* results, the final file holds everything regardless of
+        completion order. A small JSON write — safe on the GUI thread (computing
+        the checksums, which is NOT, happens off-thread and is passed in via
+        ``self._last_checksums``). Never raises (write_report swallows OSError).
         """
         from datetime import datetime
 
@@ -952,11 +973,53 @@ class RipMixin:
         rip_report.write_report(
             rip_log,
             log_file,
-            ctdb_result=ctdb_result,
+            ctdb_result=getattr(self, "_last_ctdb_result", None),
+            flac_verify_result=getattr(self, "_last_flac_verify_result", None),
+            transcode_result=getattr(self, "_last_transcode_result", None),
+            checksums=getattr(self, "_last_checksums", None),
             generated_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             timing=self._last_rip_timing,
             debug_log=self._build_rip_debug_log(),
         )
+
+    # --- Per-file SHA256 digests (embedded in the report) -------------------
+
+    def _start_checksums(
+        self, rip_dir: Path, wait_for: threading.Thread | None
+    ) -> None:
+        """Compute a SHA256 for every audio file, on a daemon thread.
+
+        Runs after ``wait_for`` (the post-rip metaflac/transcode thread) so it
+        hashes the FINAL files — the tagged/re-compressed FLAC masters *and* any
+        derived MP3/WavPack/WAV. Hashing does real disk I/O across a whole album,
+        so it must never touch the GUI thread (§3.2); the result is delivered via
+        ``checksums_done`` (queued to the GUI thread), which folds it into the
+        one debug report. Daemon + guarded emit, like the CTDB/FLAC-verify steps.
+        """
+        from platterpus import checksums
+
+        def work() -> None:
+            if wait_for is not None:
+                wait_for.join(timeout=_CHECKSUM_SETTLE_TIMEOUT_S)
+            digests = checksums.compute_digests(rip_dir)
+            try:
+                self.checksums_done.emit(digests)
+            except RuntimeError:  # window already destroyed — nothing to update
+                pass
+
+        log.info("computing SHA256 digests for %s", rip_dir)
+        thread = threading.Thread(target=work, daemon=True)
+        self._checksums_thread = thread
+        thread.start()
+
+    def _on_checksums_done(self, digests: object) -> None:
+        """Digests computed — record + re-write the report (on the GUI thread)."""
+        if not isinstance(digests, dict):
+            return
+        self._last_checksums = digests
+        log.info("SHA256 digests: %d file(s) hashed", len(digests))
+        if self._last_rip_log is not None and self._last_rip_log_file is not None:
+            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
 
     # --- Post-rip FLAC encode-verify (opt-in, default on) -------------------
 
@@ -992,6 +1055,11 @@ class RipMixin:
         """
         if not isinstance(result, FlacVerifyResult):
             return
+        # Record + re-write the report so the FLAC-integrity outcome lands in the
+        # one debug file alongside the other checks.
+        self._last_flac_verify_result = result
+        if self._last_rip_log is not None and self._last_rip_log_file is not None:
+            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
         if result.error:
             message = f"FLAC verify: skipped — {result.error}"
         elif result.failures:
@@ -1051,6 +1119,10 @@ class RipMixin:
         """
         if not isinstance(result, TranscodeResult):
             return
+        # Record + re-write so the transcode outcome is in the report too.
+        self._last_transcode_result = result
+        if self._last_rip_log is not None and self._last_rip_log_file is not None:
+            self._write_rip_report(self._last_rip_log, self._last_rip_log_file)
         if result.error:
             message = f"Transcode: skipped — {result.error} (FLAC master kept)"
         elif result.failures:

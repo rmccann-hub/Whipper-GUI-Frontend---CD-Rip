@@ -27,7 +27,10 @@ from platterpus.verdict import accuraterip_verdict
 log = logging.getLogger(__name__)
 
 # Bump when the JSON shape changes in a way a consumer must notice.
-REPORT_SCHEMA_VERSION: int = 1
+# v2 (0.4.5): added the `verification` block (FLAC-integrity + transcode outcomes
+# beside CTDB) and per-file `checksums` — the maintainer's "one debug file" rule
+# means everything extra lives here, not in extra sidecars.
+REPORT_SCHEMA_VERSION: int = 2
 
 # Cap on how many session-log lines the report embeds. A normal session is a few
 # hundred lines (negligible); but the in-memory buffer is bounded at tens of
@@ -42,6 +45,9 @@ def build_report(
     rip_log: object,
     *,
     ctdb_result: object | None = None,
+    flac_verify_result: object | None = None,
+    transcode_result: object | None = None,
+    checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
     debug_log: dict | None = None,
@@ -50,14 +56,26 @@ def build_report(
 
     ``generated_at`` is supplied by the caller (an ISO-8601 timestamp) so this
     stays pure and deterministic. ``ctdb_result`` is an optional
-    :class:`~platterpus.ctdb.verify.CtdbVerifyResult`. ``timing`` is an optional
-    dict of wall-clock measurements (see :func:`build_timing`). ``debug_log`` is
-    an optional ``{"scope", "truncated", "lines"}`` dict embedding this session's
-    log (see :func:`build_debug_log`) so the report is a self-contained debug
-    record. Never raises.
+    :class:`~platterpus.ctdb.verify.CtdbVerifyResult`. ``flac_verify_result`` is
+    an optional :class:`~platterpus.adapters.flac_verify.FlacVerifyResult` and
+    ``transcode_result`` an optional
+    :class:`~platterpus.adapters.transcode.TranscodeResult` — together they form
+    the report's ``verification`` block alongside CTDB. ``checksums`` is an
+    optional ``{relpath: sha256}`` map (see :mod:`platterpus.checksums`).
+    ``timing`` / ``debug_log`` are as in :func:`build_timing` /
+    :func:`build_debug_log`. Never raises.
     """
     try:
-        return _build(rip_log, ctdb_result, generated_at, timing, debug_log)
+        return _build(
+            rip_log,
+            ctdb_result,
+            generated_at,
+            timing,
+            debug_log,
+            flac_verify_result,
+            transcode_result,
+            checksums,
+        )
     except Exception:  # noqa: BLE001 — a report builder must never crash a rip
         log.exception("rip-report build failed; emitting minimal envelope")
         return {
@@ -132,6 +150,9 @@ def _build(
     generated_at: str,
     timing: dict | None = None,
     debug_log: dict | None = None,
+    flac_verify_result: object | None = None,
+    transcode_result: object | None = None,
+    checksums: dict | None = None,
 ) -> dict:
     message, level = accuraterip_verdict(rip_log)
     info = getattr(rip_log, "ripping_info", None)
@@ -162,6 +183,17 @@ def _build(
         "sha256_hash": getattr(rip_log, "sha256_hash", "") or None,
         "tracks": [_track(t) for t in (getattr(rip_log, "tracks", ()) or ())],
         "ctdb": _ctdb(ctdb_result),
+        # The full post-rip verification suite in one place: AccurateRip lives in
+        # `verdict`/`tracks`, CTDB stays at `ctdb` (back-compat), and this block
+        # adds the FLAC-integrity decode + the transcode outcome so a reader sees
+        # every check the master (and any derived files) passed.
+        "verification": {
+            "flac_integrity": _flac_verify(flac_verify_result),
+            "transcode": _transcode(transcode_result),
+        },
+        # Per-file SHA256 for long-term integrity checking (bit-rot). Embedded
+        # here rather than a separate checksums.sha256 sidecar — one debug file.
+        "checksums": (dict(checksums) if checksums else None),
         # Bulky, so it sits last: the embedded session log that makes this
         # report a self-contained debug record (None when not captured).
         "debug": debug_log,
@@ -209,6 +241,41 @@ def _hex_crc(value: object) -> str | None:
     return None
 
 
+def _flac_verify(result: object | None) -> dict | None:
+    """Serialize a FlacVerifyResult (decode==stored-MD5 test of the masters).
+
+    ``ran`` distinguishes "verified and passed/failed" from "couldn't run"
+    (e.g. the ``flac`` binary is absent); ``failures`` lists any files that
+    failed the decode test. None when no verify was attempted.
+    """
+    if result is None:
+        return None
+    failures = getattr(result, "failures", ()) or ()
+    return {
+        "ran": bool(getattr(result, "ran", False)),
+        "ok": bool(getattr(result, "ok", False)),
+        "checked": getattr(result, "checked", 0),
+        "failures": [str(p) for p in failures],
+        "error": getattr(result, "error", "") or None,
+    }
+
+
+def _transcode(result: object | None) -> dict | None:
+    """Serialize a TranscodeResult (deriving MP3/WavPack/WAV from the master).
+
+    None when the rip was FLAC-only (no transcode happened)."""
+    if result is None:
+        return None
+    failures = getattr(result, "failures", ()) or ()
+    return {
+        "ran": bool(getattr(result, "ran", False)),
+        "ok": bool(getattr(result, "ok", False)),
+        "transcoded": getattr(result, "transcoded", 0),
+        "failures": [str(p) for p in failures],
+        "error": getattr(result, "error", "") or None,
+    }
+
+
 def _ctdb(result: object | None) -> dict | None:
     if result is None:
         return None
@@ -249,6 +316,9 @@ def write_report(
     log_file: Path,
     *,
     ctdb_result: object | None = None,
+    flac_verify_result: object | None = None,
+    transcode_result: object | None = None,
+    checksums: dict | None = None,
     generated_at: str = "",
     timing: dict | None = None,
     debug_log: dict | None = None,
@@ -257,13 +327,17 @@ def write_report(
 
     Returns the path written, or None on any failure (the report is a nice-to-
     have; it must never break the post-rip flow). Writing a small JSON file is
-    cheap, so this is safe to call on the GUI thread.
+    cheap, so this is safe to call on the GUI thread. (Computing ``checksums``
+    is NOT — that's done off-thread by the caller and passed in here.)
     """
     target = report_path_for(log_file)
     try:
         report = build_report(
             rip_log,
             ctdb_result=ctdb_result,
+            flac_verify_result=flac_verify_result,
+            transcode_result=transcode_result,
+            checksums=checksums,
             generated_at=generated_at,
             timing=timing,
             debug_log=debug_log,

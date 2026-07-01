@@ -206,3 +206,63 @@ unreleased value, rough conflict/maintenance estimate). No merging, no commitmen
 it turns "should we consolidate?" into a decision backed by data, and feeds the §6
 checklist. Park the manifest in §6.
 
+## 8. C2 error pointers — drive gap or software gap? (research finding, 2026-07-01)
+
+**Symptom.** On the Pioneer BDR-209D, a cyanrip rip log header reads
+`C2 errors:      unsupported by drive`.
+
+**What C2 buys.** C2 error pointers are per-sample flags the drive derives from
+the CD's CIRC layer, telling the ripper exactly which returned samples it could
+not fully correct. A secure ripper can then do one fast pass and re-read *only*
+the flagged sectors, instead of reading everything 2–3× and comparing for
+consensus. This is why EAC's C2 path runs at "nearly burst mode speed"
+([EAC extraction technology][eac]). C2 is a **speed** optimisation at equal
+accuracy — not an accuracy feature.
+
+**The finding: it is primarily a software gap, with a hardware caveat.**
+- Our whole extraction stack ignores C2. Hydrogenaudio's ripper comparison lists
+  the C2 column as **"No"** for cdparanoia, whipper **and** cyanrip; only EAC,
+  dBpoweramp and XLD use C2 ([comparison][cmp]). cdparanoia has never used C2 —
+  it relies on multi-pass re-reads + jitter/overlap analysis ([cdparanoia][cdp]);
+  the cd-paranoia manpage never mentions C2 ([manpage][man]).
+- cyanrip's line is a *capability report*, not a failed attempt. It prints the
+  libcdio SCSI cap bit verbatim (`src/cyanrip_log.c`):
+  `cyanrip_log(..., "C2 errors:      %s by drive\n", (ctx->rcap & CDIO_DRIVE_CAP_READ_C2_ERRS) ? "supported" : "unsupported");`
+  ([source][src]). Even if the bit were set, libcdio-paranoia would not consume it.
+- Hardware caveat: Pioneer BDR-208/209-class drives appear **not** to advertise
+  C2 even under Windows/EAC (reported "C2 Error Pointers: No") ([dBpoweramp][dbp],
+  [CdrInfo][cdr]). So for *this* drive the "unsupported" report is plausibly
+  accurate — a C2-capable engine likely still couldn't get pointers from it.
+  **Hardware-gated:** confirm with a real BDR-209D probe before acting.
+
+**No mature Linux C2 path exists.** libcdio-paranoia (whipper + cyanrip) doesn't;
+`cdda2wav`/`icedax` can request C2 but isn't a secure/consensus ripper; dBpoweramp
+ships no Linux ripper.
+
+**Options (decision gates).**
+- **(a) Do nothing — recommended.** libcdio-paranoia consensus re-reads +
+  AccurateRip/CTDB external verification already reach provable bit-perfection.
+  C2 would only make it *faster*, not *more correct*. Defensible: our north star
+  is correctness, and AccurateRip verifies independently of any drive flag.
+- **(d) Expose read speed `-S` — cheap partial mitigation.** Not C2, but the real
+  speed lever we don't yet surface. A lower fixed speed cuts read errors → fewer
+  re-read passes → faster net on marginal discs. Low effort; best payoff after (a).
+- **(b) Patch/fork libcdio-paranoia (or cyanrip's read loop) to use C2.** Very high
+  effort — C2 logic belongs in the conservative GPL-3.0 paranoia core; low upstream
+  appetite. **Pointless on the BDR-209D if it exposes no C2.** Hardware-gated.
+- **(c) Swap extraction engine for a C2-using one.** No mature Linux candidate
+  exists. Not viable.
+
+**Recommendation.** Keep **(a)**; add **(d)** as a Settings knob when convenient.
+Treat **(b)/(c)** as parked behind a real-hardware confirmation that the drive
+even exposes C2 — current evidence says it does not, which by itself defeats them
+for this rig. Effort-vs-payoff rank: **(a) > (d) > (b) > (c)**.
+
+[eac]: https://www.exactaudiocopy.de/extraction-technology/
+[cmp]: https://wiki.hydrogenaudio.org/index.php?title=Comparison_of_CD_rippers
+[cdp]: https://wiki.hydrogenaudio.org/index.php?title=Cdparanoia
+[man]: https://manpages.debian.org/unstable/libcdio-utils/cd-paranoia.1.en.html
+[src]: https://github.com/cyanreg/cyanrip/blob/master/src/cyanrip_log.c
+[dbp]: https://forum.dbpoweramp.com/forum/dbpoweramp/cd-ripper/31777-pioneer-bdr-208dbk-ripping-questions
+[cdr]: https://www.cdrinfo.com/d7/content/pioneer-bdr-2207-bdr-207m-bdxl-burner-review?page=1
+

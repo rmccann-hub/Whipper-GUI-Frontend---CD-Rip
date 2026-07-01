@@ -1,50 +1,32 @@
-"""Per-file SHA256 manifest — a long-term integrity record for a rip.
+"""Per-file SHA256 digests — a long-term integrity record for a rip.
 
-The ``.log`` already carries EAC-style CRC32s that prove *bit-perfection at rip
-time*. A SHA256 manifest answers a different question: **has anything changed
-since?** Years later, bit-rot, a bad disk, or a careless re-tag can corrupt a
-file; comparing the files against this manifest (``sha256sum -c
-checksums.sha256``) catches that. It's standard archival practice and complements
-— doesn't replace — the AccurateRip/CTDB rip-time verification.
+The ``.log`` carries EAC-style CRC32s that prove *bit-perfection at rip time*.
+SHA256 digests answer a different question: **has anything changed since?** —
+bit-rot, a bad disk, or a careless re-tag years later. They complement (don't
+replace) the AccurateRip/CTDB rip-time proof.
 
-The manifest lists every audio file beside the FLACs (the FLAC masters *and* any
-derived MP3/WavPack/WAV), in the standard ``<hex>␠␠<relpath>`` format
-``sha256sum`` reads. Pure and never-raises: a hashing/IO error on one file is
-recorded as a comment line rather than aborting the manifest (it backs an
-archival guarantee, not a gate — a partial manifest still protects the files it
-could read).
+Per the maintainer's "one debug file" rule, these digests are **embedded in the
+`.platterpus.json` report**, not written as a separate `checksums.sha256`
+sidecar — the only files a rip leaves are the EAC-compliant ``.log``, the
+``.cue``, and that one JSON. To verify later, a digest can be re-computed with
+:func:`sha256_file` (or the value pasted into any SHA256 checker).
+
+Pure and never-raises: a hashing/IO error on one file is recorded against that
+file rather than aborting — a partial record still protects the files it could
+read.
 """
 
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
 from pathlib import Path
 
 # Audio extensions we fingerprint — the FLAC master plus every format the
 # transcode adapter can derive. Lower-cased; matched case-insensitively.
-_AUDIO_SUFFIXES: frozenset[str] = frozenset(
-    {".flac", ".mp3", ".wav", ".wv", ".m4a"}
-)
-
-# The sidecar filename, in the album folder beside the audio.
-MANIFEST_NAME: str = "checksums.sha256"
+_AUDIO_SUFFIXES: frozenset[str] = frozenset({".flac", ".mp3", ".wav", ".wv", ".m4a"})
 
 # Read files in 1 MiB chunks so a long album never loads a whole track into RAM.
 _CHUNK: int = 1024 * 1024
-
-
-@dataclass(frozen=True)
-class ManifestResult:
-    """Outcome of writing a manifest. `error` is set only on a fatal failure
-    (e.g. the directory couldn't be written); per-file read errors are counted
-    in `failed` and noted as comments in the file, not raised."""
-
-    path: Path | None = None
-    hashed: int = 0
-    failed: int = 0
-    error: str = ""
-    failures: tuple[str, ...] = field(default_factory=tuple)
 
 
 def sha256_file(path: Path) -> str:
@@ -60,55 +42,33 @@ def sha256_file(path: Path) -> str:
 
 
 def audio_files(rip_dir: Path) -> list[Path]:
-    """Every audio file under `rip_dir`, sorted, for a stable manifest order."""
-    return sorted(
-        p
-        for p in rip_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in _AUDIO_SUFFIXES
-    )
-
-
-def write_manifest(rip_dir: Path) -> ManifestResult:
-    """Write ``checksums.sha256`` for every audio file under `rip_dir`.
-
-    Never raises: a per-file read error becomes a ``# <name>: <error>`` comment
-    and increments `failed`; only an inability to enumerate or write the
-    manifest itself yields a result with `error` set. Paths are written relative
-    to `rip_dir` so the manifest is portable (matches ``sha256sum``'s default).
-    """
+    """Every audio file under `rip_dir`, sorted, for a stable digest order."""
     try:
-        files = audio_files(rip_dir)
-    except OSError as exc:
-        return ManifestResult(error=f"could not list {rip_dir}: {exc}")
+        return sorted(
+            p
+            for p in rip_dir.rglob("*")
+            if p.is_file() and p.suffix.lower() in _AUDIO_SUFFIXES
+        )
+    except OSError:
+        # A missing/unreadable directory yields no files rather than raising —
+        # this backs a best-effort report section, never a gate.
+        return []
 
-    lines: list[str] = []
-    hashed = 0
-    failures: list[str] = []
-    for path in files:
+
+def compute_digests(rip_dir: Path) -> dict[str, str]:
+    """Map each audio file (relative POSIX path) to its SHA256, for the report.
+
+    Never raises: a file that can't be read maps to ``"unreadable: <error>"``
+    instead of aborting the whole set. Streams each file, so it's safe on large
+    albums — but it still does real disk I/O, so callers must run it OFF the GUI
+    thread (it's invoked from the post-rip worker, after any transcode, so the
+    derived files are included too).
+    """
+    digests: dict[str, str] = {}
+    for path in audio_files(rip_dir):
         rel = path.relative_to(rip_dir).as_posix()
         try:
-            digest = sha256_file(path)
+            digests[rel] = sha256_file(path)
         except OSError as exc:
-            failures.append(rel)
-            lines.append(f"# {rel}: unreadable ({exc})")
-            continue
-        # Two spaces + filename is the exact format `sha256sum -c` expects.
-        lines.append(f"{digest}  {rel}")
-        hashed += 1
-
-    manifest_path = rip_dir / MANIFEST_NAME
-    try:
-        manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    except OSError as exc:
-        return ManifestResult(
-            error=f"could not write {manifest_path}: {exc}",
-            hashed=hashed,
-            failed=len(failures),
-            failures=tuple(failures),
-        )
-    return ManifestResult(
-        path=manifest_path,
-        hashed=hashed,
-        failed=len(failures),
-        failures=tuple(failures),
-    )
+            digests[rel] = f"unreadable: {exc}"
+    return digests
